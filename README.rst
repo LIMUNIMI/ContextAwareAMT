@@ -8,3 +8,17 @@ end-to-end method.
 
 To make feature-extraction able to generalize over the input context, it should
 be trained over different contexts.
+
+ TODO
+ ----
+
+#. add pedaling to asmd
+#. add pedaling support in dataset building
+#. test dataset building
+#. add pedaling support in the nn
+#. train nn
+#. save model
+#. implement transfer learning
+#. synthesize new dataset for new context
+#. retrain the mapping part
+#. implement demo script
