@@ -33,48 +33,53 @@ def create_scale(duration, silence, velocity, start=0):
     return scale, end + silence
 
 
-notes = []
-start = 1
-N_VELOCITY_LAYERS = 10
-STEP = 127 // N_VELOCITY_LAYERS
-COUNTOUR = (127 % N_VELOCITY_LAYERS) // 2
-for i, v in enumerate(range(COUNTOUR, 127 - COUNTOUR - 1, STEP), start=1):
-    print("Creating velocity layer ", i, ": ", v)
-    # for 20 levels of velocity:
-    new_scale, end = create_scale(0.1, 0, v, start)
-    start = end + 1
-    notes += new_scale
-    new_scale, end = create_scale(0.1, 1, v, start)
-    start = end + 1
-    notes += new_scale
-    new_scale, end = create_scale(0.1, -0.02, v, start)
-    start = end + 1
-    notes += new_scale
-    # new_scale, end = create_scale(0.5, 0, v, start)
-    # start = end + 1
-    # notes += new_scale
-    # new_scale, end = create_scale(0.5, 1, v, start)
-    # start = end + 1
-    # notes += new_scale
-    # new_scale, end = create_scale(0.5, -0.02, v, start)
-    # start = end + 1
-    notes += new_scale
-    new_scale, end = create_scale(1.5, 0, v, start)
-    start = end + 1
-    notes += new_scale
-    new_scale, end = create_scale(1.5, 1, v, start)
-    start = end + 1
-    notes += new_scale
-    new_scale, end = create_scale(1.5, -0.02, v, start)
-    start = end + 1
-    notes += new_scale
+def main():
+    notes = []
+    start = 1
+    N_VELOCITY_LAYERS = 10
+    STEP = 127 // N_VELOCITY_LAYERS
+    COUNTOUR = (127 % N_VELOCITY_LAYERS) // 2
+    for i, v in enumerate(range(COUNTOUR, 127 - COUNTOUR - 1, STEP), start=1):
+        print("Creating velocity layer ", i, ": ", v)
+        # for 20 levels of velocity:
+        new_scale, end = create_scale(0.1, 0, v, start)
+        start = end + 1
+        notes += new_scale
+        new_scale, end = create_scale(0.1, 1, v, start)
+        start = end + 1
+        notes += new_scale
+        new_scale, end = create_scale(0.1, -0.02, v, start)
+        start = end + 1
+        notes += new_scale
+        # new_scale, end = create_scale(0.5, 0, v, start)
+        # start = end + 1
+        # notes += new_scale
+        # new_scale, end = create_scale(0.5, 1, v, start)
+        # start = end + 1
+        # notes += new_scale
+        # new_scale, end = create_scale(0.5, -0.02, v, start)
+        # start = end + 1
+        notes += new_scale
+        new_scale, end = create_scale(1.5, 0, v, start)
+        start = end + 1
+        notes += new_scale
+        new_scale, end = create_scale(1.5, 1, v, start)
+        start = end + 1
+        notes += new_scale
+        new_scale, end = create_scale(1.5, -0.02, v, start)
+        start = end + 1
+        notes += new_scale
 
-h = end // 3600
-m = int((end % 3600) / 60)
-s = (end % 3600) % 60
-print("Total duration: ", h, "hh ", m, "mm ", s, "ss ")
-print("Total number of notes: ", len(notes))
-my_midi = pm.PrettyMIDI(initial_tempo=60)
-my_midi.instruments = [pm.Instrument(0)]
-my_midi.instruments[0].notes = notes
-my_midi.write('to_be_synthesized/scales.mid')
+    h = end // 3600
+    m = int((end % 3600) / 60)
+    s = (end % 3600) % 60
+    print("Total duration: ", h, "hh ", m, "mm ", s, "ss ")
+    print("Total number of notes: ", len(notes))
+    my_midi = pm.PrettyMIDI(initial_tempo=60)
+    my_midi.instruments = [pm.Instrument(0)]
+    my_midi.instruments[0].notes = notes
+    my_midi.write('to_be_synthesized/scales.mid')
+
+
+if __name__ == "__main__":
+    main()

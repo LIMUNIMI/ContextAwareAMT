@@ -5,10 +5,12 @@ from types import SimpleNamespace
 
 import numpy as np
 from tqdm import trange
+
 from asmd import asmd
 
-from .utils import find_start_stop, make_pianoroll, stretch_pianoroll
 from . import settings as s
+from .utils import (find_start_stop, make_pianoroll, spectrogram,
+                    stretch_pianoroll)
 
 
 def NMF(V,
@@ -153,33 +155,19 @@ def NMF(V,
             W *= 1.0 / (s.EPS + normVec)
 
 
-def spectrogram(audio, frames=s.FRAME_SIZE, hop=s.HOP_SIZE):
-
-    import essentia.standard as esst
-    import essentia as es
-    spectrogram = []
-    spec = esst.SpectrumCQ(numberBins=s.BINS,
-                           sampleRate=s.SR,
-                           windowType='hann')
-    for frame in esst.FrameGenerator(audio, frameSize=frames, hopSize=hop):
-        spectrogram.append(spec(frame))
-
-    return es.array(spectrogram).T
-
-
 class NMFTools:
     def __init__(self,
                  initW,
                  minpitch,
                  maxpitch,
                  res=0.001,
-                 sr=s.SR,
                  realign=False,
-                 cost_func='EucDist',
-                 eps_activations=1e-4):
+                 sr=s.SR,
+                 cost_func=s.NMF_COST_FUNC,
+                 eps_activations=s.EPS_ACTIVATIONS):
         self.W = initW
         self.minpitch = minpitch
-        self.maxpitch = maxpitch,
+        self.maxpitch = maxpitch
         self.res = res
         self.sr = sr
         self.realign = realign
@@ -193,10 +181,10 @@ class NMFTools:
         # remove stoping and starting silence in audio
         start, stop = find_start_stop(audio, sample_rate=self.sr)
         audio = audio[start:stop]
-        V = spectrogram(audio)
+        self.V = spectrogram(audio, s.FRAME_SIZE, s.HOP_SIZE, s.SR)
 
         # compute the needed resolution for pianoroll
-        res = len(audio) / self.sr / V.shape[1]
+        res = len(audio) / self.sr / self.V.shape[1]
         self.pr = make_pianoroll(score,
                                  res=res,
                                  basis=s.BASIS,
@@ -212,11 +200,10 @@ class NMFTools:
         self.pr = self.pr[:, start:stop + 1]
 
         # stretch pianoroll
-        self.H = stretch_pianoroll(self.pr, V.shape[1])
-        self.pr = copy(self.H)
+        self.H = stretch_pianoroll(self.pr, self.V.shape[1])
 
         # check shapes
-        assert V.shape == (self.W.shape[0], self.H.shape[1]),\
+        assert self.V.shape == (self.W.shape[0], self.H.shape[1]),\
             "V, W, H shapes are not comparable"
         assert self.H.shape[0] == self.W.shape[1],\
             "W, H have different ranks"
@@ -225,6 +212,7 @@ class NMFTools:
                         self.minpitch * s.BASIS:(self.maxpitch + 1) * s.BASIS]
         self.H = self.H[self.minpitch * s.BASIS:(self.maxpitch + 1) *
                         s.BASIS, :]
+        self.pr = copy(self.H)
         self.H[self.H == 0] = self.eps_activations
 
     def perform_nmf(self, audio, score):
@@ -257,15 +245,19 @@ class NMFTools:
         # score[:, 2] = new_offs
 
     def to3d(self):
-        if self.H.ndim != 3:
+        if self.W.ndim != 3:
             npitch = self.maxpitch - self.minpitch + 1
-            self.H = self.H.reshape(npitch, s.BASIS, -1)
+            if hasattr(self, 'H'):
+                self.H = self.H.reshape(npitch, s.BASIS, -1)
+                self.pr = self.pr.reshape(npitch, s.BASIS, -1)
             self.W = self.W.reshape((-1, npitch, s.BASIS), order='C')
 
     def to2d(self):
-        if self.H.ndim != 2:
+        if self.W.ndim != 2:
             npitch = self.maxpitch - self.minpitch + 1
-            self.H = self.H.reshape(npitch * s.BASIS, -1)
+            if hasattr(self, 'H'):
+                self.H = self.H.reshape(npitch * s.BASIS, -1)
+                self.pr = self.pr.reshape(npitch * s.BASIS, -1)
             self.W = self.W.reshape((-1, npitch * s.BASIS), order='C')
 
     def get_minispecs(self):
@@ -303,14 +295,14 @@ class NMFTools:
 
     def gen_notes_from_H(self):
         self.to3d()
-        summed_pr = self.pr.sum(axis=2)
-        input_onsets = np.argwhere(self.pr[:, :, 0] > 0)
+        summed_pr = self.pr.sum(axis=1)
+        input_onsets = np.argwhere(self.pr[:, 0, :] > 0)
         for note in input_onsets:
             # compute offset
             pitch = note[0]
             offset = -1
             for i in range(note[1], summed_pr.shape[1]):
-                if summed_pr[i] == 0:
+                if summed_pr[note[0], i] == 0:
                     offset = i - 1
                     break
             if offset == -1:
@@ -318,7 +310,7 @@ class NMFTools:
             onset = note[1]
 
             argmax = np.argmax(self.H[int(pitch - self.minpitch), :,
-                                      onset:offset + 1])[1] + onset
+                                      onset:offset + 1]) + onset
             yield pitch, onset, offset, argmax
 
 
@@ -327,35 +319,49 @@ def processing(i, dataset, nmf_tools):
     score = dataset.get_score(i, score_type=['non_aligned'])
     velocities = dataset.get_score(i, score_type=['precise_alignment'])[:, 3]
     nmf_tools.perform_nmf(audio, score)
-    return (nmf_tools.get_minispecs(), velocities.tolist())
+    nmf_tools.to2d()
+    diff_spec = nmf_tools.V - nmf_tools.W @ nmf_tools.H
+    winlen = s.FRAME_SIZE / s.SR
+    hop = s.HOP_SIZE / s.SR
+    pedaling = dataset.get_pedaling(i,
+                                    frame_based=True,
+                                    winlen=winlen,
+                                    hop=hop)
+    return (nmf_tools.get_minispecs(), velocities.tolist(), (diff_spec,
+                                                             pedaling))
 
 
-def create_mini_specs(nmf_tools, mini_spec_path):
+def create_datasets(nmf_tools: NMFTools, mini_spec_path: str,
+                    diff_spec_path: str) -> None:
     """
-    Perform alignment and NMF but not velocity estimation; instead, saves all
-    the mini_specs of each note in the Maestro dataset for successive training
+    Creates datasets and dumps them to file.
+
+    * ``mini_spec_path`` will contain a list of tuples; each tuple contains the
+    mini spectrogram and the corresponding velocities.
+    * ``diff_spec_path`` will contain a list a tuples; each tuple contains the
+    difference between the original and reconstructed spectrogram and the
+    pedaling aligned with the score
+
     """
-    from .maestro_split_indices import maestro_splits
-    train, validation, test = maestro_splits()
-    dataset = asmd.Dataset().filter(datasets=s.NMF_DATASETS)
+    dataset = asmd.Dataset().filter(datasets=s.NMF_DATASETS, groups=['train'])
     random.seed(1750)
-    train = random.sample(train, s.NUM_SONGS_FOR_TRAINING)
-    dataset.paths = np.array(dataset.paths)[train].tolist()
+    dataset.paths = random.sample(dataset.paths, s.NUM_SONGS_FOR_TRAINING)
 
     data = dataset.parallel(processing, nmf_tools, n_jobs=s.NJOBS)
 
-    mini_specs, velocities = [], []
+    mini_specs, diff_specs = [], []
     for d in data:
-        specs, vels = d
+        specs, vels, diff_spec = d
+        diff_specs.append(diff_spec)
         # removing nones
         for i in range(len(specs)):
             spec = specs[i]
             vel = vels[i]
             if spec is not None and vel is not None:
-                mini_specs.append(spec)
-                velocities.append(vel)
+                mini_specs.append((spec, vel))
 
-    pickle.dump((mini_specs, velocities), open(mini_spec_path, 'wb'))
+    pickle.dump(mini_specs, open(mini_spec_path, 'wb'))
+    pickle.dump(diff_specs, open(diff_spec_path, 'wb'))
     print(
-        f"number of (inputs, targets) in training set: {len(mini_specs)}, {len(velocities)}"
+        f"number of (notes, spectrgrams) in training set: {len(mini_specs)}, {len(diff_specs)}"
     )

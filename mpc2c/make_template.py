@@ -4,12 +4,14 @@ import pickle
 import sys
 import plotly.graph_objects as go
 from tqdm import trange
-import settings as s
+from . import settings as s
+from .utils import Spectrometer
+import visdom
 
 
 def main():
     import essentia.standard as esst
-    spec = esst.SpectrumCQ(numberBins=s.BINS, sampleRate=s.SR, windowType='hann')
+    spec = Spectrometer(s.FRAME_SIZE, s.SR)
 
     print("Loading midi")
     notes = pm.PrettyMIDI(midi_file=s.SCALE_PATH[0]).instruments[0].notes
@@ -47,7 +49,7 @@ def main():
                 print("Error: notes timing not correct")
                 print(f"note: {start}, {end}, {len(audio)}")
                 sys.exit(99)
-            spd[:, 0] += spec(frame)
+            spd[:, 0] += spec.apply(frame)
         counter[note.pitch, 0] += s.ATTACK
 
         # other basis except the last one
@@ -78,7 +80,11 @@ def main():
 
     # plot template
     fig = go.Figure(data=go.Heatmap(z=template))
-    fig.show()
+    try:
+        vis = visdom.Visdom()
+        vis.plotlyplot(fig)
+    except:
+        fig.show()
 
     # saving template
     pickle.dump((template, minpitch, maxpitch), open(s.TEMPLATE_PATH, 'wb'))
