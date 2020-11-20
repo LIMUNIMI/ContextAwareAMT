@@ -5,11 +5,10 @@ from types import SimpleNamespace
 
 import numpy as np
 from tqdm import trange
-
-import settings as s
-from asmd import audioscoredataset
+from asmd import asmd
 
 from .utils import find_start_stop, make_pianoroll, stretch_pianoroll
+from . import settings as s
 
 
 def NMF(V,
@@ -229,6 +228,7 @@ class NMFTools:
         self.H[self.H == 0] = self.eps_activations
 
     def perform_nmf(self, audio, score):
+        self.to2d()
         self.initialize(audio, score)
 
         # perform nfm
@@ -256,26 +256,41 @@ class NMFTools:
         # score[:, 1] = new_ons
         # score[:, 2] = new_offs
 
+    def to3d(self):
+        if self.H.ndim != 3:
+            npitch = self.maxpitch - self.minpitch + 1
+            self.H = self.H.reshape(npitch, s.BASIS, -1)
+            self.W = self.W.reshape((-1, npitch, s.BASIS), order='C')
+
+    def to2d(self):
+        if self.H.ndim != 2:
+            npitch = self.maxpitch - self.minpitch + 1
+            self.H = self.H.reshape(npitch * s.BASIS, -1)
+            self.W = self.W.reshape((-1, npitch * s.BASIS), order='C')
+
     def get_minispecs(self):
 
         # use the updated H and W for computing mini-spectrograms
         # and predict velocities
         mini_specs = []
-        npitch = self.maxpitch - self.minpitch + 1
-        H = self.H.reshape(npitch, s.BASIS, -1)
-        W = self.W.reshape((-1, npitch, s.BASIS), order='C')
-        for pitch, onset, offset, argmax in self.gen_notes_from_H(H):
+        self.to3d()
+        for pitch, onset, offset, argmax in self.gen_notes_from_H():
             # select the sorrounding space in H
             start = max(0, argmax - s.MINI_SPEC_SIZE // 2)
-            end = min(start + s.MINI_SPEC_SIZE, H.shape[2])
-
-            if end - start < s.MINI_SPEC_SIZE:
-                mini_specs.append(None)
-                continue
+            end = min(start + s.MINI_SPEC_SIZE, self.H.shape[2])
 
             # compute the mini_spec
-            mini_spec = W[:, int(pitch - self.minpitch), :] @\
-                H[int(pitch - self.minpitch), :, start:end]
+            mini_spec = self.W[:, int(pitch - self.minpitch), :] @\
+                self.H[int(pitch - self.minpitch), :, start:end]
+
+            if mini_spec.shape[1] < s.MINI_SPEC_SIZE:
+                mini_spec = np.pad(mini_spec,
+                                   pad_width=[
+                                       (0,
+                                        s.MINI_SPEC_SIZE - mini_spec.shape[1])
+                                   ],
+                                   mode='constant',
+                                   constant_values=s.PADDING_VALUE)
 
             # normalizing with rms
             # mini_spec /= (mini_spec**2).mean()**0.5
@@ -286,7 +301,8 @@ class NMFTools:
 
         return mini_specs
 
-    def gen_notes_from_H(self, H):
+    def gen_notes_from_H(self):
+        self.to3d()
         summed_pr = self.pr.sum(axis=2)
         input_onsets = np.argwhere(self.pr[:, :, 0] > 0)
         for note in input_onsets:
@@ -294,13 +310,15 @@ class NMFTools:
             pitch = note[0]
             offset = -1
             for i in range(note[1], summed_pr.shape[1]):
-                if summed_pr[i] == 0 or i == summed_pr.shape[1] - 1:
+                if summed_pr[i] == 0:
                     offset = i - 1
                     break
+            if offset == -1:
+                offset = summed_pr.shape[1]
             onset = note[1]
 
-            argmax = np.argmax(H[int(note[0] - self.minpitch), :,
-                                 onset:offset])[1] + onset
+            argmax = np.argmax(self.H[int(pitch - self.minpitch), :,
+                                      onset:offset + 1])[1] + onset
             yield pitch, onset, offset, argmax
 
 
@@ -319,7 +337,7 @@ def create_mini_specs(nmf_tools, mini_spec_path):
     """
     from .maestro_split_indices import maestro_splits
     train, validation, test = maestro_splits()
-    dataset = audioscoredataset.Dataset().filter(datasets=["Maestro"])
+    dataset = asmd.Dataset().filter(datasets=s.NMF_DATASETS)
     random.seed(1750)
     train = random.sample(train, s.NUM_SONGS_FOR_TRAINING)
     dataset.paths = np.array(dataset.paths)[train].tolist()

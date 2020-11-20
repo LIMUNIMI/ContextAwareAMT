@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "mpc2c"
+version = "0.1.0"
+description = ""
+authors = ["Federico Simonetta <federico.simonetta@unimi.it>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+Cython = "^0.29.21"
+numpy = "^1.19.4"
+tqdm = "^4.52.0"
+joblib = "^0.17.0"
+pretty_midi = "^0.2.9"
+essentia = "^2.1b6.dev184"
+
+[tool.poetry.dev-dependencies]
+ipdb = "^0.13.4"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

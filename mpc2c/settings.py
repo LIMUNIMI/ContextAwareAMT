@@ -1,8 +1,10 @@
 # TODO: move to yaml or json
 
 # NMF
+NMF_DATASETS = ["Maestro"]
 EPS = 2.0**-52
 MINI_SPEC_SIZE = 14
+PADDING_VALUE = -1
 DEVICE = 'cuda'
 NJOBS = 5
 NUM_SONGS_FOR_TRAINING = 100
@@ -26,5 +28,3 @@ BASIS_L = 1
 TEMPLATE_PATH = 'nmf_template.pkl'
 
 SCALE_PATH = ['to_be_synthesized/scales.mid', 'audio/pianoteq_scales.mp3']
-
-
