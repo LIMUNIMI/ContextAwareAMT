@@ -5,16 +5,16 @@ NMF_DATASETS = ["Maestro"]
 #: epsilon value used inside the nmf to prevent divisons by 0
 EPS = 2.0**-52
 #: width of mini spectrograms centered around the maximum value
-MINI_SPEC_SIZE = 9
+MINI_SPEC_SIZE = 5
 #: value used for padding mini specs when their width is < MINI_SPEC_SIZE
-PADDING_VALUE = -1
+PADDING_VALUE = -1e-15
 #: cost function used in the NMF
 NMF_COST_FUNC = 'EucDist'
 #: number of jobs used for creating the dataset
 NJOBS = 1
 #: number of songs considered for training
 NUM_SONGS_FOR_TRAINING = 100
-EPS_RANGE = 0.1
+EPS_RANGE = 0
 #: value used for range around activations
 EPS_ACTIVATIONS = 0
 #: percentage of the dataset to use, use it for debugging

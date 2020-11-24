@@ -220,8 +220,9 @@ def make_pianoroll(mat,
         pr[pitch, 0, start:start + attack] = vel
 
         # the eps_range before onset
-        start_eps = max(0, start - eps_range)
-        pr[pitch, 0, start_eps:start] = eps
+        if eps_range > 0:
+            start_eps = max(0, start - eps_range)
+            pr[pitch, 0, start_eps:start] = eps
 
         start += attack
 
@@ -229,7 +230,7 @@ def make_pianoroll(mat,
         END = False
         for b in range(1, basis):
             for k in range(basis_l):
-                t = start + b * basis_l + k
+                t = start + (b - 1) * basis_l + k
                 if t < end:
                     pr[pitch, b, t] = vel
                 else:
@@ -243,8 +244,9 @@ def make_pianoroll(mat,
             if start + (basis - 1) * basis_l < end:
                 pr[pitch, basis - 1, start + (basis - 1) * basis_l:end] = vel
                 # the eps_range after the offset
-                end_eps = min(L, end + eps_range)
-                pr[pitch, basis - 1, end:end_eps] = eps
+                if eps_range > 0:
+                    end_eps = min(L, end + eps_range)
+                    pr[pitch, basis - 1, end:end_eps] = eps
 
     # collapse pitch and basis dimension
     pr = pr.reshape((128 * basis, -1), order='C')

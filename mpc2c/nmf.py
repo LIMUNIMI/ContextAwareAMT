@@ -4,7 +4,6 @@ from copy import copy
 from types import SimpleNamespace
 
 import numpy as np
-from tqdm import trange
 
 from asmd import asmd
 
@@ -20,6 +19,7 @@ def NMF(V,
         num_iter=10,
         params=None,
         cost_func='Music',
+        fixH=False,
         fixW=False):
     """Given a non-negative matrix V, find non-negative templates W and
     activations H that approximate V.
@@ -72,9 +72,14 @@ def NMF(V,
     B : int
         the number of basis for template
     """
-    if not fixW:
-        normVec = W.sum(axis=0)
-        W *= 1.0 / (s.EPS + normVec)
+    # normalize activations
+    W /= W.sum(axis=0)
+
+    # normalize H
+    H /= H.sum()
+
+    # normalize to unit sum
+    V /= V.sum()
 
     # get important params
     K, M = V.shape
@@ -84,10 +89,10 @@ def NMF(V,
         if "Mh" not in params or "Mw" not in params:
             raise RuntimeError("Mh and Mw *MUST* be provided")
         params = {
-            "a1": params.get("a1") or 0,
-            "a2": params.get("a2") or 1e3,
-            "a3": params.get("a3") or 1,
-            "b1": params.get("b1") or 1e2,
+            "a1": params.get("a1") or 10,
+            "a2": params.get("a2") or 10,
+            "a3": params.get("a3") or 0,
+            "b1": params.get("b1") or 0,
             "b2": params.get("b2") or 0,
             "Mh": params["Mh"],
             "Mw": params["Mw"]
@@ -97,11 +102,8 @@ def NMF(V,
     # create helper matrix of all ones
     onesMatrix = np.ones((K, M))
 
-    # normalize to unit sum
-    V /= (s.EPS + V.sum())
-
     # main iterations
-    for iter in trange(L, desc='NMF:'):
+    for iter in range(L):
 
         # compute approximation
         Lambda = s.EPS + W @ H
@@ -112,21 +114,24 @@ def NMF(V,
             if not fixW:
                 W *= (V @ H.T / (Lambda @ H.T + s.EPS))
 
-            H *= (W.T @ V / (W.T @ Lambda + s.EPS))
+            if not fixH:
+                H *= (W.T @ V / (W.T @ Lambda + s.EPS))
 
         elif cost_func == 'KLDiv':
             # Kullback Leibler divergence update rules
             if not fixW:
                 W *= ((V / Lambda) @ H.T) / (onesMatrix @ H.T + s.EPS)
 
-            H *= (W.T @ (V / Lambda)) / (W.T @ onesMatrix + s.EPS)
+            if not fixH:
+                H *= (W.T @ (V / Lambda)) / (W.T @ onesMatrix + s.EPS)
 
         elif cost_func == 'ISDiv':
             # Itakura Saito divergence update rules
             if not fixW:
                 W *= ((Lambda**-2 * V) @ H.T) / ((Lambda**-1) @ H.T + s.EPS)
 
-            H *= (W.T @ (Lambda**-2 * V)) / (W.T @ (Lambda**-1) + s.EPS)
+            if not fixH:
+                H *= (W.T @ (Lambda**-2 * V)) / (W.T @ (Lambda**-1) + s.EPS)
 
         elif cost_func == 'Music':
             # update rules for music score-informed applications
@@ -141,18 +146,21 @@ def NMF(V,
                 W *= numW / (onesMatrix @ H.T + s.EPS + p.b2 +
                              4 * p.b1 * W_indicator)
 
-            numH = W.T @ (V / Lambda) + p.a1 * p.Mh
-            numH[:, B:] += p.a2 * H[:, B:]
-            numH[:, :-B] += H[:, :-B]
-            H *= numH / (W.T @ onesMatrix + s.EPS + p.a1 + p.a3 + 4 * p.a2 * H)
+            if not fixH:
+                numH = W.T @ (V / Lambda) + p.a1 * p.Mh
+                numH[:, B:] += p.a2 * H[:, B:]
+                numH[:, :-B] += H[:, :-B]
+                H *= numH / (W.T @ onesMatrix + s.EPS + p.a1 + p.a3 +
+                             4 * p.a2 * H)
 
         else:
             raise ValueError('Unknown cost function')
 
         # normalize templates to unit sum
-        if not fixW:
-            normVec = W.sum(axis=0)
-            W *= 1.0 / (s.EPS + normVec)
+        W /= W.sum(axis=0)
+
+        # normalize H
+        H /= H.sum()
 
 
 class NMFTools:
@@ -163,8 +171,7 @@ class NMFTools:
                  res=0.001,
                  realign=False,
                  sr=s.SR,
-                 cost_func=s.NMF_COST_FUNC,
-                 eps_activations=s.EPS_ACTIVATIONS):
+                 cost_func=s.NMF_COST_FUNC):
         self.W = initW
         self.minpitch = minpitch
         self.maxpitch = maxpitch
@@ -172,7 +179,6 @@ class NMFTools:
         self.sr = sr
         self.realign = realign
         self.cost_func = cost_func
-        self.eps_activations = eps_activations
 
     def initialize(self, audio, score):
         self.audio = audio
@@ -190,15 +196,15 @@ class NMFTools:
                                  basis=s.BASIS,
                                  velocities=False,
                                  attack=s.ATTACK,
-                                 eps=self.eps_activations,
+                                 eps=s.EPS_ACTIVATIONS,
                                  eps_range=s.EPS_RANGE)
-
         # remove trailing zeros in H
         nonzero_cols = self.pr.any(axis=0).nonzero()[0]
         start = nonzero_cols[0]
         stop = nonzero_cols[-1]
         self.pr = self.pr[:, start:stop + 1]
 
+        print(f"Restretching {self.pr.shape[1] - self.V.shape[1]} cols")
         # stretch pianoroll
         self.H = stretch_pianoroll(self.pr, self.V.shape[1])
 
@@ -213,7 +219,7 @@ class NMFTools:
         self.H = self.H[self.minpitch * s.BASIS:(self.maxpitch + 1) *
                         s.BASIS, :]
         self.pr = copy(self.H)
-        self.H[self.H == 0] = self.eps_activations
+        self.H[self.H == 0] = s.EPS
 
     def perform_nmf(self, audio, score):
         self.to2d()
@@ -225,7 +231,9 @@ class NMFTools:
             self.H,
             B=s.BASIS,
             num_iter=5,
-            cost_func=self.cost_func)
+            cost_func=self.cost_func,
+            fixH=True,
+            fixW=False)
 
         NMF(self.V,
             self.W,
@@ -233,6 +241,7 @@ class NMFTools:
             B=s.BASIS,
             num_iter=5,
             cost_func=self.cost_func,
+            fixH=False,
             fixW=True)
 
     def realign(self, audio, score):
@@ -266,14 +275,20 @@ class NMFTools:
         # and predict velocities
         mini_specs = []
         self.to3d()
-        for pitch, onset, offset, argmax in self.gen_notes_from_H():
+        for pitch, onset, offset in self.gen_notes_from_H():
             # select the sorrounding space in H
-            start = max(0, argmax - s.MINI_SPEC_SIZE // 2)
-            end = min(start + s.MINI_SPEC_SIZE, self.H.shape[2])
+            # start = max(0, argmax - s.MINI_SPEC_SIZE // 2)
+            start = onset
+            end = min(start + s.MINI_SPEC_SIZE, self.H.shape[2], offset + 1)
 
             # compute the mini_spec
             mini_spec = self.W[:, int(pitch - self.minpitch), :] @\
-                self.H[int(pitch - self.minpitch), :, start:end]
+                self.H[pitch, :, start:end]
+
+            # normalizing with rms
+            # mini_spec /= (mini_spec**2).mean()**0.5
+            # normalizing to the sum
+            mini_spec /= mini_spec.sum()
 
             if mini_spec.shape[1] < s.MINI_SPEC_SIZE:
                 mini_spec = np.pad(mini_spec,
@@ -283,11 +298,6 @@ class NMFTools:
                                    ],
                                    mode='constant',
                                    constant_values=s.PADDING_VALUE)
-
-            # normalizing with rms
-            # mini_spec /= (mini_spec**2).mean()**0.5
-            # normalizing to the sum
-            mini_spec /= mini_spec.sum()
 
             mini_specs.append(mini_spec)
 
@@ -299,7 +309,7 @@ class NMFTools:
         input_onsets = np.argwhere(self.pr[:, 0, :] > 0)
         for note in input_onsets:
             # compute offset
-            pitch = note[0]
+            pitch, onset = note
             offset = -1
             for i in range(note[1], summed_pr.shape[1]):
                 if summed_pr[note[0], i] == 0:
@@ -307,17 +317,17 @@ class NMFTools:
                     break
             if offset == -1:
                 offset = summed_pr.shape[1]
-            onset = note[1]
 
-            argmax = np.argmax(self.H[int(pitch - self.minpitch), :,
-                                      onset:offset + 1]) + onset
-            yield pitch, onset, offset, argmax
+            # argmax = np.argmax(self.H[pitch, :, onset:offset + 1]) + onset
+            yield pitch, onset, offset
 
 
-def processing(i, dataset, nmf_tools):
+def processing(i, dataset, nmf_params):
+    __import__('ipdb').set_trace()
     audio, sr = dataset.get_mix(i, sr=s.SR)
     score = dataset.get_score(i, score_type=['non_aligned'])
     velocities = dataset.get_score(i, score_type=['precise_alignment'])[:, 3]
+    nmf_tools = NMFTools(*nmf_params)
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
     diff_spec = nmf_tools.V - nmf_tools.W @ nmf_tools.H
@@ -326,12 +336,12 @@ def processing(i, dataset, nmf_tools):
     pedaling = dataset.get_pedaling(i,
                                     frame_based=True,
                                     winlen=winlen,
-                                    hop=hop)
+                                    hop=hop)[0]
     return (nmf_tools.get_minispecs(), velocities.tolist(), (diff_spec,
                                                              pedaling))
 
 
-def create_datasets(nmf_tools: NMFTools, mini_spec_path: str,
+def create_datasets(nmf_params, mini_spec_path: str,
                     diff_spec_path: str) -> None:
     """
     Creates datasets and dumps them to file.
@@ -347,7 +357,7 @@ def create_datasets(nmf_tools: NMFTools, mini_spec_path: str,
     random.seed(1750)
     dataset.paths = random.sample(dataset.paths, s.NUM_SONGS_FOR_TRAINING)
 
-    data = dataset.parallel(processing, nmf_tools, n_jobs=s.NJOBS)
+    data = dataset.parallel(processing, nmf_params, n_jobs=s.NJOBS)
 
     mini_specs, diff_specs = [], []
     for d in data:

@@ -40,9 +40,8 @@ def main():
     if args.datasets:
         from mpc2c import nmf
         import pickle
-        template = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
-        nmf_tools = nmf.NMFTools(*template)
-        nmf.create_datasets(nmf_tools, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH)
+        nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
+        nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH)
 
 
 if __name__ == "__main__":
