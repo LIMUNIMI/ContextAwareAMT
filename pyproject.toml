@@ -6,7 +6,7 @@ authors = ["Federico Simonetta <federico.simonetta@unimi.it>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.6.9"
 Cython = "^0.29.21"
 numpy = "^1.19.4"
 tqdm = "^4.52.0"
@@ -15,6 +15,7 @@ pretty_midi = "^0.2.9"
 essentia = "^2.1b6.dev184"
 visdom = "^0.1.8"
 plotly = "^4.12.0"
+torch = "^1.7.0"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.4"

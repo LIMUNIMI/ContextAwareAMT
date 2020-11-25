@@ -1,7 +1,5 @@
 # NMF
 
-#: datasets used for training the model
-NMF_DATASETS = ["Maestro"]
 #: epsilon value used inside the nmf to prevent divisons by 0
 EPS = 2.0**-52
 #: width of mini spectrograms centered around the maximum value
@@ -23,9 +21,15 @@ DATASET_LEN = 1
 # NN
 DEVICE = 'cuda'
 EPOCHS = 500
-BATCH_SIZE = 400
+BATCH_SIZE = 1
 EARLY_STOP = 10
 BRANCHES = 16
+LR_VELOCITY = 1
+LR_PEDALING = 1
+KERNEL = 3
+STRIDE = 2
+DILATION = 5
+PLOT_LOSSES = True
 
 # MAKE_TEMPLATE
 #: how many basis use in total
@@ -42,6 +46,8 @@ BASIS_L = 1
 SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
+#: datasets used for training the model
+DATASETS = ["Maestro"]
 
 # PATHS
 TEMPLATE_PATH = 'nmf_template.pkl'
@@ -52,3 +58,6 @@ SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
 #: same length; just use "pad" for Maestro
 preprocessing = "pad"
+
+#: use the following for debugging
+BUILD = True

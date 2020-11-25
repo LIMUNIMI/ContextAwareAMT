@@ -273,11 +273,10 @@ class NMFTools:
                 self.pr = self.pr.reshape(npitch * s.BASIS, -1)
             self.W = self.W.reshape((-1, npitch * s.BASIS), order='C')
 
-    def get_minispecs(self):
+    def generate_minispecs(self):
 
         # use the updated H and W for computing mini-spectrograms
         # and predict velocities
-        mini_specs = []
         self.to3d()
         for pitch, onset, offset in self.gen_notes_from_H():
             # select the sorrounding space in H
@@ -303,9 +302,13 @@ class NMFTools:
                                    mode='constant',
                                    constant_values=s.PADDING_VALUE)
 
-            mini_specs.append(mini_spec)
+            yield mini_spec
 
-        return mini_specs
+    def get_minispecs(self):
+        mini_specs = []
+        for mini_spec in self.generate_minispecs():
+            mini_specs.append(mini_spec)
+        return np.array(mini_specs)
 
     def gen_notes_from_H(self):
         self.to3d()
@@ -362,7 +365,7 @@ def create_datasets(nmf_params, mini_spec_path: str,
     pedaling aligned with the score
 
     """
-    dataset = asmd.Dataset().filter(datasets=s.NMF_DATASETS, groups=[group])
+    dataset = asmd.Dataset().filter(datasets=s.DATASETS, groups=[group])
     random.seed(1750)
     # dataset.paths = random.sample(dataset.paths, s.NUM_SONGS_FOR_TRAINING)
 

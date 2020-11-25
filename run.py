@@ -7,7 +7,8 @@ from Cython.Build import Cythonize
 
 from mpc2c import settings as s
 
-Cythonize.main(["mpc2c/**.py", "-3", "--inplace"])
+if s.BUILD:
+    Cythonize.main(["mpc2c/**.py", "-3", "--inplace"])
 
 
 def parse_args():
@@ -25,6 +26,12 @@ def parse_args():
     parser.add_argument("--datasets",
                         action="store_true",
                         help="Create the datasets using NMF.")
+    parser.add_argument("--train-velocity",
+                        action="store_true",
+                        help="Train the neural network for velocity estimation.")
+    parser.add_argument("--train-pedaling",
+                        action="store_true",
+                        help="Train the neural network for pedaling estimation.")
     return parser.parse_args()
 
 
@@ -44,6 +51,17 @@ def main():
                             "train")
         nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
                             "valid")
+    if args.train_pedaling:
+        from mpc2c import training
+        import pickle
+        nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
+        training.train_pedaling(nmf_params)
+
+    if args.train_velocity:
+        from mpc2c import training
+        import pickle
+        nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
+        training.train_velocity(nmf_params)
 
 
 if __name__ == "__main__":
