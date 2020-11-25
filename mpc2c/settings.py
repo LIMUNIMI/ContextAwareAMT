@@ -11,9 +11,9 @@ PADDING_VALUE = -1e-15
 #: cost function used in the NMF
 NMF_COST_FUNC = 'EucDist'
 #: number of jobs used for creating the dataset
-NJOBS = 1
+NJOBS = 10
 #: number of songs considered for training
-NUM_SONGS_FOR_TRAINING = 100
+NUM_SONGS_FOR_TRAINING = 1000
 EPS_RANGE = 0
 #: value used for range around activations
 EPS_ACTIVATIONS = 0
@@ -45,6 +45,10 @@ HOP_SIZE = 512
 
 # PATHS
 TEMPLATE_PATH = 'nmf_template.pkl'
-MINI_SPEC_PATH = 'mini_spec.pkl'
-DIFF_SPEC_PATH = 'diff_spec.pkl'
+MINI_SPEC_PATH = 'mini_spec.pkl.gz'
+DIFF_SPEC_PATH = 'diff_spec.pkl.gz'
 SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
+
+#: on of "pad" or "stretch": the strategy used to have midi and audio with the
+#: same length; just use "pad" for Maestro
+preprocessing = "pad"

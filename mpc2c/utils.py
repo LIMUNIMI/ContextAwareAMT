@@ -60,6 +60,27 @@ def spectrogram(audio, frame_size, hop, sr, log=True, binsPerSemitone=3):
     return es.array(chromas).T
 
 
+def pad(arr1, arr2):
+    """
+    Pad 2 2d-arrays so that they have the same length over axis 1.
+    Useful for spectrograms, pianorolls, etc.
+    Returns the inputs enlarged in same order as the input
+    """
+    # chose the shortest one
+    if arr1.shape[1] < arr2.shape[1]:
+        shortest, longest = arr1, arr2
+    else:
+        shortest, longest = arr2, arr1
+    pad = longest.shape[1] - shortest.shape[1]
+    shortest = np.pad(shortest, ((0, 0), (0, pad)),
+                      mode='constant',
+                      constant_values=0)
+    if arr1.shape[1] < arr2.shape[1]:
+        return shortest, longest
+    else:
+        return longest, shortest
+
+
 def midi_pitch_to_f0(midi_pitch):
     """
     Return a frequency given a midi pitch

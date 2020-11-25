@@ -1,12 +1,13 @@
 # from mpc2c import nmf
 import argparse
-from mpc2c import settings as s
 
 # from cylang import cylang
 # cylang.compile()
-# from Cython.Build import Cythonize
+from Cython.Build import Cythonize
 
-# Cythonize.main(["mpc2c/**.py", "-3", "--inplace"])
+from mpc2c import settings as s
+
+Cythonize.main(["mpc2c/**.py", "-3", "--inplace"])
 
 
 def parse_args():
@@ -21,11 +22,9 @@ def parse_args():
         action="store_true",
         help="Create the midi file that must be synthesized for creating the template."
     )
-    parser.add_argument(
-        "--datasets",
-        action="store_true",
-        help="Create the datasets using NMF."
-    )
+    parser.add_argument("--datasets",
+                        action="store_true",
+                        help="Create the datasets using NMF.")
     return parser.parse_args()
 
 
@@ -41,7 +40,10 @@ def main():
         from mpc2c import nmf
         import pickle
         nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
-        nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH)
+        nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
+                            "train")
+        nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
+                            "valid")
 
 
 if __name__ == "__main__":

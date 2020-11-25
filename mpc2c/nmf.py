@@ -1,3 +1,4 @@
+import gzip
 import pickle
 import random
 from copy import copy
@@ -8,7 +9,7 @@ import numpy as np
 from asmd import asmd
 
 from . import settings as s
-from .utils import (find_start_stop, make_pianoroll, spectrogram,
+from .utils import (find_start_stop, make_pianoroll, pad, spectrogram,
                     stretch_pianoroll)
 
 
@@ -191,22 +192,25 @@ class NMFTools:
 
         # compute the needed resolution for pianoroll
         res = len(audio) / self.sr / self.V.shape[1]
-        self.pr = make_pianoroll(score,
-                                 res=res,
-                                 basis=s.BASIS,
-                                 velocities=False,
-                                 attack=s.ATTACK,
-                                 eps=s.EPS_ACTIVATIONS,
-                                 eps_range=s.EPS_RANGE)
-        # remove trailing zeros in H
-        nonzero_cols = self.pr.any(axis=0).nonzero()[0]
-        start = nonzero_cols[0]
-        stop = nonzero_cols[-1]
-        self.pr = self.pr[:, start:stop + 1]
+        self.H = make_pianoroll(score,
+                                res=res,
+                                basis=s.BASIS,
+                                velocities=False,
+                                attack=s.ATTACK,
+                                eps=s.EPS_ACTIVATIONS,
+                                eps_range=s.EPS_RANGE)
 
-        print(f"Restretching {self.pr.shape[1] - self.V.shape[1]} cols")
-        # stretch pianoroll
-        self.H = stretch_pianoroll(self.pr, self.V.shape[1])
+        if s.preprocessing == "stretch":
+            # remove trailing zeros in H
+            nonzero_cols = self.pr.any(axis=0).nonzero()[0]
+            start = nonzero_cols[0]
+            stop = nonzero_cols[-1]
+            self.H = self.H[:, start:stop + 1]
+
+            # stretch pianoroll
+            self.H = stretch_pianoroll(self.H, self.V.shape[1])
+        elif s.preprocessing == "pad":
+            self.V, self.H = pad(self.V, self.H)
 
         # check shapes
         assert self.V.shape == (self.W.shape[0], self.H.shape[1]),\
@@ -323,13 +327,16 @@ class NMFTools:
 
 
 def processing(i, dataset, nmf_params):
-    __import__('ipdb').set_trace()
     audio, sr = dataset.get_mix(i, sr=s.SR)
     score = dataset.get_score(i, score_type=['non_aligned'])
+
+    # computing velocities and minspecs
     velocities = dataset.get_score(i, score_type=['precise_alignment'])[:, 3]
     nmf_tools = NMFTools(*nmf_params)
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
+
+    # computing diff spec and pedaling
     diff_spec = nmf_tools.V - nmf_tools.W @ nmf_tools.H
     winlen = s.FRAME_SIZE / s.SR
     hop = s.HOP_SIZE / s.SR
@@ -337,12 +344,14 @@ def processing(i, dataset, nmf_params):
                                     frame_based=True,
                                     winlen=winlen,
                                     hop=hop)[0]
+    # padding so that pedaling and diff_spec have the same length
+    pedaling, diff_spec = pad(pedaling.T, diff_spec)
     return (nmf_tools.get_minispecs(), velocities.tolist(), (diff_spec,
                                                              pedaling))
 
 
 def create_datasets(nmf_params, mini_spec_path: str,
-                    diff_spec_path: str) -> None:
+                    diff_spec_path: str, group: str) -> None:
     """
     Creates datasets and dumps them to file.
 
@@ -353,11 +362,15 @@ def create_datasets(nmf_params, mini_spec_path: str,
     pedaling aligned with the score
 
     """
-    dataset = asmd.Dataset().filter(datasets=s.NMF_DATASETS, groups=['train'])
+    dataset = asmd.Dataset().filter(datasets=s.NMF_DATASETS, groups=[group])
     random.seed(1750)
-    dataset.paths = random.sample(dataset.paths, s.NUM_SONGS_FOR_TRAINING)
+    # dataset.paths = random.sample(dataset.paths, s.NUM_SONGS_FOR_TRAINING)
 
-    data = dataset.parallel(processing, nmf_params, n_jobs=s.NJOBS)
+    # max_nbytes=None disable shared memory for large arrays
+    data = dataset.parallel(processing,
+                            nmf_params,
+                            n_jobs=s.NJOBS,
+                            max_nbytes=None)
 
     mini_specs, diff_specs = [], []
     for d in data:
@@ -370,8 +383,10 @@ def create_datasets(nmf_params, mini_spec_path: str,
             if spec is not None and vel is not None:
                 mini_specs.append((spec, vel))
 
-    pickle.dump(mini_specs, open(mini_spec_path, 'wb'))
-    pickle.dump(diff_specs, open(diff_spec_path, 'wb'))
+    pickle.dump(mini_specs,
+                gzip.open(group + "_" + mini_spec_path, 'wb'))  # type: ignore
+    pickle.dump(diff_specs,
+                gzip.open(group + "_" + diff_spec_path, 'wb'))  # type: ignore
     print(
         f"number of (notes, spectrgrams) in training set: {len(mini_specs)}, {len(diff_specs)}"
     )
