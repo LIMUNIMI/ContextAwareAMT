@@ -1,8 +1,9 @@
 import torch
 import torch.nn.functional as F
-from asmd import asmd
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset as TorchDataset
+
+from asmd import asmd
 
 from . import nmf
 from . import settings as s
@@ -55,7 +56,7 @@ class VelocityDataset(TorchDataset, asmd.Dataset):
         self.nmf_tools.to2d()
         velocities = self.get_score(i, score_type=['precise_alignment'])[:, 3]
         minispecs = self.nmf_tools.get_minispecs()
-        return torch.from_numpy(minispecs), torch.from_numpy(velocities)
+        return torch.from_numpy(minispecs), torch.from_numpy(velocities)#, torch.tensor(False)
         # return next(self.generator)
 
     def generate_data(self):
@@ -77,10 +78,10 @@ def pad_collate(batch):
     yy = list(yy)
     lens = [x.shape[-1] for x in xx]
 
-    max1 = max([i for i, j in lens])
+    m = max(lens)
     with torch.no_grad():
         for i in range(len(xx)):
-            pad = max1 - xx[i].shape[-1]
+            pad = m - xx[i].shape[-1]
             xx[i] = F.pad(xx[i], (0, 0, 0, pad), 'constant', 0)
             yy[i] = F.pad(yy[i], (0, 0, 0, pad), 'constant', 0)
     x_pad = torch.stack(xx)
@@ -88,21 +89,21 @@ def pad_collate(batch):
 
     return x_pad, y_pad, lens
 
+
 def reshape_collate(batch):
     xx, yy = zip(*batch)
-    return xx.transpose(0, 1), yy.transpose(0, 1)
+    return xx[0], yy[0], None
 
 
 def get_loader(groups, nmf_params, mode):
     if mode == 'velocity':
-        return DataLoader(VelocityDataset(nmf_params,
-                                          datasets=s.DATASETS,
-                                          groups=groups),
-                          batch_size=1,
-                          # batch_size=s.BATCH_SIZE,
-                          num_workers=s.NJOBS,
-                          pin_memory=True,
-                          collate_fn=reshape_collate)
+        return DataLoader(
+            VelocityDataset(nmf_params, datasets=s.DATASETS, groups=groups),
+            batch_size=1,
+            # batch_size=s.BATCH_SIZE,
+            num_workers=s.NJOBS,
+            pin_memory=True,
+            collate_fn=reshape_collate)
     elif mode == 'pedaling':
         return DataLoader(PedalingDataset(nmf_params,
                                           datasets=s.DATASETS,

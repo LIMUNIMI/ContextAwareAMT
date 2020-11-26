@@ -296,12 +296,15 @@ class NMFTools:
             if mini_spec.shape[1] < s.MINI_SPEC_SIZE:
                 mini_spec = np.pad(mini_spec,
                                    pad_width=[
+                                       (0, 0),
                                        (0,
                                         s.MINI_SPEC_SIZE - mini_spec.shape[1])
                                    ],
                                    mode='constant',
                                    constant_values=s.PADDING_VALUE)
 
+            if mini_spec.shape != (256, 5):
+                print(mini_spec.shape)
             yield mini_spec
 
     def get_minispecs(self):
@@ -353,8 +356,8 @@ def processing(i, dataset, nmf_params):
                                                              pedaling))
 
 
-def create_datasets(nmf_params, mini_spec_path: str,
-                    diff_spec_path: str, group: str) -> None:
+def create_datasets(nmf_params, mini_spec_path: str, diff_spec_path: str,
+                    group: str) -> None:
     """
     Creates datasets and dumps them to file.
 
@@ -386,10 +389,14 @@ def create_datasets(nmf_params, mini_spec_path: str,
             if spec is not None and vel is not None:
                 mini_specs.append((spec, vel))
 
-    pickle.dump(mini_specs,
-                gzip.open(group + "_" + mini_spec_path, 'wb'))  # type: ignore
-    pickle.dump(diff_specs,
-                gzip.open(group + "_" + diff_spec_path, 'wb'))  # type: ignore
+    pickle.dump(
+        mini_specs,
+        gzip.open(  # type: ignore
+            group + "_" + mini_spec_path, 'wb'))
+    pickle.dump(
+        diff_specs,
+        gzip.open(  # type: ignore
+            group + "_" + diff_spec_path, 'wb'))
     print(
         f"number of (notes, spectrgrams) in training set: {len(mini_specs)}, {len(diff_specs)}"
     )

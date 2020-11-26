@@ -5,19 +5,21 @@ from . import settings as s
 
 
 def conv_output_size(size):
-    return int((size - s.DILATION * (s.KERNEL - 1) / s.STRIDE) + 1)
+    return int((size - s.DILATION * (s.KERNEL - 1)) / s.STRIDE)
 
 
 class MIDIParameterEstimation(nn.Module):
-    def __init__(self, input_size, output_features):
+    def __init__(self, input_features, output_features):
         """
-        Size of the inputs are expected to be 3d: (batch, 1, input_size,
+        Size of the inputs are expected to be 3d: (batch, input_features,
         frames).  Convolutional kernels are applied frame-wise so that the
-        input_size is reduced to one and the returned tensor has shape (batch,
-        output_features, frames).
+        input_features is reduced to one and the returned tensor has shape (batch,
+        output_features, frames), where each output feature corresponds to a
+        channel of the output of the stack
 
         """
         super().__init__()
+        input_size = input_features
         # add one block to introduce the needed number of features
         next_input_size = conv_output_size(input_size)
         input_features = 1
@@ -28,6 +30,7 @@ class MIDIParameterEstimation(nn.Module):
                           output_features,
                           kernel_size=(s.KERNEL, 1),
                           stride=(s.STRIDE, 1),
+                          padding=0,
                           dilation=(s.DILATION, 1)),
                 nn.BatchNorm2d(output_features),
                 nn.ReLU()
@@ -46,6 +49,7 @@ class MIDIParameterEstimation(nn.Module):
                           kernel_size=(s.KERNEL, 1),
                           stride=(s.STRIDE, 1),
                           dilation=(s.DILATION, 1),
+                          padding=0,
                           groups=input_features),
                 nn.BatchNorm2d(output_features),
                 nn.ReLU()
@@ -60,6 +64,7 @@ class MIDIParameterEstimation(nn.Module):
                           kernel_size=(input_size, 1),
                           stride=1,
                           dilation=1,
+                          padding=0,
                           groups=input_features),
                 nn.BatchNorm2d(output_features),
                 nn.ReLU()
@@ -70,17 +75,33 @@ class MIDIParameterEstimation(nn.Module):
               sum([p.numel() for p in self.parameters() if p.requires_grad]))
 
     def forward(self, x):
-        # we need to remove the height dimension and put features along the
-        # channels
-        ret = self.stack(x)[:, :, 0]
+        """
+        Arguments
+        ---------
+
+        inp : torch.tensor
+            shape (batch, in_features, frames)
+
+        Returns
+        -------
+
+        torch.tensor
+            shape (batch, out_features, frames)
+        """
+        # unsqueeze the channels dimension
+        x = x.unsqueeze(1)
+        # apply the stack
+        x = self.stack(x)
+        # remove the height
+        x = x[..., 0, :]
         # normalize to 1
         # TODO
-        return ret / ret.max()
+        return x / x.max()
 
 
 class MIDIVelocityEstimation(MIDIParameterEstimation):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, input_features):
+        super().__init__(input_features, 1)
 
     def forward(self, x):
         """
@@ -88,9 +109,16 @@ class MIDIVelocityEstimation(MIDIParameterEstimation):
         ---------
 
         inp : torch.tensor
-            shape (batch, 1, frames)
+            shape (batch, in_features, frames)
+
+        Returns
+        -------
+
+        torch.tensor
+            shape (batch,)
         """
-        return torch.max(super().forward[:, 0], dim=-1)
+        # TODO: a linear layer
+        return torch.max(super().forward(x)[:, 0], dim=-1)[0]
 
 
 def init_weights(m, initializer):

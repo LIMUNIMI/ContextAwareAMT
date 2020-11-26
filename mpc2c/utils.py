@@ -57,7 +57,8 @@ def spectrogram(audio, frame_size, hop, sr, log=True, binsPerSemitone=3):
                                      startFromZero=True):
         chromas.append(spectrometer.apply(frame))
 
-    return es.array(chromas).T
+    spec = es.array(chromas).T
+    return spec
 
 
 def pad(arr1, arr2):

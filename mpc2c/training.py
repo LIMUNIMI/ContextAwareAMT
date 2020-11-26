@@ -1,10 +1,9 @@
 from time import time
 
 import numpy as np
-from tqdm import tqdm
-
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from . import data_management, feature_extraction, plotting
 from . import settings as s
@@ -13,14 +12,16 @@ from . import settings as s
 def train_pedaling(nmf_params):
     trainloader = data_management.get_loader(['train'], nmf_params, 'pedaling')
     validloader = data_management.get_loader(['valid'], nmf_params, 'pedaling')
-    model = feature_extraction.MIDIParameterEstimation(s.BINS, 3).to(s.DEVICE)
+    model = feature_extraction.MIDIParameterEstimation(s.BINS, 3).to(
+        s.DEVICE).to(s.DTYPE)
     train(trainloader, validloader, model)
 
 
 def train_velocity(nmf_params):
     trainloader = data_management.get_loader(['train'], nmf_params, 'velocity')
     validloader = data_management.get_loader(['valid'], nmf_params, 'velocity')
-    model = feature_extraction.MIDIVelocityEstimation(s.BINS, 1).to(s.DEVICE)
+    model = feature_extraction.MIDIVelocityEstimation(s.BINS).to(s.DEVICE).to(
+        s.DTYPE)
 
     train(trainloader, validloader, model)
 
@@ -28,8 +29,17 @@ def train_velocity(nmf_params):
 def train(trainloader, validloader, model):
     optim = torch.optim.Adadelta(model.parameters(), lr=s.LR_VELOCITY)
 
-    def trainloss_fn(x, y):
-        return F.l1_loss(x * 127, y)
+    def trainloss_fn(x, y, lens=None):
+        y /= 127
+
+        if not lens:
+            # TODO: somehow, the two have  different shape
+            return F.l1_loss(x, y)
+
+        loss = torch.zeros(len(lens))
+        for batch, L in enumerate(lens):
+            loss[batch] = F.l1_loss(x[batch, :L], y[batch, :L])
+        return loss
 
     validloss_fn = trainloss_fn
     train_epoch(model, optim, trainloss_fn, validloss_fn, trainloader,
@@ -49,31 +59,33 @@ def train_epoch(model, optim, trainloss_fn, validloss_fn, trainloader,
         trainloss, validloss, trainloss_valid = [], [], []
         print("-> Training")
         model.train()
-        for inputs, targets in tqdm(trainloader):
-            inputs = inputs.to(s.DEVICE)
-            targets = targets.to(s.DEVICE)
+        for inputs, targets, lens in tqdm(trainloader):
+            inputs = inputs.to(s.DEVICE).to(s.DTYPE)
+            targets = targets.to(s.DEVICE).to(s.DTYPE)
 
             optim.zero_grad()
             out = model(inputs)
-            loss = trainloss_fn(out, targets)
+            loss = trainloss_fn(out, targets, lens)
             loss.backward()
             optim.step()
             trainloss.append(loss.detach().cpu().numpy())
 
-        print(f"training loss : {np.mean(trainloss):.4e}")
+        trainloss = np.mean(trainloss)
+        print(f"training loss : {trainloss:.4e}")
 
         print("-> Validating")
         with torch.no_grad():
             model.eval()
-            for inputs, targets in tqdm(validloader):
-                inputs = inputs
-                targets = targets.to(s.DEVICE)
+            for inputs, targets, lens in tqdm(validloader):
+                inputs = inputs.to(s.DEVICE).to(s.DTYPE)
+                targets = targets.to(s.DEVICE).to(s.DTYPE)
                 # targets = torch.argmax(targets, dim=1).to(torch.float)
 
                 out = model(inputs)
-                loss = validloss_fn(targets, out)
-                validloss += loss.tolist()
-                trainloss_valid += trainloss_fn(targets, out)
+                validloss.append(
+                    validloss_fn(targets, out, lens).detach().cpu().numpy())
+                trainloss_valid.append(
+                    trainloss_fn(targets, out, lens).detach().cpu().numpy())
 
         validloss = np.mean(validloss)
         trainloss_valid = np.mean(validloss_fn)

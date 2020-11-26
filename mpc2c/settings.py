@@ -1,5 +1,6 @@
-# NMF
+import torch
 
+# NMF
 #: epsilon value used inside the nmf to prevent divisons by 0
 EPS = 2.0**-52
 #: width of mini spectrograms centered around the maximum value
@@ -8,8 +9,6 @@ MINI_SPEC_SIZE = 5
 PADDING_VALUE = -1e-15
 #: cost function used in the NMF
 NMF_COST_FUNC = 'EucDist'
-#: number of jobs used for creating the dataset
-NJOBS = 10
 #: number of songs considered for training
 NUM_SONGS_FOR_TRAINING = 1000
 EPS_RANGE = 0
@@ -21,15 +20,16 @@ DATASET_LEN = 1
 # NN
 DEVICE = 'cuda'
 EPOCHS = 500
-BATCH_SIZE = 1
+BATCH_SIZE = 5
 EARLY_STOP = 10
 BRANCHES = 16
 LR_VELOCITY = 1
 LR_PEDALING = 1
 KERNEL = 3
-STRIDE = 2
+STRIDE = 1
 DILATION = 5
 PLOT_LOSSES = True
+DTYPE = torch.float64
 
 # MAKE_TEMPLATE
 #: how many basis use in total
@@ -48,6 +48,8 @@ FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: datasets used for training the model
 DATASETS = ["Maestro"]
+#: number of jobs used
+NJOBS = 10
 
 # PATHS
 TEMPLATE_PATH = 'nmf_template.pkl'
@@ -60,4 +62,4 @@ SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 preprocessing = "pad"
 
 #: use the following for debugging
-BUILD = True
+BUILD = False
