@@ -16,11 +16,13 @@ EPS_RANGE = 0
 EPS_ACTIVATIONS = 0
 #: percentage of the dataset to use, use it for debugging
 DATASET_LEN = 1
+#: if True, recreate data
+REDUMP = True
 
 # NN
 DEVICE = 'cuda'
 EPOCHS = 500
-BATCH_SIZE = 5
+BATCH_SIZE = 1
 EARLY_STOP = 10
 BRANCHES = 16
 LR_VELOCITY = 1

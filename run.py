@@ -8,7 +8,7 @@ from Cython.Build import Cythonize
 from mpc2c import settings as s
 
 if s.BUILD:
-    Cythonize.main(["mpc2c/**.py", "-3", "--inplace"])
+    Cythonize.main(["mpc2c/[!data_management.py]**.py", "-3", "--inplace"])
 
 
 def parse_args():
