@@ -53,13 +53,13 @@ NJOBS = 10
 
 # PATHS
 TEMPLATE_PATH = 'nmf_template.pkl'
-MINI_SPEC_PATH = 'mini_spec.pkl.gz'
-DIFF_SPEC_PATH = 'diff_spec.pkl.gz'
+VELOCITY_DATA_PATH = '/datasets/mpc2c/velocity/'
+PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
 SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
 #: same length; just use "pad" for Maestro
-preprocessing = "pad"
+PREPROCESSING = "pad"
 
 #: use the following for debugging
-BUILD = False
+BUILD = True
