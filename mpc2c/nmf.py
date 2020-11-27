@@ -1,7 +1,6 @@
 import gzip
 import pickle
 import random
-from copy import copy
 from types import SimpleNamespace
 
 import numpy as np
@@ -74,13 +73,10 @@ def NMF(V,
         the number of basis for template
     """
     # normalize activations
-    W /= W.sum(axis=0)
+    W /= W.sum(axis=0) + s.EPS
 
     # normalize H
-    H /= H.sum()
-
-    # normalize to unit sum
-    V /= V.sum()
+    H /= H.sum() + s.EPS
 
     # get important params
     K, M = V.shape
@@ -157,12 +153,6 @@ def NMF(V,
         else:
             raise ValueError('Unknown cost function')
 
-        # normalize templates to unit sum
-        W /= W.sum(axis=0)
-
-        # normalize H
-        H /= H.sum()
-
 
 class NMFTools:
     def __init__(self,
@@ -173,7 +163,7 @@ class NMFTools:
                  realign=False,
                  sr=s.SR,
                  cost_func=s.NMF_COST_FUNC):
-        self.W = initW
+        self.initW = initW[:, minpitch * s.BASIS:(maxpitch + 1) * s.BASIS]
         self.minpitch = minpitch
         self.maxpitch = maxpitch
         self.res = res
@@ -190,44 +180,47 @@ class NMFTools:
         audio = audio[start:stop]
         self.V = spectrogram(audio, s.FRAME_SIZE, s.HOP_SIZE, s.SR)
 
+        # normalize to unit sum
+        self.V /= self.V.sum()
+
         # compute the needed resolution for pianoroll
         res = len(audio) / self.sr / self.V.shape[1]
-        self.H = make_pianoroll(score,
-                                res=res,
-                                basis=s.BASIS,
-                                velocities=False,
-                                attack=s.ATTACK,
-                                eps=s.EPS_ACTIVATIONS,
-                                eps_range=s.EPS_RANGE)
+        self.initH = make_pianoroll(score,
+                                    res=res,
+                                    basis=s.BASIS,
+                                    velocities=False,
+                                    attack=s.ATTACK,
+                                    eps=s.EPS_ACTIVATIONS,
+                                    eps_range=s.EPS_RANGE)
 
-        if s.preprocessing == "stretch":
+        if s.PREPROCESSING == "stretch":
             # remove trailing zeros in H
-            nonzero_cols = self.pr.any(axis=0).nonzero()[0]
+            nonzero_cols = self.initH.any(axis=0).nonzero()[0]
             start = nonzero_cols[0]
             stop = nonzero_cols[-1]
-            self.H = self.H[:, start:stop + 1]
+            self.initH = self.H[:, start:stop + 1]
 
             # stretch pianoroll
-            self.H = stretch_pianoroll(self.H, self.V.shape[1])
-        elif s.preprocessing == "pad":
-            self.V, self.H = pad(self.V, self.H)
+            self.initH = stretch_pianoroll(self.initH, self.V.shape[1])
+        elif s.PREPROCESSING == "pad":
+            self.V, self.initH = pad(self.V, self.initH)
+
+        self.initH = self.initH[self.minpitch * s.BASIS:(self.maxpitch + 1) *
+                                s.BASIS, :]
 
         # check shapes
-        assert self.V.shape == (self.W.shape[0], self.H.shape[1]),\
+        assert self.V.shape == (self.initW.shape[0], self.initH.shape[1]),\
             "V, W, H shapes are not comparable"
-        assert self.H.shape[0] == self.W.shape[1],\
+        assert self.initH.shape[0] == self.initW.shape[1],\
             "W, H have different ranks"
-
-        self.W = self.W[:,
-                        self.minpitch * s.BASIS:(self.maxpitch + 1) * s.BASIS]
-        self.H = self.H[self.minpitch * s.BASIS:(self.maxpitch + 1) *
-                        s.BASIS, :]
-        self.pr = copy(self.H)
-        self.H[self.H == 0] = s.EPS
 
     def perform_nmf(self, audio, score):
         self.to2d()
+        # set initH and V
         self.initialize(audio, score)
+        # prepare matrices that will be modified by nmf
+        self.H = self.initH.copy()
+        self.W = self.initW.copy()
 
         # perform nfm
         NMF(self.V,
@@ -258,20 +251,22 @@ class NMFTools:
         # score[:, 2] = new_offs
 
     def to3d(self):
-        if self.W.ndim != 3:
+        if self.initW.ndim != 3:
             npitch = self.maxpitch - self.minpitch + 1
             if hasattr(self, 'H'):
                 self.H = self.H.reshape(npitch, s.BASIS, -1)
-                self.pr = self.pr.reshape(npitch, s.BASIS, -1)
+                self.initH = self.initH.reshape(npitch, s.BASIS, -1)
             self.W = self.W.reshape((-1, npitch, s.BASIS), order='C')
+            self.initW = self.initW.reshape((-1, npitch, s.BASIS), order='C')
 
     def to2d(self):
-        if self.W.ndim != 2:
+        if self.initW.ndim != 2:
             npitch = self.maxpitch - self.minpitch + 1
             if hasattr(self, 'H'):
                 self.H = self.H.reshape(npitch * s.BASIS, -1)
-                self.pr = self.pr.reshape(npitch * s.BASIS, -1)
+                self.initH = self.initH.reshape(npitch * s.BASIS, -1)
             self.W = self.W.reshape((-1, npitch * s.BASIS), order='C')
+            self.initW = self.initW.reshape((-1, npitch * s.BASIS), order='C')
 
     def generate_minispecs(self):
 
@@ -315,8 +310,8 @@ class NMFTools:
 
     def gen_notes_from_H(self):
         self.to3d()
-        summed_pr = self.pr.sum(axis=1)
-        input_onsets = np.argwhere(self.pr[:, 0, :] > 0)
+        summed_pr = self.initH.sum(axis=1)
+        input_onsets = np.argwhere(self.initH[:, 0, :] > 0)
         for note in input_onsets:
             # compute offset
             pitch, onset = note
