@@ -26,12 +26,14 @@ def parse_args():
     parser.add_argument("--datasets",
                         action="store_true",
                         help="Create the datasets using NMF.")
-    parser.add_argument("--train-velocity",
-                        action="store_true",
-                        help="Train the neural network for velocity estimation.")
-    parser.add_argument("--train-pedaling",
-                        action="store_true",
-                        help="Train the neural network for pedaling estimation.")
+    parser.add_argument(
+        "--train-velocity",
+        action="store_true",
+        help="Train the neural network for velocity estimation.")
+    parser.add_argument(
+        "--train-pedaling",
+        action="store_true",
+        help="Train the neural network for pedaling estimation.")
     return parser.parse_args()
 
 
@@ -48,9 +50,9 @@ def main():
         import pickle
         nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
         nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
-                            "train")
+                            ["train"])
         nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
-                            "valid")
+                            ["valid"])
     if args.train_pedaling:
         from mpc2c import training
         import pickle

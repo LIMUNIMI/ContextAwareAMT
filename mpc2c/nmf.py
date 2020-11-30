@@ -1,11 +1,6 @@
-import gzip
-import pickle
-import random
 from types import SimpleNamespace
 
 import numpy as np
-
-from asmd import asmd
 
 from . import settings as s
 from .utils import (find_start_stop, make_pianoroll, pad, spectrogram,
@@ -241,15 +236,6 @@ class NMFTools:
             fixH=False,
             fixW=True)
 
-    def realign(self, audio, score):
-        raise NotImplementedError("'realign' not implemented yet!")
-        # from .alignment.align_with_amt import audio_to_score_alignment
-        # score = copy(score)
-        # # align score
-        # new_ons, new_offs = audio_to_score_alignment(score, audio, self.sr, res=self.res)
-        # score[:, 1] = new_ons
-        # score[:, 2] = new_offs
-
     def to3d(self):
         if self.initW.ndim != 3:
             npitch = self.maxpitch - self.minpitch + 1
@@ -285,8 +271,7 @@ class NMFTools:
 
             # normalizing with rms
             # mini_spec /= (mini_spec**2).mean()**0.5
-            # normalizing to the sum
-            mini_spec /= mini_spec.sum()
+            mini_spec /= (mini_spec.sum() + s.EPS)
 
             if mini_spec.shape[1] < s.MINI_SPEC_SIZE:
                 mini_spec = np.pad(mini_spec,
@@ -298,8 +283,6 @@ class NMFTools:
                                    mode='constant',
                                    constant_values=s.PADDING_VALUE)
 
-            if mini_spec.shape != (256, 5):
-                print(mini_spec.shape)
             yield mini_spec
 
     def get_minispecs(self):

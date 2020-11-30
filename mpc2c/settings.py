@@ -22,7 +22,7 @@ REDUMP = True
 # NN
 DEVICE = 'cuda'
 EPOCHS = 500
-BATCH_SIZE = 1
+BATCH_SIZE = 100
 EARLY_STOP = 10
 BRANCHES = 16
 LR_VELOCITY = 1
@@ -56,12 +56,13 @@ NJOBS = 10
 # PATHS
 TEMPLATE_PATH = 'nmf_template.pkl'
 VELOCITY_DATA_PATH = '/datasets/mpc2c/velocity/'
-PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
+VELOCITY_DATA_PATH = './data/velocity'
+# PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
 SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
 #: same length; just use "pad" for Maestro
 PREPROCESSING = "pad"
 
-#: use the following for debugging
-BUILD = True
+#: If compiling code with cython in pure-python mode
+BUILD = False
