@@ -1,25 +1,28 @@
 from time import time
 
 import numpy as np
+from tqdm import tqdm
+
 import torch
 import torch.nn.functional as F
-from tqdm import tqdm
 
 from . import data_management, feature_extraction, plotting
 from . import settings as s
 
 
 def train_pedaling(nmf_params):
+    validloader = data_management.get_loader(['validation'], nmf_params,
+                                             'pedaling')
     trainloader = data_management.get_loader(['train'], nmf_params, 'pedaling')
-    validloader = data_management.get_loader(['valid'], nmf_params, 'pedaling')
     model = feature_extraction.MIDIParameterEstimation(s.BINS, 3).to(
         s.DEVICE).to(s.DTYPE)
     train(trainloader, validloader, model)
 
 
 def train_velocity(nmf_params):
+    validloader = data_management.get_loader(['validation'], nmf_params,
+                                             'velocity')
     trainloader = data_management.get_loader(['train'], nmf_params, 'velocity')
-    validloader = data_management.get_loader(['valid'], nmf_params, 'velocity')
     model = feature_extraction.MIDIVelocityEstimation(s.BINS).to(s.DEVICE).to(
         s.DTYPE)
 
@@ -33,7 +36,6 @@ def train(trainloader, validloader, model):
         y /= 127
 
         if not lens:
-            # TODO: somehow, the two have  different shape
             return F.l1_loss(x, y)
 
         loss = torch.zeros(len(lens))
@@ -88,7 +90,7 @@ def train_epoch(model, optim, trainloss_fn, validloss_fn, trainloader,
                     trainloss_fn(targets, out, lens).detach().cpu().numpy())
 
         validloss = np.mean(validloss)
-        trainloss_valid = np.mean(validloss_fn)
+        trainloss_valid = np.mean(trainloss_valid)
         print(f"validation loss : {validloss:.4e}")
         print(f"validation-training loss : {validloss:.4e}")
         if validloss < best_loss:

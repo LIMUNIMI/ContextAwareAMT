@@ -17,12 +17,13 @@ EPS_ACTIVATIONS = 0
 #: percentage of the dataset to use, use it for debugging
 DATASET_LEN = 1
 #: if True, recreate data
-REDUMP = True
+REDUMP = False
 
 # NN
 DEVICE = 'cuda'
 EPOCHS = 500
-BATCH_SIZE = 100
+VEL_BATCH_SIZE = 100
+PED_BATCH_SIZE = 1
 EARLY_STOP = 10
 BRANCHES = 16
 LR_VELOCITY = 1
@@ -31,7 +32,7 @@ KERNEL = 3
 STRIDE = 1
 DILATION = 5
 PLOT_LOSSES = True
-DTYPE = torch.float64
+DTYPE = torch.float16
 
 # MAKE_TEMPLATE
 #: how many basis use in total
@@ -56,8 +57,7 @@ NJOBS = 10
 # PATHS
 TEMPLATE_PATH = 'nmf_template.pkl'
 VELOCITY_DATA_PATH = '/datasets/mpc2c/velocity/'
-VELOCITY_DATA_PATH = './data/velocity'
-# PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
+PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
 SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
