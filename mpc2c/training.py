@@ -11,18 +11,18 @@ from . import settings as s
 
 
 def train_pedaling(nmf_params):
+    trainloader = data_management.get_loader(['train'], nmf_params, 'pedaling')
     validloader = data_management.get_loader(['validation'], nmf_params,
                                              'pedaling')
-    trainloader = data_management.get_loader(['train'], nmf_params, 'pedaling')
     model = feature_extraction.MIDIParameterEstimation(s.BINS, 3).to(
         s.DEVICE).to(s.DTYPE)
     train(trainloader, validloader, model)
 
 
 def train_velocity(nmf_params):
+    trainloader = data_management.get_loader(['train'], nmf_params, 'velocity')
     validloader = data_management.get_loader(['validation'], nmf_params,
                                              'velocity')
-    trainloader = data_management.get_loader(['train'], nmf_params, 'velocity')
     model = feature_extraction.MIDIVelocityEstimation(s.BINS).to(s.DEVICE).to(
         s.DTYPE)
 

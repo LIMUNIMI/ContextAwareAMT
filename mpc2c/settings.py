@@ -17,7 +17,7 @@ EPS_ACTIVATIONS = 0
 #: percentage of the dataset to use, use it for debugging
 DATASET_LEN = 1
 #: if True, recreate data
-REDUMP = False
+REDUMP = True
 
 # NN
 DEVICE = 'cuda'
