@@ -16,7 +16,7 @@ from . import utils
 def process_pedaling(i, dataset, nmf_params):
     nmf_tools = nmf.NMFTools(*nmf_params)
     audio, sr = dataset.get_mix(i, sr=s.SR)
-    score = dataset.get_score(i, score_type=['non_aligned'])
+    score = dataset.get_score(i, score_type=['precise_alignment'])
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
     diff_spec = nmf_tools.V - nmf_tools.W @ nmf_tools.H
@@ -34,7 +34,7 @@ def process_pedaling(i, dataset, nmf_params):
 def process_velocities(i, dataset, nmf_params):
     nmf_tools = nmf.NMFTools(*nmf_params)
     audio, sr = dataset.get_mix(i, sr=s.SR)
-    score = dataset.get_score(i, score_type=['non_aligned'])
+    score = dataset.get_score(i, score_type=['precise_alignment'])
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
     velocities = dataset.get_score(i, score_type=['precise_alignment'])[:, 3]

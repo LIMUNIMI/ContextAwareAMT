@@ -154,14 +154,12 @@ class NMFTools:
                  initW,
                  minpitch,
                  maxpitch,
-                 res=0.001,
                  realign=False,
                  sr=s.SR,
                  cost_func=s.NMF_COST_FUNC):
         self.initW = initW[:, minpitch * s.BASIS:(maxpitch + 1) * s.BASIS]
         self.minpitch = minpitch
         self.maxpitch = maxpitch
-        self.res = res
         self.sr = sr
         self.realign = realign
         self.cost_func = cost_func
