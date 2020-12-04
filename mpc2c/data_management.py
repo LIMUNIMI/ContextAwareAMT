@@ -121,7 +121,6 @@ class DatasetDump(TorchDataset):
                         np.savez(path_y, y)
                     index += 1
 
-            # max_nbytes=None disable shared memory for large arrays
             self.dataset.parallel(pickle_fn, process_fn, *args, **kwargs)
 
             self.dumped = True
@@ -182,6 +181,7 @@ def get_loader(groups, nmf_params, mode):
                                        "_".join(groups),
                                        not s.REDUMP,
                                        num_samples=num_samples)
+        # max_nbytes=None disable shared memory for large arrays
         velocity_dataset.dump(process_velocities,
                               nmf_params,
                               n_jobs=s.NJOBS,
@@ -197,6 +197,7 @@ def get_loader(groups, nmf_params, mode):
                                        "_".join(groups),
                                        not s.REDUMP,
                                        num_samples=None)
+        # max_nbytes=None disable shared memory for large arrays
         pedaling_dataset.dump(process_pedaling,
                               nmf_params,
                               n_jobs=s.NJOBS,

@@ -37,6 +37,14 @@ def parse_args():
     return parser.parse_args()
 
 
+def load_nmf_params():
+    import pickle
+    nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
+    print("using minpitch: ", nmf_params[1])
+    print("using maxpitch: ", nmf_params[2])
+    return nmf_params
+
+
 def main():
     args = parse_args()
     if args.template:
@@ -47,22 +55,19 @@ def main():
         create_midi_scale.main()
     if args.datasets:
         from mpc2c import nmf
-        import pickle
-        nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
+        nmf_params = load_nmf_params()
         nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
                             ["train"])
         nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
                             ["valid"])
     if args.train_pedaling:
         from mpc2c import training
-        import pickle
-        nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
+        nmf_params = load_nmf_params()
         training.train_pedaling(nmf_params)
 
     if args.train_velocity:
         from mpc2c import training
-        import pickle
-        nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
+        nmf_params = load_nmf_params()
         training.train_velocity(nmf_params)
 
 
