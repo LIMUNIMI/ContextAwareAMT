@@ -34,6 +34,16 @@ def parse_args():
         "--train-pedaling",
         action="store_true",
         help="Train the neural network for pedaling estimation.")
+    parser.add_argument(
+        "--skopt",
+        action="store_true",
+        help="If activated, instead of a full training, performs various little training cycles to look  for hyper-parameters using skopt."
+    )
+    parser.add_argument(
+        "--redump",
+        action="store_true",
+        help="If used, it pre-processes the full dataset and dumps it before of starting training procedure."
+    )
     return parser.parse_args()
 
 
@@ -47,6 +57,7 @@ def load_nmf_params():
 
 def main():
     args = parse_args()
+    s.REDUMP = args.redump
     if args.template:
         from mpc2c import make_template
         make_template.main()
@@ -59,16 +70,28 @@ def main():
         nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
                             ["train"])
         nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
-                            ["valid"])
+                            ["validation"])
     if args.train_pedaling:
         from mpc2c import training
         nmf_params = load_nmf_params()
-        training.train_pedaling(nmf_params)
+        if args.skopt:
+            from mpc2c.mytorchutils import hyperopt
+            s.DATASET_LEN = 0.1
+            hyperopt(s.SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
+                     lambda x: training.train_pedaling(nmf_params, x))
+        else:
+            training.train_pedaling(nmf_params, s.VEL_HYPERPARAMS)
 
     if args.train_velocity:
         from mpc2c import training
         nmf_params = load_nmf_params()
-        training.train_velocity(nmf_params)
+        if args.skopt:
+            from mpc2c.mytorchutils import hyperopt
+            s.DATASET_LEN = 0.1
+            hyperopt(s.SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
+                     lambda x: training.train_velocity(nmf_params, x))
+        else:
+            training.train_velocity(nmf_params, s.PED_HYPERPARAMS)
 
 
 if __name__ == "__main__":

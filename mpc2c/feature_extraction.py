@@ -9,15 +9,22 @@ def conv_output_size(size):
 
 
 class MIDIParameterEstimation(nn.Module):
-    def __init__(self, input_features, output_features):
+    def __init__(self, input_features, output_features, *hyperparams):
         """
         Size of the inputs are expected to be 3d: (batch, input_features,
         frames).  Convolutional kernels are applied frame-wise so that the
-        input_features is reduced to one and the returned tensor has shape (batch,
-        output_features, frames), where each output feature corresponds to a
-        channel of the output of the stack
+        input_features is reduced to one and the returned tensor has shape
+        (batch, output_features, frames), where each output feature corresponds
+        to a channel of the output of the stack
+
+        `hyperparams` must contains 3 values:
+
+            * kernel_size
+            * stride
+            * dilation
 
         """
+        kernel_size, stride, dilation = hyperparams
         super().__init__()
         input_size = input_features
         # add one block to introduce the needed number of features
@@ -28,10 +35,10 @@ class MIDIParameterEstimation(nn.Module):
             self.stack = [
                 nn.Conv2d(input_features,
                           output_features,
-                          kernel_size=(s.KERNEL, 1),
-                          stride=(s.STRIDE, 1),
+                          kernel_size=(kernel_size, 1),
+                          stride=(stride, 1),
                           padding=0,
-                          dilation=(s.DILATION, 1)),
+                          dilation=(dilation, 1)),
                 nn.BatchNorm2d(output_features),
                 nn.ReLU()
             ]
@@ -46,9 +53,9 @@ class MIDIParameterEstimation(nn.Module):
             self.stack += [
                 nn.Conv2d(input_features,
                           output_features,
-                          kernel_size=(s.KERNEL, 1),
-                          stride=(s.STRIDE, 1),
-                          dilation=(s.DILATION, 1),
+                          kernel_size=(kernel_size, 1),
+                          stride=(stride, 1),
+                          dilation=(dilation, 1),
                           padding=0,
                           groups=input_features),
                 nn.BatchNorm2d(output_features),
@@ -100,8 +107,8 @@ class MIDIParameterEstimation(nn.Module):
 
 
 class MIDIVelocityEstimation(MIDIParameterEstimation):
-    def __init__(self, input_features):
-        super().__init__(input_features, 1)
+    def __init__(self, input_features, *hyperparams):
+        super().__init__(input_features, 1, *hyperparams)
 
     def forward(self, x):
         """

@@ -1,4 +1,14 @@
+import os
+
 import torch
+
+from skopt import space
+
+# PATHS
+TEMPLATE_PATH = 'nmf_template.pkl'
+VELOCITY_DATA_PATH = '/datasets/mpc2c/velocity/'
+PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
+SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 
 # NMF
 #: epsilon value used inside the nmf to prevent divisons by 0
@@ -14,25 +24,43 @@ NUM_SONGS_FOR_TRAINING = 1000
 EPS_RANGE = 0
 #: value used for range around activations
 EPS_ACTIVATIONS = 0
-#: percentage of the dataset to use, use it for debugging
-DATASET_LEN = 1
-#: if True, recreate data
-REDUMP = True
-
+#: if True, recreate data (also set by --redump)
+REDUMP = False
 # NN
 DEVICE = 'cuda'
 EPOCHS = 500
-VEL_BATCH_SIZE = 100
+VEL_HYPERPARAMS = {
+    "lr": 0.5,
+    "wd": 0.01,
+    "kernel": 4,
+    "stride": 1,
+    "dilation": 5
+}
+PED_HYPERPARAMS = {
+    "lr": 0.5,
+    "wd": 0.01,
+    "kernel": 4,
+    "stride": 1,
+    "dilation": 5
+}
+VEL_BATCH_SIZE = 1200
 PED_BATCH_SIZE = 1
 EARLY_STOP = 10
-BRANCHES = 16
-LR_VELOCITY = 1
-LR_PEDALING = 1
-KERNEL = 3
-STRIDE = 1
-DILATION = 5
 PLOT_LOSSES = True
-DTYPE = torch.float16
+DTYPE = torch.float32
+#: percentage of the dataset to use, use it for debugging or for skopt
+DATASET_LEN = 1
+
+# SKOPT
+SKSPACE = [
+    space.Real(0.0001, 2, name='lr'),
+    space.Real(0.0001, 1, name='wd'),
+    space.Integer(1, 32, name='kernel'),
+    space.Integer(1, 32, name='stride'),
+    space.Integer(1, 16, name='dilation')
+]
+SKCHECKPOINT = 'skopt_checkpoint.pkl'
+SKITERATIONS = 10**4
 
 # MAKE_TEMPLATE
 #: how many basis use in total
@@ -53,12 +81,6 @@ HOP_SIZE = 512
 DATASETS = ["Maestro"]
 #: number of jobs used
 NJOBS = 10
-
-# PATHS
-TEMPLATE_PATH = 'nmf_template.pkl'
-VELOCITY_DATA_PATH = '/datasets/mpc2c/velocity/'
-PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
-SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
 #: same length; just use "pad" for Maestro
