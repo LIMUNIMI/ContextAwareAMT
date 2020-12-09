@@ -1,11 +1,9 @@
 import torch
 from torch import nn
 
-from . import settings as s
 
-
-def conv_output_size(size):
-    return int((size - s.DILATION * (s.KERNEL - 1)) / s.STRIDE)
+def conv_output_size(size, dilation, kernel, stride):
+    return int((size - dilation * (kernel - 1)) / stride)
 
 
 class MIDIParameterEstimation(nn.Module):
@@ -28,7 +26,8 @@ class MIDIParameterEstimation(nn.Module):
         super().__init__()
         input_size = input_features
         # add one block to introduce the needed number of features
-        next_input_size = conv_output_size(input_size)
+        next_input_size = conv_output_size(input_size, dilation, kernel_size,
+                                           stride)
         input_features = 1
         if next_input_size > 0:
             input_size = next_input_size
@@ -47,7 +46,8 @@ class MIDIParameterEstimation(nn.Module):
             self.stack = []
 
         # start adding blocks until we can
-        next_input_size = conv_output_size(input_size)
+        next_input_size = conv_output_size(input_size, dilation, kernel_size,
+                                           stride)
         while next_input_size > 0:
             input_size = next_input_size
             self.stack += [
@@ -61,7 +61,8 @@ class MIDIParameterEstimation(nn.Module):
                 nn.BatchNorm2d(output_features),
                 nn.ReLU()
             ]
-            next_input_size = conv_output_size(input_size)
+            next_input_size = conv_output_size(input_size, dilation,
+                                               kernel_size, stride)
 
         # add the last block to get size 1 along frequencies dimension
         if input_size > 1:
@@ -101,9 +102,11 @@ class MIDIParameterEstimation(nn.Module):
         x = self.stack(x)
         # remove the height
         x = x[..., 0, :]
-        # normalize to 1
+        # output should be included in [0, 1)
         # TODO
-        return x / x.max()
+        return [
+            x / x.max(),
+        ]
 
 
 class MIDIVelocityEstimation(MIDIParameterEstimation):
@@ -125,7 +128,9 @@ class MIDIVelocityEstimation(MIDIParameterEstimation):
             shape (batch,)
         """
         # TODO: a linear layer
-        return torch.max(super().forward(x)[:, 0], dim=-1)[0]
+        return [
+            torch.max(super().forward(x)[0][:, 0], dim=-1)[0],
+        ]
 
 
 def init_weights(m, initializer):

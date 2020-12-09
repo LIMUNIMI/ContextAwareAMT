@@ -21,7 +21,7 @@ def train_velocity(nmf_params, hyperparams):
     validloader = data_management.get_loader(['validation'], nmf_params,
                                              'velocity')
     model = feature_extraction.MIDIVelocityEstimation(
-        s.BINS, 1, hyperparams['kernel'], hyperparams['stride'],
+        s.BINS, hyperparams['kernel'], hyperparams['stride'],
         hyperparams['dilation']).to(s.DEVICE).to(s.DTYPE)
 
     return train(trainloader,
@@ -48,4 +48,4 @@ def train(trainloader, validloader, model, *args, **kwargs):
 
     validloss_fn = trainloss_fn
     return train_epochs(model, optim, trainloss_fn, validloss_fn, trainloader,
-                        validloader)
+                        validloader, plot_losses=s.PLOT_LOSSES)
