@@ -1,9 +1,10 @@
-import visdom
 from time import time
 
 import numpy as np
 import torch
 from tqdm import tqdm
+
+from . import context
 
 
 def train_epochs(model,
@@ -105,7 +106,7 @@ def train_epochs(model,
                 targets[i] = targets[i].to(device).to(dtype)
 
             optim.zero_grad()
-            out = model(inputs)
+            out = model(*inputs)
             loss = trainloss_fn(out, targets, lens)
             loss.backward()
             optim.step()
@@ -136,9 +137,9 @@ def train_epochs(model,
         if validloss < best_loss:
             best_loss = validloss
             best_epoch = epoch
-            state_dict = model.cpu().state_dict()
+            state_dict = model.state_dict()
             name = f"checkpoints/checkpoint{best_loss:.4f}.pt"
-            torch.save({'dtype': model.dtype, 'state_dict': state_dict}, name)
+            torch.save({'dtype': dtype, 'state_dict': state_dict}, name)
         elif epoch - best_epoch > early_stop:
             print("-- Early stop! --")
             break
@@ -146,19 +147,16 @@ def train_epochs(model,
             print(f"{epoch - best_epoch} from early stop!!")
 
         if plot_losses:
-            plot_losses(trainloss, validloss, trainloss_valid, epoch)
+            plot_losses_func(trainloss, validloss, trainloss_valid, epoch)
 
         print("Time for this epoch: ", time() - epoch_ttt)
     return best_loss
 
 
-vis = visdom.Visdom()
-
-
-def plot_losses(trainloss, validloss, trainloss_valid, epoch):
-    vis.line(torch.tensor([[trainloss, validloss, trainloss_valid]]),
-             X=torch.tensor([epoch]),
-             update='append',
-             win="losses",
-             opts=dict(legend=['train', 'valid', 'trainloss-valid'],
-                       title="losses!"))
+def plot_losses_func(trainloss, validloss, trainloss_valid, epoch):
+    context.vis.line(torch.tensor([[trainloss, validloss, trainloss_valid]]),
+                     X=torch.tensor([epoch]),
+                     update='append',
+                     win="losses",
+                     opts=dict(legend=['train', 'valid', 'trainloss-valid'],
+                               title="losses!"))

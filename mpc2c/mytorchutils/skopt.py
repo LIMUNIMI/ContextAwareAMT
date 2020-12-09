@@ -1,3 +1,4 @@
+import sys
 import os
 from dataclasses import dataclass
 
@@ -7,6 +8,8 @@ import visdom
 import skopt
 from skopt import load, plots
 from skopt.callbacks import CheckpointSaver, VerboseCallback
+
+from . import context
 
 
 def hyperopt(*args):
@@ -54,6 +57,7 @@ class SKOptimizer(object):
     num_iter: int
     to_minimize: callable
     optimization_method: callable = skopt.dummy_minimize
+    seed: int = 1992
 
     def _make_objective_func(self):
         global objective
@@ -68,10 +72,12 @@ class SKOptimizer(object):
             try:
                 loss = self.to_minimize(hyperparams)
             except (ValueError, Exception, RuntimeError) as e:
-                # the following 2 are for debugging
-                # import traceback
-                # traceback.print_exc(e)
-                print("Detected runtime error: ", e)
+                if context.DEBUG:
+                    # the following 2 are for debugging
+                    import traceback
+                    traceback.print_exc(e)
+                print("Detected runtime error: ", e, file=sys.stderr)
+                print("To view this error, set `context.DEBUG` to False")
                 loss = 1.0
             return loss
         return objective
@@ -93,6 +99,7 @@ class SKOptimizer(object):
     def optimize(self):
         if os.path.exists(self.checkpoint_path):
             print("Loading and plotting previous checkpoint...")
+            self._make_objective_func()
             self.res = load(self.checkpoint_path)
             x0 = self.res.x_iters
             y0 = self.res.func_vals
@@ -110,6 +117,7 @@ class SKOptimizer(object):
             x0=x0,  # already examined values for x
             y0=y0,  # observed values for x0
             callback=[verbose_callback, checkpoint_saver],
+            random_state=self.seed,
             n_calls=self.num_iter)
         skopt.utils.dump(res, "skopt_result.pkl")
         print("\n=================================\n")
