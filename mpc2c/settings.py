@@ -19,8 +19,6 @@ MINI_SPEC_SIZE = 5
 PADDING_VALUE = -1e-15
 #: cost function used in the NMF
 NMF_COST_FUNC = 'EucDist'
-#: number of songs considered for training
-NUM_SONGS_FOR_TRAINING = 1000
 EPS_RANGE = 0
 #: value used for range around activations
 EPS_ACTIVATIONS = 0
@@ -43,7 +41,7 @@ PED_HYPERPARAMS = {
     "stride": 1,
     "dilation": 5
 }
-VEL_BATCH_SIZE = 1200
+VEL_BATCH_SIZE = 600
 PED_BATCH_SIZE = 1
 EARLY_STOP = 10
 PLOT_LOSSES = True

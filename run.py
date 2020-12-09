@@ -57,7 +57,13 @@ def load_nmf_params():
 
 def main():
     args = parse_args()
+    if args.skopt:
+        # if we are hyper-optimizing, change some settings
+        from mpc2c.mytorchutils import hyperopt
+        s.DATASET_LEN = 0.01
+        s.PLOT_LOSSES = False
     s.REDUMP = args.redump
+
     if args.template:
         from mpc2c import make_template
         make_template.main()
@@ -75,8 +81,6 @@ def main():
         from mpc2c import training
         nmf_params = load_nmf_params()
         if args.skopt:
-            from mpc2c.mytorchutils import hyperopt
-            s.DATASET_LEN = 0.1
             hyperopt(s.SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
                      lambda x: training.train_pedaling(nmf_params, x))
         else:
@@ -86,8 +90,6 @@ def main():
         from mpc2c import training
         nmf_params = load_nmf_params()
         if args.skopt:
-            from mpc2c.mytorchutils import hyperopt
-            s.DATASET_LEN = 0.1
             hyperopt(s.SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
                      lambda x: training.train_velocity(nmf_params, x))
         else:
