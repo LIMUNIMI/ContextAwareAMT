@@ -1,3 +1,3 @@
 import visdom
-DEBUG = True
+DEBUG = False
 vis = visdom.Visdom()

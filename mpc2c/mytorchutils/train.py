@@ -124,11 +124,11 @@ def train_epochs(model,
                 for i in range(len(targets)):
                     targets[i] = targets[i].to(device).to(dtype)
 
-                out = model(*inputs)
+                out = model.predict(*inputs)
                 validloss.append(
-                    validloss_fn(targets, out, lens).detach().cpu().numpy())
+                    validloss_fn(out, targets, lens).detach().cpu().numpy())
                 trainloss_valid.append(
-                    trainloss_fn(targets, out, lens).detach().cpu().numpy())
+                    trainloss_fn(out, targets, lens).detach().cpu().numpy())
 
         validloss = np.mean(validloss)
         trainloss_valid = np.mean(trainloss_valid)

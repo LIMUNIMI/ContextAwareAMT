@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 
 
@@ -75,12 +74,12 @@ class MIDIParameterEstimation(nn.Module):
                           padding=0,
                           groups=input_features),
                 nn.BatchNorm2d(output_features),
-                nn.ReLU()
+                nn.Sigmoid()
             ]
+        else:
+            # change the last activation so that the outputs fits [0, 1)
+            self.stack[-1] = nn.Sigmoid()
         self.stack = nn.Sequential(*self.stack)
-        print(self)
-        print("Total number of parameters: ",
-              sum([p.numel() for p in self.parameters() if p.requires_grad]))
 
     def forward(self, x):
         """
@@ -102,16 +101,24 @@ class MIDIParameterEstimation(nn.Module):
         x = self.stack(x)
         # remove the height
         x = x[..., 0, :]
-        # output should be included in [0, 1)
-        # TODO
-        return [
-            x / x.max(),
-        ]
+        # !!! output should be included in [0, 1)
+        return [x, ]
+
+    def predict(self, x):
+        return self.forward(x)
 
 
 class MIDIVelocityEstimation(MIDIParameterEstimation):
-    def __init__(self, input_features, *hyperparams):
+    def __init__(self, input_features, note_frames, *hyperparams):
         super().__init__(input_features, 1, *hyperparams)
+        self.linear = nn.Sequential(
+            nn.Linear(note_frames, note_frames),
+            nn.ReLU(),
+            nn.Linear(note_frames, note_frames),
+            nn.ReLU(),
+            nn.Linear(note_frames, 1),
+            nn.Sigmoid()
+        )
 
     def forward(self, x):
         """
@@ -127,10 +134,12 @@ class MIDIVelocityEstimation(MIDIParameterEstimation):
         torch.tensor
             shape (batch,)
         """
-        # TODO: a linear layer
         return [
-            torch.max(super().forward(x)[0][:, 0], dim=-1)[0],
+            self.linear(super().forward(x)[0][:, 0])[:, 0],
         ]
+
+    def predict(self, x):
+        return self.forward(x)
 
 
 def init_weights(m, initializer):

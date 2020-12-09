@@ -21,7 +21,7 @@ def train_velocity(nmf_params, hyperparams):
     validloader = data_management.get_loader(['validation'], nmf_params,
                                              'velocity')
     model = feature_extraction.MIDIVelocityEstimation(
-        s.BINS, hyperparams['kernel'], hyperparams['stride'],
+        s.BINS, s.MINI_SPEC_SIZE, hyperparams['kernel'], hyperparams['stride'],
         hyperparams['dilation']).to(s.DEVICE).to(s.DTYPE)
 
     return train(trainloader,
@@ -32,6 +32,9 @@ def train_velocity(nmf_params, hyperparams):
 
 
 def train(trainloader, validloader, model, *args, **kwargs):
+    print(model)
+    print("Total number of parameters: ",
+          sum([p.numel() for p in model.parameters() if p.requires_grad]))
     optim = torch.optim.Adadelta(model.parameters(), *args, **kwargs)
 
     def trainloss_fn(x, y, lens):
