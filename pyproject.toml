@@ -16,6 +16,7 @@ essentia = "^2.1b6.dev184"
 visdom = "^0.1.8"
 plotly = "^4.12.0"
 torch = "^1.7.0"
+scikit-optimize = "^0.8.1"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.4"

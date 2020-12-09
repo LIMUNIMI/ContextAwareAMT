@@ -36,7 +36,7 @@ class SKOptimizer(object):
         and which returns one loss
 
     `optimization_method` a callable that implements he skopt interface;
-        defaults to `skopt.gbrt_minimize`
+        defaults to `skopt.dummy_minimize`
 
     Methods
     -------
@@ -49,13 +49,15 @@ class SKOptimizer(object):
         of exiting.
     """
 
-    space: dict
+    space: list
     checkpoint_path: str
     num_iter: int
     to_minimize: callable
-    optimization_method = skopt.gbrt_minimize
+    optimization_method: callable = skopt.dummy_minimize
 
     def _make_objective_func(self):
+        global objective
+
         @skopt.utils.use_named_args(self.space)
         def objective(**hyperparams):
 
@@ -97,16 +99,16 @@ class SKOptimizer(object):
             self.plot()
         else:
             print("Starting new optimization from scratch...")
-            x0, y0 = None
+            x0 = y0 = None
 
         verbose_callback = VerboseCallback(1)
         checkpoint_saver = CheckpointSaver(self.checkpoint_path)
         print("\n=================================\n")
         res = self.optimization_method(
-            self._make_objective_func(),
+            func=self._make_objective_func(),
+            dimensions=self.space,
             x0=x0,  # already examined values for x
             y0=y0,  # observed values for x0
-            dimensions=self.space,
             callback=[verbose_callback, checkpoint_saver],
             n_calls=self.num_iter)
         skopt.utils.dump(res, "skopt_result.pkl")
