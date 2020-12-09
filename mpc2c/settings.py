@@ -1,7 +1,4 @@
-import os
-
 import torch
-
 from skopt import space
 
 # PATHS
