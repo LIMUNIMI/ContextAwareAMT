@@ -84,8 +84,8 @@ def train_epochs(model,
     for comparison purposes; however, sometimes you are interested in metric
     different from the loss.
 
-    You should thus use the best loss according to the backpropagation
-    algorithm as training loss and your target metric as validation loss; this
+    You should thus use the loss that suits best the backpropagation
+    algorithm as training loss, and your target metric as validation loss; this
     approach allows you to monitor the metric of interest during validation, to
     use early stopping against your metric of interest and to monitor the
     validation comparing it with the training.
