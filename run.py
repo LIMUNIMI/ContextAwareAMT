@@ -23,9 +23,6 @@ def parse_args():
         action="store_true",
         help="Create the midi file that must be synthesized for creating the template."
     )
-    parser.add_argument("--datasets",
-                        action="store_true",
-                        help="Create the datasets using NMF.")
     parser.add_argument(
         "--train-velocity",
         action="store_true",
@@ -70,13 +67,6 @@ def main():
     if args.scale:
         from mpc2c import create_midi_scale
         create_midi_scale.main()
-    if args.datasets:
-        from mpc2c import nmf
-        nmf_params = load_nmf_params()
-        nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
-                            ["train"])
-        nmf.create_datasets(nmf_params, s.MINI_SPEC_PATH, s.DIFF_SPEC_PATH,
-                            ["validation"])
     if args.train_pedaling:
         from mpc2c import training
         nmf_params = load_nmf_params()
