@@ -64,6 +64,10 @@ class MIDIParameterEstimation(nn.Module):
                                                kernel_size, stride)
 
         # add the last block to get size 1 along frequencies dimension
+        if len(self.stack) == 0:
+            raise RuntimeError(
+                "Network hyper-parameters would create a one-layer convnet")
+
         if input_size > 1:
             self.stack += [
                 nn.Conv2d(input_features,
@@ -102,7 +106,9 @@ class MIDIParameterEstimation(nn.Module):
         # remove the height
         x = x[..., 0, :]
         # !!! output should be included in [0, 1)
-        return [x, ]
+        return [
+            x,
+        ]
 
     def predict(self, x):
         return self.forward(x)
@@ -111,14 +117,11 @@ class MIDIParameterEstimation(nn.Module):
 class MIDIVelocityEstimation(MIDIParameterEstimation):
     def __init__(self, input_features, note_frames, *hyperparams):
         super().__init__(input_features, 1, *hyperparams)
-        self.linear = nn.Sequential(
-            nn.Linear(note_frames, note_frames),
-            nn.ReLU(),
-            nn.Linear(note_frames, note_frames),
-            nn.ReLU(),
-            nn.Linear(note_frames, 1),
-            nn.Sigmoid()
-        )
+        self.linear = nn.Sequential(nn.Linear(note_frames, note_frames),
+                                    nn.ReLU(),
+                                    nn.Linear(note_frames, note_frames),
+                                    nn.ReLU(), nn.Linear(note_frames, 1),
+                                    nn.Sigmoid())
 
     def forward(self, x):
         """
