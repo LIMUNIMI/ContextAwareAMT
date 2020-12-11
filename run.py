@@ -24,6 +24,11 @@ def parse_args():
         help="Create the midi file that must be synthesized for creating the template."
     )
     parser.add_argument(
+        "--datasets",
+        action="store_true",
+        help="Prepare the datasets by splitting the various contexts and resynthesizing them"
+    )
+    parser.add_argument(
         "--train-velocity",
         action="store_true",
         help="Train the neural network for velocity estimation.")
@@ -67,6 +72,10 @@ def main():
     if args.scale:
         from mpc2c import create_midi_scale
         create_midi_scale.main()
+    if args.datasets:
+        from mpc2c.asmd_resynth import split_resynth
+        split_resynth(s.DATASETS, s.CARLA_PROJ, s.RESYNTH_DATA_PATH,
+                      s.CONTEXT_SPLITS, s.RESYNTH_FINAL_DECAY)
     if args.train_pedaling:
         from mpc2c import training
         nmf_params = load_nmf_params()

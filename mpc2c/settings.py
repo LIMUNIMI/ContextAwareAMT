@@ -2,10 +2,24 @@ import torch
 from skopt import space
 
 # PATHS
-TEMPLATE_PATH = 'nmf_template.pkl'
 VELOCITY_DATA_PATH = '/datasets/mpc2c/velocity/'
 PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
+RESYNTH_DATA_PATH = '/datasets/mpc2c/resynth'
 SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
+CARLA_PROJ = './carla_proj'
+TEMPLATE_PATH = 'nmf_template.pkl'
+
+# resynthesis of the datasets
+DATASETS = ["Maestro"]
+CONTEXT_SPLITS = [20, 10, 25]
+RESYNTH_FINAL_DECAY = 3
+
+# GENERIC
+SR = 22050
+FRAME_SIZE = 2048
+HOP_SIZE = 512
+#: number of jobs used
+NJOBS = 10
 
 # NMF
 #: epsilon value used inside the nmf to prevent divisons by 0
@@ -21,6 +35,7 @@ EPS_RANGE = 0
 EPS_ACTIVATIONS = 0
 #: if True, recreate data (also set by --redump)
 REDUMP = False
+
 # NN
 DEVICE = 'cuda'
 EPOCHS = 500
@@ -67,15 +82,6 @@ BINS = 256
 ATTACK = 1
 #: the number of frames for the other basis
 BASIS_L = 1
-
-# GENERIC
-SR = 22050
-FRAME_SIZE = 2048
-HOP_SIZE = 512
-#: datasets used for training the model
-DATASETS = ["Maestro"]
-#: number of jobs used
-NJOBS = 10
 
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
 #: same length; just use "pad" for Maestro
