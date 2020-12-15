@@ -74,8 +74,10 @@ def main():
         create_midi_scale.main()
     if args.datasets:
         from mpc2c.asmd_resynth import split_resynth
-        split_resynth(s.DATASETS, s.CARLA_PROJ, s.RESYNTH_DATA_PATH,
-                      s.CONTEXT_SPLITS, s.RESYNTH_FINAL_DECAY)
+        from pathlib import Path
+        split_resynth(s.DATASETS, Path(s.CARLA_PROJ),
+                      Path(s.RESYNTH_DATA_PATH), s.CONTEXT_SPLITS,
+                      s.RESYNTH_FINAL_DECAY)
     if args.train_pedaling:
         from mpc2c import training
         nmf_params = load_nmf_params()

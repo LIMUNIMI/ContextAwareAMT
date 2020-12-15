@@ -12,7 +12,7 @@ TEMPLATE_PATH = 'nmf_template.pkl'
 # resynthesis of the datasets
 DATASETS = ["Maestro"]
 CONTEXT_SPLITS = [20, 10, 25]
-RESYNTH_FINAL_DECAY = 3
+RESYNTH_FINAL_DECAY = 4
 
 # GENERIC
 SR = 22050

@@ -19,12 +19,16 @@ Config
 #. Open ``mpc2c/settings.py`` and check the variables in section 'PATH',
    especially ``VELOCIY_DATA_PATH``, ``PEDALING_DATA_PATH``, and
    ``RESYNTHESIS_DATA_PATH``. Set them to meaningful paths for your system.
-#. Make sure that ``jack_synth`` module dependencies are installed and that
-   ``carla`` is configured correctly
-#. Prepare your Carla configrations and put them in the
-   ``mpc2csettings.CARLA_PROJ`` directory.; the included ones need
-   ``pianoteq``, ``sf2 soundfont`` ``reverb something`` and ``salamander grand
-   piano`` available in path: [TODO]
+#. Make sure that you have ``jackd`` installed
+#. Run ``poetry run python -m pycarla.carla -d`` to download Carla host
+#. Prepare your Carla presets by using ``poetry run python -m pycarla.carla
+   -r`` and put them in the ``mpc2c.settings.CARLA_PROJ`` directory; the
+   included ones need:
+
+    * ``Pianoteq 6 STAGE`` LV2 plugin installed and available to Carla (e.g. in ``~/.lv2/`` or ``/usr/lib/lv2/``)
+    * ``Calf Reverb`` LV2 plugin installed and available to Carla (e.g. in ``~/.lv2/`` or ``/usr/lib/lv2/``)
+    * ``SalamanderGrandPianoV3Retuned`` SFZ version installed in
+      ``/opt/soundfonts/SalamanderGrandPianoV3+20161209_48khz24bit/SalamanderGrandPianoV3Retuned.sfz``
 
 
 Datasets
