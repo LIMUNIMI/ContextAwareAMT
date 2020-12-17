@@ -2,77 +2,119 @@ from torch import nn
 
 
 def conv_output_size(size, dilation, kernel, stride):
-    return int((size - dilation * (kernel - 1)) / stride)
+    out = []
+    for dim in range(len(size)):
+        out.append(
+            int((size[dim] - dilation[dim] * (kernel[dim] - 1)) / stride[dim]))
+    return tuple(out)
 
 
 class MIDIParameterEstimation(nn.Module):
-    def __init__(self, input_features, output_features, *hyperparams):
+    def __init__(self, input_size, output_features, out_frames, *hyperparams):
         """
-        Size of the inputs are expected to be 3d: (batch, input_features,
-        frames).  Convolutional kernels are applied frame-wise so that the
-        input_features is reduced to one and the returned tensor has shape
-        (batch, output_features, frames), where each output feature corresponds
-        to a channel of the output of the stack
+        * `hyperparams` must contains 3 values:
 
-        `hyperparams` must contains 3 values:
+            * kernel_size : tuple[int]
+            * stride : tuple[int]
+            * dilation : tuple[int]
 
-            * kernel_size
-            * stride
-            * dilation
+        * `input_size` is a tuple[int] containing the number of rows (features)
+        and columns (frames) of each input. It can contain only one number if
+        the number of columns is unknwon.
 
+        * Size of the inputs are expected to be 3d:
+
+            `(batch, input_features, frames)`
+
+        * If `out_frames` is None, the convolutional kernels are applied
+        frame-wise so that the `input_features` dimension is reduced to 1 while
+        the `frames` dimension remains untouched.  The returned tensor has
+        shape:
+
+            `(batch, output_features, frames)`
+
+        where the `output_feature` dimension is the channel dimension of the
+        internal convolutional stack. Only the first int of `input_size` and of
+        each hyperparam is used.
+        This setting is useful for frame-level parameters.
+
+        * If `out_frames` is not None, it should be a tuple of two ints and
+        both `hyperparams` and `input_size` should also contain tuples of 2
+        ints. In this case, the convolutional stack is made so that the output
+        size is:
+
+            `(batch, output_features, out_frames[1])`
+
+        This setting can be used for note-level parameters, where each note is
+        represented using a fixed number of frames `out_frames[0]`. This method
+        doesn't work if the number of features is much lower than the number of
+        columns [TODO].
         """
-        kernel_size, stride, dilation = hyperparams
+
         super().__init__()
-        input_size = input_features
-        # add one block to introduce the needed number of features
-        next_input_size = conv_output_size(input_size, dilation, kernel_size,
-                                           stride)
-        input_features = 1
-        if next_input_size > 0:
-            input_size = next_input_size
-            self.stack = [
-                nn.Conv2d(input_features,
-                          output_features,
-                          kernel_size=(kernel_size, 1),
-                          stride=(stride, 1),
-                          padding=0,
-                          dilation=(dilation, 1)),
-                nn.BatchNorm2d(output_features),
-                nn.ReLU()
-            ]
-            input_features = output_features
-        else:
-            self.stack = []
 
-        # start adding blocks until we can
-        next_input_size = conv_output_size(input_size, dilation, kernel_size,
-                                           stride)
-        while next_input_size > 0:
-            input_size = next_input_size
-            self.stack += [
-                nn.Conv2d(input_features,
-                          output_features,
-                          kernel_size=(kernel_size, 1),
-                          stride=(stride, 1),
-                          dilation=(dilation, 1),
-                          padding=0,
-                          groups=input_features),
-                nn.BatchNorm2d(output_features),
-                nn.ReLU()
-            ]
+        # setup the `out_frames` stuffs
+        kernel_size, stride, dilation = hyperparams
+
+        def add_module(input_features):
+            """
+            Add a module to the stack if the output size is >= 0
+
+            Returns (True, size_after_the_module) if the module is added,
+            (False, same_size_as_input) if the module is not added.
+            """
+
+            # computing size after the first block
             next_input_size = conv_output_size(input_size, dilation,
                                                kernel_size, stride)
+            if next_input_size[0] > 0:
+                # if we can reduce the features
+                if (out_frames is not None
+                        and next_input_size[1] <= 0) or out_frames is None:
+                    # if we cannot apply kernels on the frames, let's
+                    # apply them framewise except for the last layer
+                    k = (kernel_size[0], 1)
+                    s = (stride[0], 1)
+                    d = (dilation[0], 1)
 
-        # add the last block to get size 1 along frequencies dimension
+                self.stack += [
+                    nn.Conv2d(input_features,
+                              output_features,
+                              kernel_size=k,
+                              stride=s,
+                              padding=0,
+                              dilation=d),
+                    nn.BatchNorm2d(output_features),
+                    nn.ReLU()
+                ]
+                return True, next_input_size
+            else:
+                return False, input_size
+
+        # start adding blocks until we can
+        self.stack = []
+        input_features = 1
+        added = True
+        while added:
+            added, input_size = add_module(input_features)
+            input_features = output_features
+
+        # add the last block to get size 1 along feature dimension and
+        # (optionally) along the frame dimension
         if len(self.stack) == 0:
             raise RuntimeError(
                 "Network hyper-parameters would create a one-layer convnet")
 
-        if input_size > 1:
+        if out_frames is None:
+            k = (input_size[0], 1)
+        else:
+            k = input_size
+
+        if input_size[0] > 1:
             self.stack += [
                 nn.Conv2d(input_features,
                           output_features,
-                          kernel_size=(input_size, 1),
+                          kernel_size=k,
                           stride=1,
                           dilation=1,
                           padding=0,
@@ -114,35 +156,35 @@ class MIDIParameterEstimation(nn.Module):
         return self.forward(x)
 
 
-class MIDIVelocityEstimation(MIDIParameterEstimation):
-    def __init__(self, input_features, note_frames, *hyperparams):
-        super().__init__(input_features, 1, *hyperparams)
-        self.linear = nn.Sequential(nn.Linear(note_frames, note_frames),
-                                    nn.ReLU(),
-                                    nn.Linear(note_frames, note_frames),
-                                    nn.ReLU(), nn.Linear(note_frames, 1),
-                                    nn.Sigmoid())
+# class MIDIVelocityEstimation(MIDIParameterEstimation):
+#     def __init__(self, input_features, note_frames, hyperparams):
+#         super().__init__(input_features, 1, hyperparams)
+#         self.linear = nn.Sequential(nn.Linear(note_frames, note_frames),
+#                                     nn.ReLU(),
+#                                     nn.Linear(note_frames, note_frames),
+#                                     nn.ReLU(), nn.Linear(note_frames, 1),
+#                                     nn.Sigmoid())
 
-    def forward(self, x):
-        """
-        Arguments
-        ---------
+#     def forward(self, x):
+#         """
+#         Arguments
+#         ---------
 
-        inp : torch.tensor
-            shape (batch, in_features, frames)
+#         inp : torch.tensor
+#             shape (batch, in_features, frames)
 
-        Returns
-        -------
+#         Returns
+#         -------
 
-        torch.tensor
-            shape (batch,)
-        """
-        return [
-            self.linear(super().forward(x)[0][:, 0])[:, 0],
-        ]
+#         torch.tensor
+#             shape (batch,)
+#         """
+#         return [
+#             self.linear(super().forward(x)[0][:, 0])[:, 0],
+#         ]
 
-    def predict(self, x):
-        return self.forward(x)
+#     def predict(self, x):
+#         return self.forward(x)
 
 
 def init_weights(m, initializer):

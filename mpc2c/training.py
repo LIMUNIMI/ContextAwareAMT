@@ -1,9 +1,9 @@
 import torch
 import torch.nn.functional as F
 
-from .mytorchutils import train_epochs
 from . import data_management, feature_extraction
 from . import settings as s
+from .mytorchutils import train_epochs
 
 
 def train_pedaling(nmf_params, hyperparams):
@@ -11,8 +11,8 @@ def train_pedaling(nmf_params, hyperparams):
     validloader = data_management.get_loader(['validation'], nmf_params,
                                              'pedaling')
     model = feature_extraction.MIDIParameterEstimation(
-        s.BINS, 3, hyperparams['kernel'], hyperparams['stride'],
-        hyperparams['dilation']).to(s.DEVICE).to(s.DTYPE)
+        s.BINS, 3, None, (hyperparams['kernel'], hyperparams['stride'],
+                          hyperparams['dilation'])).to(s.DEVICE).to(s.DTYPE)
     return train(trainloader, validloader, model, hyperparams['lr'])
 
 
@@ -20,9 +20,10 @@ def train_velocity(nmf_params, hyperparams):
     trainloader = data_management.get_loader(['train'], nmf_params, 'velocity')
     validloader = data_management.get_loader(['validation'], nmf_params,
                                              'velocity')
-    model = feature_extraction.MIDIVelocityEstimation(
-        s.BINS, s.MINI_SPEC_SIZE, hyperparams['kernel'], hyperparams['stride'],
-        hyperparams['dilation']).to(s.DEVICE).to(s.DTYPE)
+    model = feature_extraction.MIDIParameterEstimation(
+        s.BINS, 1, s.MINI_SPEC_SIZE,
+        (hyperparams['kernel'], hyperparams['stride'],
+         hyperparams['dilation'])).to(s.DEVICE).to(s.DTYPE)
 
     return train(trainloader,
                  validloader,
@@ -50,5 +51,10 @@ def train(trainloader, validloader, model, *args, **kwargs):
         return loss
 
     validloss_fn = trainloss_fn
-    return train_epochs(model, optim, trainloss_fn, validloss_fn, trainloader,
-                        validloader, plot_losses=s.PLOT_LOSSES)
+    return train_epochs(model,
+                        optim,
+                        trainloss_fn,
+                        validloss_fn,
+                        trainloader,
+                        validloader,
+                        plot_losses=s.PLOT_LOSSES)
