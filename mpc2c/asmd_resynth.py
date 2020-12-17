@@ -6,6 +6,7 @@ from typing import List, Optional
 
 import mido
 import numpy as np
+
 import pycarla
 from asmd import asmd
 
@@ -124,6 +125,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
             proj = glob[i]
             carla = pycarla.Carla(proj, server, min_wait=4)
             carla.start()
+            carla.wait_exists()
 
         # get the song with this context
         d = dataset.filter(groups=[group], copy=True)
@@ -132,7 +134,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
             # for each song in this context, get the new audio_path
             audio_path = output_path / d.paths[i][0][0]
             audio_path.parent.mkdir(parents=True, exist_ok=True)
-            audio_path = str(audio_path)
+            audio_path = str(audio_path).replace('.wav', '.flac')
             old_audio_path = str(old_install_dir / d.paths[i][0][0])
             if group != "orig":
                 # if this is a new context, resynthesize...
