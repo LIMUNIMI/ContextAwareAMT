@@ -141,9 +141,10 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
             # for each song in this context, get the new audio_path
             audio_path = output_path / d.paths[i][0][0]
             if audio_path.exists() and audio_path.stat().st_size > 0:
-                # if the file already exists and not empty, skip it
+                print(f"{audio_path} already exists")
                 continue
             audio_path.parent.mkdir(parents=True, exist_ok=True)
+            audio_path = str(audio_path)
             old_audio_path = str(old_install_dir / d.paths[i][0][0])
             if group != "orig":
                 # if this is a new context, resynthesize...
