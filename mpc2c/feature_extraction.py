@@ -10,7 +10,7 @@ def conv_output_size(size, dilation, kernel, stride):
 
 
 class MIDIParameterEstimation(nn.Module):
-    def __init__(self, input_size, output_features, out_frames, *hyperparams):
+    def __init__(self, input_size, output_features, note_level, hyperparams):
         """
         * `hyperparams` must contains 3 values:
 
@@ -24,36 +24,35 @@ class MIDIParameterEstimation(nn.Module):
 
         * Size of the inputs are expected to be 3d:
 
-            `(batch, input_features, frames)`
+            `(batch, input_size[0], input_size[1])`
 
-        * If `out_frames` is None, the convolutional kernels are applied
+        * If `note_level` is False, the convolutional kernels are applied
         frame-wise so that the `input_features` dimension is reduced to 1 while
         the `frames` dimension remains untouched.  The returned tensor has
         shape:
 
-            `(batch, output_features, frames)`
+            `(batch, output_features, input_size[1])`
 
         where the `output_feature` dimension is the channel dimension of the
         internal convolutional stack. Only the first int of `input_size` and of
         each hyperparam is used.
         This setting is useful for frame-level parameters.
 
-        * If `out_frames` is not None, it should be a tuple of two ints and
-        both `hyperparams` and `input_size` should also contain tuples of 2
-        ints. In this case, the convolutional stack is made so that the output
-        size is:
+        * If `note_level` is True, both `hyperparams` and `input_size` should
+        contain tuples of 2 ints. In this case, the convolutional stack is made
+        so that the output size is:
 
-            `(batch, output_features, out_frames[1])`
+            `(batch, output_features, 1)`
 
         This setting can be used for note-level parameters, where each note is
-        represented using a fixed number of frames `out_frames[0]`. This method
-        doesn't work if the number of features is much lower than the number of
-        columns [TODO].
+        represented using a fixed number of frames `input_size[1]`. This method
+        doesn't work if the number of rows (`input_size[0]`) is much lower than
+        the number of columns (`input_size[1]`) [TODO].
         """
 
         super().__init__()
 
-        # setup the `out_frames` stuffs
+        # setup the `note_level` stuffs
         kernel_size, stride, dilation = hyperparams
 
         def add_module(input_features):
@@ -69,8 +68,7 @@ class MIDIParameterEstimation(nn.Module):
                                                kernel_size, stride)
             if next_input_size[0] > 0:
                 # if we can reduce the features
-                if (out_frames is not None
-                        and next_input_size[1] <= 0) or out_frames is None:
+                if (note_level and next_input_size[1] <= 0) or not note_level:
                     # if we cannot apply kernels on the frames, let's
                     # apply them framewise except for the last layer
                     k = (kernel_size[0], 1)
@@ -105,7 +103,7 @@ class MIDIParameterEstimation(nn.Module):
             raise RuntimeError(
                 "Network hyper-parameters would create a one-layer convnet")
 
-        if out_frames is None:
+        if not note_level:
             k = (input_size[0], 1)
         else:
             k = input_size
