@@ -1,6 +1,7 @@
-import sys
 import os
+import sys
 from dataclasses import dataclass
+from typing import Callable, Tuple
 
 import matplotlib.pyplot as plt
 import visdom
@@ -33,7 +34,10 @@ class SKOptimizer(object):
 
     `checkpoint_path` is a path where checkpoints are saved
 
-    `num_iter` is the number of iterations
+    `num_iter` is a tuple[int] containing the number of iterations for the two
+        procedures: the first is the number of iterations to do using the uniform
+        random choice, the second is the number of iterations to do using the
+        `optimization_method` specified in this call
 
     `to_minimize` is a callable that accepts hyperparams in `space` as a dict
         and which returns one loss
@@ -49,14 +53,16 @@ class SKOptimizer(object):
 
     `optimize` load a checkpoint if it exists and starts the optimization
         procedure; calls the `plot` method after checkpoint loading  and before
-        of exiting.
+        of exiting. First, this performs `num_iter[0]` iterations using a
+        uniform radnom sampler, then it performs `num_iter[1]` iterations using
+        the method specified in the constructor
     """
 
     space: list
     checkpoint_path: str
-    num_iter: int
-    to_minimize: callable
-    optimization_method: callable = skopt.dummy_minimize
+    num_iter: Tuple[int]
+    to_minimize: Callable
+    optimization_method: Callable = skopt.forest_minimize
     seed: int = 1992
 
     def _make_objective_func(self):
@@ -111,6 +117,22 @@ class SKOptimizer(object):
         verbose_callback = VerboseCallback(1)
         checkpoint_saver = CheckpointSaver(self.checkpoint_path)
         print("\n=================================\n")
+        print("\nUniform random init\n")
+        print("\n=================================\n")
+        res = skopt.dummy_minimize(
+            func=self._make_objective_func(),
+            dimensions=self.space,
+            x0=x0,  # already examined values for x
+            y0=y0,  # observed values for x0
+            callback=[verbose_callback, checkpoint_saver],
+            random_state=self.seed,
+            n_calls=self.num_iter[0])
+        x0 = self.res.x_iters
+        y0 = self.res.func_vals
+
+        print("\n=================================\n")
+        print("\nSpecific method optimization\n")
+        print("\n=================================\n")
         res = self.optimization_method(
             func=self._make_objective_func(),
             dimensions=self.space,
@@ -118,7 +140,7 @@ class SKOptimizer(object):
             y0=y0,  # observed values for x0
             callback=[verbose_callback, checkpoint_saver],
             random_state=self.seed,
-            n_calls=self.num_iter)
+            n_calls=self.num_iter[1])
         skopt.utils.dump(res, "skopt_result.pkl")
         print("\n=================================\n")
 
