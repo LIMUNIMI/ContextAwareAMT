@@ -82,7 +82,7 @@ def main():
         from mpc2c import training
         nmf_params = load_nmf_params()
         if args.skopt:
-            hyperopt(s.SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
+            hyperopt(s.PED_SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
                      lambda x: training.train_pedaling(nmf_params, x))
         else:
             training.train_pedaling(nmf_params, s.VEL_HYPERPARAMS)
@@ -91,7 +91,7 @@ def main():
         from mpc2c import training
         nmf_params = load_nmf_params()
         if args.skopt:
-            hyperopt(s.SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
+            hyperopt(s.VEL_SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
                      lambda x: training.train_velocity(nmf_params, x))
         else:
             training.train_velocity(nmf_params, s.PED_HYPERPARAMS)

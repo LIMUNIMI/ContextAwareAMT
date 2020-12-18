@@ -11,8 +11,11 @@ def train_pedaling(nmf_params, hyperparams):
     validloader = data_management.get_loader(['validation'], nmf_params,
                                              'pedaling')
     model = feature_extraction.MIDIParameterEstimation(
-        s.BINS, 3, None, (hyperparams['kernel'], hyperparams['stride'],
-                          hyperparams['dilation'])).to(s.DEVICE).to(s.DTYPE)
+        input_size=(s.BINS, ),
+        output_features=3,
+        note_level=False,
+        hyperparams=((hyperparams['kernel_0'], ), (hyperparams['stride_0'], ),
+                     (hyperparams['dilation_0'], ))).to(s.DEVICE).to(s.DTYPE)
     return train(trainloader, validloader, model, hyperparams['lr'])
 
 
@@ -21,9 +24,13 @@ def train_velocity(nmf_params, hyperparams):
     validloader = data_management.get_loader(['validation'], nmf_params,
                                              'velocity')
     model = feature_extraction.MIDIParameterEstimation(
-        s.BINS, 1, s.MINI_SPEC_SIZE,
-        (hyperparams['kernel'], hyperparams['stride'],
-         hyperparams['dilation'])).to(s.DEVICE).to(s.DTYPE)
+        input_size=(s.BINS, s.MINI_SPEC_SIZE),
+        output_features=1,
+        note_level=True,
+        hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
+                     (hyperparams['stride_0'], hyperparams['stride_1']),
+                     (hyperparams['dilation_0'],
+                      hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
 
     return train(trainloader,
                  validloader,

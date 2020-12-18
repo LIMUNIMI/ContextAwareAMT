@@ -42,16 +42,19 @@ EPOCHS = 500
 VEL_HYPERPARAMS = {
     "lr": 0.5,
     "wd": 0.01,
-    "kernel": 4,
-    "stride": 1,
-    "dilation": 5
+    "kernel_0": 4,
+    "stride_0": 1,
+    "dilation_0": 5,
+    "kernel_1": 2,
+    "stride_1": 1,
+    "dilation_1": 1
 }
 PED_HYPERPARAMS = {
     "lr": 0.5,
     "wd": 0.01,
-    "kernel": 4,
-    "stride": 1,
-    "dilation": 5
+    "kernel_0": 4,
+    "stride_0": 1,
+    "dilation_0": 5
 }
 VEL_BATCH_SIZE = 600
 PED_BATCH_SIZE = 1
@@ -62,15 +65,25 @@ DTYPE = torch.float32
 DATASET_LEN = 1
 
 # SKOPT
-SKSPACE = [
+VEL_SKSPACE = [
     space.Real(0.0001, 2, name='lr'),
     space.Real(0.0001, 1, name='wd'),
-    space.Integer(1, 32, name='kernel'),
-    space.Integer(1, 32, name='stride'),
-    space.Integer(1, 16, name='dilation')
+    space.Integer(1, 32, name='kernel_0'),
+    space.Integer(1, 32, name='stride_0'),
+    space.Integer(1, 16, name='dilation_0'),
+    space.Integer(1, 5, name='kernel_1'),
+    space.Integer(1, 3, name='stride_1'),
+    space.Integer(1, 3, name='dilation_1')
+]
+PED_SKSPACE = [
+    space.Real(0.0001, 2, name='lr'),
+    space.Real(0.0001, 1, name='wd'),
+    space.Integer(1, 32, name='kernel_0'),
+    space.Integer(1, 32, name='stride_0'),
+    space.Integer(1, 16, name='dilation_0')
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
-SKITERATIONS = 10**4
+SKITERATIONS = (500, 5000)
 
 # MAKE_TEMPLATE
 #: how many basis use in total
