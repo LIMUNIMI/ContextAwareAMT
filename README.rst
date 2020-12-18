@@ -36,6 +36,7 @@ Datasets
 
 #. Install 'Maestro' dataset from ``asmd``: ``python -m asmd.install``
 #. Prepare the new dataset with the resynthesized parts: ``python run.py --datasets``
+#. If the process stops, relaunch it (it will skip the already synthesized songs)
 
 1. Preprocess
 -------------

@@ -49,6 +49,10 @@ def group_split(datasets: List[str],
             # change attribute 'groups' of each selected song
             for song in selected_songs:
                 song['groups'].append(context)
+                song['recording']['path'] = [
+                    i.replace('.wav', '.flac')
+                    for i in song['recording']['path']
+                ]
             # save the dataset in the returned definition
             new_definition['songs'] += selected_songs
 
@@ -118,6 +122,9 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
     dataset.metadataset['install_dir'] = str(output_path)
     json.dump(dataset.metadataset, open("metadataset.json", "wt"))
     for i, group in enumerate(contexts):
+        print("\n------------------------------------")
+        print("Working on context ", group)
+        print("------------------------------------\n")
         # for each context
         # load the preset in Carla
         if group != "orig":
@@ -133,12 +140,14 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
 
             # for each song in this context, get the new audio_path
             audio_path = output_path / d.paths[i][0][0]
+            if audio_path.exists() and audio_path.stat().st_size > 0:
+                # if the file already exists and not empty, skip it
+                continue
             audio_path.parent.mkdir(parents=True, exist_ok=True)
-            audio_path = str(audio_path).replace('.wav', '.flac')
             old_audio_path = str(old_install_dir / d.paths[i][0][0])
             if group != "orig":
                 # if this is a new context, resynthesize...
-                midi_path = old_audio_path.replace('.wav', '.midi')
+                midi_path = old_audio_path.replace('.flac', '.midi')
                 synthesize_song(midi_path, audio_path, final_decay=final_decay)
             else:
                 # if this is the original context, copy it!
