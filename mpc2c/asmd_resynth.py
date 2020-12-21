@@ -100,7 +100,6 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
 
     >>> asmd.Dataset(paths=[output_path], metadataset='metadataset.json')
     """
-    server = pycarla.JackServer(['-R', '-d', 'alsa'])
     glob = list(carla_proj.glob("**/*.carxp"))
 
     # take the name of the contexts
@@ -121,39 +120,55 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
     dataset.install_dir = str(output_path)
     dataset.metadataset['install_dir'] = str(output_path)
     json.dump(dataset.metadataset, open("metadataset.json", "wt"))
-    for i, group in enumerate(contexts):
-        print("\n------------------------------------")
-        print("Working on context ", group)
-        print("------------------------------------\n")
-        # for each context
-        # load the preset in Carla
-        if group != "orig":
-            # if this is a new context, start Carla
-            proj = glob[i]
-            carla = pycarla.Carla(proj, server, min_wait=4)
-            carla.start()
-            carla.wait_exists()
+    for trial in range(100):
+        try:
+            server = pycarla.JackServer(['-R', '-d', 'alsa'])
+            for i, group in enumerate(contexts):
+                print("\n------------------------------------")
+                print("Working on context ", group)
+                print("------------------------------------\n")
+                # for each context
+                # load the preset in Carla
+                if group != "orig":
+                    # if this is a new context, start Carla
+                    proj = glob[i]
+                    carla = pycarla.Carla(proj, server, min_wait=4)
+                    carla.start()
 
-        # get the song with this context
-        d = dataset.filter(groups=[group], copy=True)
-        for i in range(len(d)):
+                # get the song with this context
+                d = dataset.filter(groups=[group], copy=True)
+                for j in range(len(d)):
 
-            # for each song in this context, get the new audio_path
-            audio_path = output_path / d.paths[i][0][0]
-            if audio_path.exists() and audio_path.stat().st_size > 0:
-                print(f"{audio_path} already exists")
-                continue
-            audio_path.parent.mkdir(parents=True, exist_ok=True)
-            audio_path = str(audio_path)
-            old_audio_path = str(old_install_dir / d.paths[i][0][0])
-            if group != "orig":
-                # if this is a new context, resynthesize...
-                midi_path = old_audio_path.replace('.flac', '.midi')
-                synthesize_song(midi_path, audio_path, final_decay=final_decay)
-            else:
-                # if this is the original context, copy it!
-                # copy the original audio path to the new audio_path
-                shutil.copy(old_audio_path, audio_path)
-        carla.kill_carla()
-        del carla
+                    # for each song in this context, get the new audio_path
+                    audio_path = output_path / d.paths[j][0][0]
+                    if audio_path.exists() and audio_path.stat().st_size > 0:
+                        print(f"{audio_path} already exists")
+                        continue
+                    audio_path.parent.mkdir(parents=True, exist_ok=True)
+                    audio_path = str(audio_path)
+                    old_audio_path = str(old_install_dir / d.paths[j][0][0])
+                    if group != "orig":
+                        # if this is a new context, resynthesize...
+                        midi_path = old_audio_path.replace('.flac', '.midi')
+                        # check that Carla is still alive..
+                        if not carla.exists():
+                            carla.restart()
+                        synthesize_song(midi_path,
+                                        audio_path,
+                                        final_decay=final_decay)
+                    else:
+                        # if this is the original context, copy it!
+                        # copy the original audio path to the new audio_path
+                        shutil.copy(old_audio_path, audio_path)
+                if group != "orig":
+                    # if this is a new context, close Carla
+                    carla.kill_carla()
+                    del carla
+        except:
+            print(
+                "There was an error while synthesizing, restarting the procedure"
+            )
+            carla.restart()
+        else:
+            break
     server.kill()
