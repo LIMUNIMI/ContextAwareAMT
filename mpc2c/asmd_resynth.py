@@ -132,7 +132,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
                 if group != "orig":
                     # if this is a new context, start Carla
                     proj = glob[i]
-                    carla = pycarla.Carla(proj, server, min_wait=4)
+                    carla = pycarla.Carla(proj, server, min_wait=8)
                     carla.start()
 
                 # get the song with this context
@@ -152,6 +152,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
                         midi_path = old_audio_path.replace('.flac', '.midi')
                         # check that Carla is still alive..
                         if not carla.exists():
+                            print("Carla doesn't exists... restarting everything")
                             carla.restart()
                         synthesize_song(midi_path,
                                         audio_path,
