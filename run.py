@@ -75,8 +75,9 @@ def main():
     if args.datasets:
         from mpc2c.asmd_resynth import split_resynth
         from pathlib import Path
-        split_resynth(s.DATASETS, Path(s.CARLA_PROJ),
-                      Path(s.RESYNTH_DATA_PATH), s.CONTEXT_SPLITS,
+        split_resynth(s.DATASETS,
+                      Path(s.CARLA_PROJ), Path(s.RESYNTH_DATA_PATH),
+                      Path(s.METADATASET_PATH), s.CONTEXT_SPLITS,
                       s.RESYNTH_FINAL_DECAY)
     if args.train_pedaling:
         from mpc2c import training
