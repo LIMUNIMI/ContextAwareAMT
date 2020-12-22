@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from . import nmf
 from . import settings as s
 from . import utils
-from .mytorchutils import DatasetDump, pad_collate, dummy_collate
+from .mytorchutils import DatasetDump, dummy_collate, pad_collate
 
 
 def process_pedaling(i, dataset, nmf_params):
@@ -39,7 +39,9 @@ def process_velocities(i, dataset, nmf_params):
 
 
 def get_loader(groups, nmf_params, mode):
-    dataset = asmd.Dataset().filter(datasets=s.DATASETS, groups=groups)
+    dataset = asmd.Dataset(
+        paths=[s.RESYNTH_DATA_PATH],
+        metadataset_path=s.METADATASET_PATH).filter(groups=groups)
     dataset.paths = dataset.paths[:int(s.DATASET_LEN * len(dataset.paths))]
     if mode == 'velocity':
         num_samples = [

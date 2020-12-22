@@ -2,9 +2,10 @@ import torch
 from skopt import space
 
 # PATHS
-VELOCITY_DATA_PATH = '/datasets/mpc2c/velocity/'
-PEDALING_DATA_PATH = '/datasets/mpc2c/pedaling/'
-RESYNTH_DATA_PATH = '/datasets/mpc2c/resynth'
+VELOCITY_DATA_PATH = '/datasets/mpc2c/resynth/velocity/'
+PEDALING_DATA_PATH = '/datasets/mpc2c/resynth/pedaling/'
+RESYNTH_DATA_PATH = '/datasets/mpc2c/resynth/'
+METADATASET_PATH = './metadataset.json'
 SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 CARLA_PROJ = './carla_proj'
 TEMPLATE_PATH = 'nmf_template.pkl'
