@@ -6,23 +6,35 @@ from . import settings as s
 from .mytorchutils import train_epochs
 
 
-def train_pedaling(nmf_params, hyperparams):
-    trainloader = data_management.get_loader(['train'], nmf_params, 'pedaling')
-    validloader = data_management.get_loader(['validation'], nmf_params,
-                                             'pedaling')
+def train_pedaling(nmf_params, hyperparams, context=None, state_dict=None):
+    trainloader = data_management.get_loader(
+        ['train', context] if context is not None else ['train'], nmf_params,
+        'pedaling')
+    validloader = data_management.get_loader(
+        ['validation', context] if context is not None else ['validation'],
+        nmf_params, 'pedaling')
+    if s.REDUMP:
+        return
     model = feature_extraction.MIDIParameterEstimation(
         input_size=(s.BINS, ),
         output_features=3,
         note_level=False,
         hyperparams=((hyperparams['kernel_0'], ), (hyperparams['stride_0'], ),
                      (hyperparams['dilation_0'], ))).to(s.DEVICE).to(s.DTYPE)
+
+    # TODO: if state_dict is not None, load it and fix initial weights
     return train(trainloader, validloader, model, hyperparams['lr'])
 
 
-def train_velocity(nmf_params, hyperparams):
-    trainloader = data_management.get_loader(['train'], nmf_params, 'velocity')
-    validloader = data_management.get_loader(['validation'], nmf_params,
-                                             'velocity')
+def train_velocity(nmf_params, hyperparams, context=None, state_dict=None):
+    trainloader = data_management.get_loader(
+        ['train', context] if context is not None else ['train'], nmf_params,
+        'velocity')
+    validloader = data_management.get_loader(
+        ['validation', context] if context is not None else ['validation'],
+        nmf_params, 'velocity')
+    if s.REDUMP:
+        return
     model = feature_extraction.MIDIParameterEstimation(
         input_size=(s.BINS, s.MINI_SPEC_SIZE),
         output_features=1,
@@ -32,6 +44,7 @@ def train_velocity(nmf_params, hyperparams):
                      (hyperparams['dilation_0'],
                       hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
 
+    # TODO: if state_dict is not None, load it and fix initial weights
     return train(trainloader,
                  validloader,
                  model,
