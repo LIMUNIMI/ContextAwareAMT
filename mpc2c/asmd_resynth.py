@@ -50,8 +50,7 @@ def group_split(datasets: List[str],
             for song in selected_songs:
                 song['groups'].append(context)
                 song['recording']['path'] = [
-                    i.replace('.wav', '.flac')
-                    for i in song['recording']['path']
+                    i[:-4] + '.flac' for i in song['recording']['path']
                 ]
             # save the dataset in the returned definition
             new_definition['songs'] += selected_songs
@@ -82,9 +81,70 @@ def synthesize_song(midi_path: str, audio_path: str, final_decay: float = 3):
     del player, recorder
 
 
+def trial(contexts, glob, dataset, output_path, old_install_dir, final_decay):
+    try:
+        for i, group in enumerate(contexts):
+            print("\n------------------------------------")
+            print("Working on context ", group)
+            print("------------------------------------\n")
+            # for each context
+            # load the preset in Carla
+            if group != "orig":
+                server = pycarla.JackServer(['-R', '-d', 'alsa'])
+                # if this is a new context, start Carla
+                proj = glob[i]
+                carla = pycarla.Carla(proj, server, min_wait=8)
+                carla.start()
+
+            # get the song with this context
+            d = dataset.filter(groups=[group], copy=True)
+            for j in range(len(d)):
+
+                # for each song in this context, get the new audio_path
+                audio_path = output_path / d.paths[j][0][0]
+                if audio_path.exists() and audio_path.stat().st_size > 0:
+                    print(f"{audio_path} already exists")
+                    continue
+                audio_path.parent.mkdir(parents=True, exist_ok=True)
+                audio_path = str(audio_path)
+                old_audio_path = str(
+                    old_install_dir / d.paths[j][0][0])[:-5] + '.wav'
+                if group != "orig":
+                    # if this is a new context, resynthesize...
+                    midi_path = old_audio_path[:-4] + '.midi'
+                    # check that Carla is still alive..
+                    if not carla.exists():
+                        print("Carla doesn't exists... restarting everything")
+                        carla.restart()
+                    synthesize_song(midi_path,
+                                    audio_path,
+                                    final_decay=final_decay)
+                else:
+                    new_audio_path = audio_path[:-5] + '.wav'
+                    print(f"Original context, copying {old_audio_path} \
+to {new_audio_path}")
+                    shutil.copy(old_audio_path, new_audio_path)
+            if group != "orig":
+                # if this is a new context, close Carla
+                carla.kill_carla()
+                del carla
+    except Exception as e:
+        print("Exception occured while processing group " + group)
+        print(e)
+        if group != "orig":
+            print(
+                "There was an error while synthesizing, restarting the procedure"
+            )
+            carla.restart()
+        return False
+    else:
+        server.kill()
+        return True
+
+
 def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
-                  output_path: pathlib.Path, context_splits: List[int],
-                  final_decay: float):
+                  output_path: pathlib.Path, metadataset_path: pathlib.Path,
+                  context_splits: List[int], final_decay: float):
     """
     Go trhough the datasets, and using the projects in `carla_proj`, create a
     new resynthesized dataset in `output_path`.
@@ -98,7 +158,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
     After the execution of this function, one can load the new definition file
     by using:
 
-    >>> asmd.Dataset(paths=[output_path], metadataset='metadataset.json')
+    >>> asmd.Dataset(paths=[output_path], metadataset_path='metadataset.json')
     """
     glob = list(carla_proj.glob("**/*.carxp"))
 
@@ -119,57 +179,16 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
     # prepare and save the new metadataset
     dataset.install_dir = str(output_path)
     dataset.metadataset['install_dir'] = str(output_path)
-    json.dump(dataset.metadataset, open("metadataset.json", "wt"))
-    for trial in range(100):
-        try:
-            server = pycarla.JackServer(['-R', '-d', 'alsa'])
-            for i, group in enumerate(contexts):
-                print("\n------------------------------------")
-                print("Working on context ", group)
-                print("------------------------------------\n")
-                # for each context
-                # load the preset in Carla
-                if group != "orig":
-                    # if this is a new context, start Carla
-                    proj = glob[i]
-                    carla = pycarla.Carla(proj, server, min_wait=8)
-                    carla.start()
-
-                # get the song with this context
-                d = dataset.filter(groups=[group], copy=True)
-                for j in range(len(d)):
-
-                    # for each song in this context, get the new audio_path
-                    audio_path = output_path / d.paths[j][0][0]
-                    if audio_path.exists() and audio_path.stat().st_size > 0:
-                        print(f"{audio_path} already exists")
-                        continue
-                    audio_path.parent.mkdir(parents=True, exist_ok=True)
-                    audio_path = str(audio_path)
-                    old_audio_path = str(old_install_dir / d.paths[j][0][0])
-                    if group != "orig":
-                        # if this is a new context, resynthesize...
-                        midi_path = old_audio_path.replace('.flac', '.midi')
-                        # check that Carla is still alive..
-                        if not carla.exists():
-                            print("Carla doesn't exists... restarting everything")
-                            carla.restart()
-                        synthesize_song(midi_path,
-                                        audio_path,
-                                        final_decay=final_decay)
-                    else:
-                        # if this is the original context, copy it!
-                        # copy the original audio path to the new audio_path
-                        shutil.copy(old_audio_path, audio_path)
-                if group != "orig":
-                    # if this is a new context, close Carla
-                    carla.kill_carla()
-                    del carla
-        except:
-            print(
-                "There was an error while synthesizing, restarting the procedure"
-            )
-            carla.restart()
-        else:
+    json.dump(dataset.metadataset, open(metadataset_path, "wt"))
+    for i in range(100):
+        if trial(contexts, glob, dataset, output_path, old_install_dir,
+                 final_decay):
             break
-    server.kill()
+
+    print("Copying ground-truth files...")
+    for dataset in datasets:
+        for old_file in old_install_dir.glob(f"{dataset}/**/*.json.gz"):
+            new_file = output_path / old_file.relative_to(old_install_dir)
+            print(f":::\n::: {old_file.name} > {new_file.name}")
+            shutil.copy(old_file, new_file)
+
