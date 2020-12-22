@@ -19,32 +19,70 @@ def parse_args():
         help="Create the initial template from `pianoteq_scales.mp3` and `scales.mid`"
     )
     parser.add_argument(
+        "-sc",
         "--scale",
         action="store_true",
         help="Create the midi file that must be synthesized for creating the template."
     )
     parser.add_argument(
+        "-d",
         "--datasets",
         action="store_true",
         help="Prepare the datasets by splitting the various contexts and resynthesizing them"
     )
     parser.add_argument(
+        "-tv",
         "--train-velocity",
         action="store_true",
         help="Train the neural network for velocity estimation.")
     parser.add_argument(
+        "-tp",
         "--train-pedaling",
         action="store_true",
         help="Train the neural network for pedaling estimation.")
     parser.add_argument(
+        "-sk",
         "--skopt",
         action="store_true",
         help="If activated, instead of a full training, performs various little training cycles to look  for hyper-parameters using skopt."
     )
     parser.add_argument(
+        "-r",
         "--redump",
         action="store_true",
-        help="If used, it pre-processes the full dataset and dumps it before of starting training procedure."
+        help="If used, it pre-processes the full dataset and dumps it, then exits")
+    parser.add_argument(
+        "-c",
+        "--context",
+        action="store",
+        type=str,
+        default=None,
+        help="If used, limits the processing to only the specified context (e.g. `-c pianoteq0`, `-c salamander1`, `-c orig`)"
+    )
+    parser.add_argument(
+        "-gm",
+        "--generic-model",
+        action="store",
+        type=str,
+        default=None,
+        help="If used, load parameters from the generic model and fix the initial weights if training."
+    )
+    parser.add_argument(
+        "-cm",
+        "--context-model",
+        action="store",
+        type=str,
+        default=None,
+        help="If used, load parameters from the specific model into th final weights. If `-gm` is used, this applies afterwards and overwrites the final part of the generic model weights."
+    )
+    parser.add_argument(
+        "-i",
+        "--input",
+        action="store",
+        type=str,
+        default=None,
+        nargs=2,
+        help="Expects two inputs, namely a path to MIDI file and a path to audio file."
     )
     return parser.parse_args()
 
@@ -86,7 +124,9 @@ def main():
             hyperopt(s.PED_SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
                      lambda x: training.train_pedaling(nmf_params, x))
         else:
-            training.train_pedaling(nmf_params, s.VEL_HYPERPARAMS)
+            training.train_pedaling(nmf_params,
+                                    s.VEL_HYPERPARAMS,
+                                    context=args.context)
 
     if args.train_velocity:
         from mpc2c import training
@@ -95,7 +135,9 @@ def main():
             hyperopt(s.VEL_SKSPACE, s.SKCHECKPOINT, s.SKITERATIONS,
                      lambda x: training.train_velocity(nmf_params, x))
         else:
-            training.train_velocity(nmf_params, s.PED_HYPERPARAMS)
+            training.train_velocity(nmf_params,
+                                    s.PED_HYPERPARAMS,
+                                    context=args.context)
 
 
 if __name__ == "__main__":

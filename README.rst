@@ -35,34 +35,52 @@ Datasets
 --------
 
 #. Install 'Maestro' dataset from ``asmd``: ``python -m asmd.install``
-#. Prepare the new dataset with the resynthesized parts: ``python run.py --datasets``
+#. Prepare the new dataset with the resynthesized parts: ``python run.py -d``
 #. If the process stops, relaunch it (it will skip the already synthesized songs)
 
 1. Preprocess
 -------------
 
-#. Create the MIDI file for the initial template: ``python run.py --scale``
+#. Create the MIDI file for the initial template: ``python run.py -sc``
 #. Synthesize the midi scale and name it ``pianoteq_scales.mp3`` (TODO: resynthesize using jack_synth)
 #. Compute the initial template and save it to file: ``python run.py --template``
 
-2. Training
------------
+2. Training the generic model
+-----------------------------
 
-#. Look for hyper-parameters for velocity: ``python run.py --train-velocity --skopt --redump``
-#. Look for hyper-parameters for pedaling: ``python run.py --train-pedaling --skopt --redump``
-#. Fully train velocity model: ``python run.py --train-velocity``
-#. Fully train pedaling model: ``python run.py --train-pedaling``
+#. Apply NMF and extract notes for velocity estimation: ``python run.py -tv -r``
+#. Apply NMF and extract frames for pedaling estimation: ``python run.py -tp -r``
+#. Look for hyper-parameters for velocity using the original context: ``python
+   run.py -tv -sk -c orig``
+#. Look for hyper-parameters for pedaling using the original context: ``python
+   run.py -tp -sk -c orig``
+#. Fully train velocity model on the original context: ``python run.py -tv -c orig``
+#. Fully train pedaling model on the original context: ``python run.py -tp -c orig``
 
-N.B. option ``--redump`` preprocess the dataset using NMF; it should be used
+N.B. option ``-r`` preprocess the dataset using NMF; it should be used
 only once per each type of model; each subsequent runs will use the already
 dumped dataset
 
-3. Modelling the contexts
--------------------------
+3. Training the context-specific models
+---------------------------------------
 
 -- TODO --
 
-4. Evaluating error distributions
+#. Fully train velocity model on the original context: ``python run.py -tv -c
+   <context> -gm <path to generic model>``
+#. Fully train pedaling model on the original context: ``python run.py -tp -c
+   <context> -gm <path to generic model>``
+
+Here ``<context>`` is any Carla preset name that you have used before.
+
+4. Testing on a specific file
+-----------------------------
+
+-- TODO --
+
+#. Fully train velocity model on the original context: ``python run.py -tv -gm <path to generic model> -cm <path to context model> -i <input midi> <input audio>``
+
+5. Evaluating error distributions
 ---------------------------------
 
 -- TODO --
