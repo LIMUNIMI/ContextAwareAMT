@@ -74,6 +74,8 @@ class MIDIParameterEstimation(nn.Module):
                     k = (kernel_size[0], 1)
                     s = (stride[0], 1)
                     d = (dilation[0], 1)
+                else:
+                    k, s, d = kernel_size, stride, dilation
 
                 self.stack += [
                     nn.Conv2d(input_features,
