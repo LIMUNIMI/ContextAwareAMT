@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import random
 import shutil
@@ -39,10 +40,12 @@ def group_split(datasets: List[str],
             if context == contexts[-1]:
                 # the last context
                 end = None
+                ext = '.wav'
             else:
                 # a new context
                 # chose a section of size s.CONTEXT_SPLITS[i]
                 end = start + context_splits[i]
+                ext = '.flac'
 
             selected_songs = songs[start:end]
 
@@ -50,7 +53,7 @@ def group_split(datasets: List[str],
             for song in selected_songs:
                 song['groups'].append(context)
                 song['recording']['path'] = [
-                    i[:-4] + '.flac' for i in song['recording']['path']
+                    i[:-4] + ext for i in song['recording']['path']
                 ]
             # save the dataset in the returned definition
             new_definition['songs'] += selected_songs
@@ -107,9 +110,9 @@ def trial(contexts, glob, dataset, output_path, old_install_dir, final_decay):
                     continue
                 audio_path.parent.mkdir(parents=True, exist_ok=True)
                 audio_path = str(audio_path)
-                old_audio_path = str(
-                    old_install_dir / d.paths[j][0][0])[:-5] + '.wav'
                 if group != "orig":
+                    old_audio_path = str(
+                        old_install_dir / d.paths[j][0][0])[:-5] + '.wav'
                     # if this is a new context, resynthesize...
                     midi_path = old_audio_path[:-4] + '.midi'
                     # check that Carla is still alive..
@@ -120,10 +123,9 @@ def trial(contexts, glob, dataset, output_path, old_install_dir, final_decay):
                                     audio_path,
                                     final_decay=final_decay)
                 else:
-                    new_audio_path = audio_path[:-5] + '.wav'
-                    print(f"Original context, copying {old_audio_path} \
-to {new_audio_path}")
-                    shutil.copy(old_audio_path, new_audio_path)
+                    old_audio_path = str(old_install_dir / d.paths[j][0][0])
+                    print(f"Orig context, {old_audio_path} > {audio_path}")
+                    shutil.copy(old_audio_path, audio_path)
             if group != "orig":
                 # if this is a new context, close Carla
                 carla.kill_carla()
@@ -191,4 +193,3 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
             new_file = output_path / old_file.relative_to(old_install_dir)
             print(f":::\n::: {old_file.name} > {new_file.name}")
             shutil.copy(old_file, new_file)
-
