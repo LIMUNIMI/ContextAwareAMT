@@ -48,8 +48,8 @@ Datasets
 2. Training the generic model
 -----------------------------
 
-#. Apply NMF and extract notes for velocity estimation: ``python run.py -tv -r``
-#. Apply NMF and extract frames for pedaling estimation: ``python run.py -tp -r``
+#. Apply NMF and extract notes for velocity estimation: ``python run.py -tv -r -c orig``
+#. Apply NMF and extract frames for pedaling estimation: ``python run.py -tp -r -c orig``
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -tv -sk -c orig``
 #. Look for hyper-parameters for pedaling using the original context: ``python
@@ -66,6 +66,8 @@ dumped dataset
 
 -- TODO --
 
+#. Apply NMF and extract notes for velocity estimation: ``python run.py -tv -r -c <context>``
+#. Apply NMF and extract frames for pedaling estimation: ``python run.py -tp -r -c <context>``
 #. Fully train velocity model on the original context: ``python run.py -tv -c
    <context> -gm <path to generic model>``
 #. Fully train pedaling model on the original context: ``python run.py -tp -c
