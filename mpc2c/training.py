@@ -28,7 +28,7 @@ def train_pedaling(nmf_params,
                      (hyperparams['dilation_0'], ))).to(s.DEVICE).to(s.DTYPE)
 
     # TODO: if state_dict is not None, load it and fix initial weights
-    return train(trainloader, validloader, model, lr=lr, wd=wd)
+    return train(trainloader, validloader, model, lr, wd)
 
 
 def train_velocity(nmf_params,
@@ -55,14 +55,14 @@ def train_velocity(nmf_params,
                       hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
 
     # TODO: if state_dict is not None, load it and fix initial weights
-    return train(trainloader, validloader, model, lr=lr, wd=wd)
+    return train(trainloader, validloader, model, lr, wd)
 
 
-def train(trainloader, validloader, model, *args, **kwargs):
+def train(trainloader, validloader, model, lr, wd):
     print(model)
     print("Total number of parameters: ",
           sum([p.numel() for p in model.parameters() if p.requires_grad]))
-    optim = torch.optim.Adadelta(model.parameters(), *args, **kwargs)
+    optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 
     def trainloss_fn(x, y, lens):
         x, y, lens = x[0], y[0], lens[0]
