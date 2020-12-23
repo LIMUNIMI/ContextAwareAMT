@@ -63,6 +63,8 @@ def train(trainloader, validloader, model, *args, **kwargs):
         y /= 127
 
         if not lens:
+            # if `lens` is False, then we are do not have features nor frames
+            x = x[..., 0, 0]
             return F.l1_loss(x, y)
 
         loss = torch.zeros(len(lens))

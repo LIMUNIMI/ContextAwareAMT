@@ -2,10 +2,27 @@ from torch import nn
 
 
 def conv_output_size(size, dilation, kernel, stride):
+    """
+    Computes the output size of a convolutional layer.
+
+    N.B. `padding` not supported for now
+
+    Parameters
+    ----------
+
+    `size` : tuple-like[int]
+        the size of each dimension processed by the convolution (e.g. for 1D
+        convolution, use a tuple/list with 1 element; for 2D conv, use a
+        tuple/list with 2 elements etc.)
+
+    `dilation`, `kernel`, `stride` : tuple-like[int]
+        parameters of the convolution, each for each dimension
+    """
     out = []
     for dim in range(len(size)):
         out.append(
-            int((size[dim] - dilation[dim] * (kernel[dim] - 1)) / stride[dim]))
+            int((size[dim] - dilation[dim] *
+                 (kernel[dim] - 1)) / stride[dim]) + 1)
     return tuple(out)
 
 
