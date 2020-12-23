@@ -57,9 +57,16 @@ Datasets
 #. Fully train velocity model on the original context: ``python run.py -tv -c orig``
 #. Fully train pedaling model on the original context: ``python run.py -tp -c orig``
 
-N.B. option ``-r`` preprocess the dataset using NMF; it should be used
-only once per each type of model; each subsequent runs will use the already
-dumped dataset
+---
+
+* option ``-r`` preprocess the dataset using NMF; it should be used only once
+  per each type of model; each subsequent runs will use the already dumped
+  dataset
+* option ``-r`` must be associated to some action that loads datasets (this
+  could be improved...)
+* option ``-sk`` reduces the dataset to 10% of its total; thus, ``-sk -r``
+  would result in preprocessing only that 10%
+
 
 3. Training the context-specific models
 ---------------------------------------
