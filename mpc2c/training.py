@@ -6,7 +6,12 @@ from . import settings as s
 from .mytorchutils import train_epochs
 
 
-def train_pedaling(nmf_params, hyperparams, context=None, state_dict=None):
+def train_pedaling(nmf_params,
+                   hyperparams,
+                   lr,
+                   wd,
+                   context=None,
+                   state_dict=None):
     trainloader = data_management.get_loader(
         ['train', context] if context is not None else ['train'], nmf_params,
         'pedaling')
@@ -23,10 +28,15 @@ def train_pedaling(nmf_params, hyperparams, context=None, state_dict=None):
                      (hyperparams['dilation_0'], ))).to(s.DEVICE).to(s.DTYPE)
 
     # TODO: if state_dict is not None, load it and fix initial weights
-    return train(trainloader, validloader, model, hyperparams['lr'])
+    return train(trainloader, validloader, model, lr=lr, wd=wd)
 
 
-def train_velocity(nmf_params, hyperparams, context=None, state_dict=None):
+def train_velocity(nmf_params,
+                   hyperparams,
+                   lr,
+                   wd,
+                   context=None,
+                   state_dict=None):
     trainloader = data_management.get_loader(
         ['train', context] if context is not None else ['train'], nmf_params,
         'velocity')
@@ -45,11 +55,7 @@ def train_velocity(nmf_params, hyperparams, context=None, state_dict=None):
                       hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
 
     # TODO: if state_dict is not None, load it and fix initial weights
-    return train(trainloader,
-                 validloader,
-                 model,
-                 lr=hyperparams['lr'],
-                 weight_decay=hyperparams['wd'])
+    return train(trainloader, validloader, model, lr=lr, wd=wd)
 
 
 def train(trainloader, validloader, model, *args, **kwargs):

@@ -20,7 +20,7 @@ SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
-NJOBS = 10
+NJOBS = 5
 
 # NMF
 #: epsilon value used inside the nmf to prevent divisons by 0
@@ -41,8 +41,6 @@ REDUMP = False
 DEVICE = 'cuda'
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    "lr": 0.5,
-    "wd": 0.01,
     "kernel_0": 4,
     "stride_0": 1,
     "dilation_0": 5,
@@ -51,8 +49,6 @@ VEL_HYPERPARAMS = {
     "dilation_1": 1
 }
 PED_HYPERPARAMS = {
-    "lr": 0.5,
-    "wd": 0.01,
     "kernel_0": 4,
     "stride_0": 1,
     "dilation_0": 5
@@ -62,13 +58,13 @@ PED_BATCH_SIZE = 1
 EARLY_STOP = 10
 PLOT_LOSSES = True
 DTYPE = torch.float32
+LR = 1
+WD = 1e-6
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
 
 # SKOPT
 VEL_SKSPACE = [
-    space.Real(0.0001, 2, name='lr'),
-    space.Real(0.0001, 1, name='wd'),
     space.Integer(1, 32, name='kernel_0'),
     space.Integer(1, 32, name='stride_0'),
     space.Integer(1, 16, name='dilation_0'),
@@ -77,8 +73,6 @@ VEL_SKSPACE = [
     space.Integer(1, 3, name='dilation_1')
 ]
 PED_SKSPACE = [
-    space.Real(0.0001, 2, name='lr'),
-    space.Real(0.0001, 1, name='wd'),
     space.Integer(1, 32, name='kernel_0'),
     space.Integer(1, 32, name='stride_0'),
     space.Integer(1, 16, name='dilation_0')

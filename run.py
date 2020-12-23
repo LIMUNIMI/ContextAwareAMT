@@ -126,6 +126,8 @@ def main():
         else:
             training.train_pedaling(nmf_params,
                                     s.VEL_HYPERPARAMS,
+                                    s.LR,
+                                    s.WD,
                                     context=args.context)
 
     if args.train_velocity:
@@ -137,6 +139,8 @@ def main():
         else:
             training.train_velocity(nmf_params,
                                     s.PED_HYPERPARAMS,
+                                    s.LR,
+                                    s.WD,
                                     context=args.context)
 
 
