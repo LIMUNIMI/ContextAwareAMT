@@ -110,7 +110,10 @@ def train_epochs(model,
             loss = trainloss_fn(out, targets, lens)
             loss.backward()
             optim.step()
-            trainloss.append(loss.detach().cpu().numpy())
+            loss = loss.detach().cpu().numpy()
+            if np.isnan(loss):
+                raise RuntimeError("Nan in training loss!")
+            trainloss.append(loss)
 
         trainloss = np.mean(trainloss)
         print(f"training loss : {trainloss:.4e}")
@@ -125,17 +128,19 @@ def train_epochs(model,
                     targets[i] = targets[i].to(device).to(dtype)
 
                 out = model.predict(*inputs)
-                validloss.append(
-                    validloss_fn(out, targets, lens).detach().cpu().numpy())
+                loss = validloss_fn(out, targets, lens).detach().cpu().numpy()
+                validloss.append(loss)
                 trainloss_valid.append(
                     trainloss_fn(out, targets, lens).detach().cpu().numpy())
+                if np.isnan(loss):
+                    raise RuntimeError("Nan in training loss!")
 
-        validloss = np.mean(validloss)
+        vl = np.mean(validloss)
         trainloss_valid = np.mean(trainloss_valid)
-        print(f"validation loss : {validloss:.4e}")
+        print(f"validation loss : {vl:.4e}")
         print(f"validation-training loss : {validloss:.4e}")
-        if validloss < best_loss:
-            best_loss = validloss
+        if vl < best_loss:
+            best_loss = vl
             best_epoch = epoch
             state_dict = model.state_dict()
             name = f"checkpoints/checkpoint{best_loss:.4f}.pt"
