@@ -94,7 +94,9 @@ def train(trainloader, validloader, model, lr, wd):
 
     def trainloss_fn(x, y, lens):
         x, y, lens = x[0], y[0], lens[0]
-        y /= 127
+        # divide, but not in-place, otherwise successive operations would see a
+        # different value for `y`
+        y = y / 127
 
         if not lens:
             # if `lens` is False, then we are do not have features nor frames

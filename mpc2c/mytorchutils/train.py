@@ -138,7 +138,7 @@ def train_epochs(model,
         vl = np.mean(validloss)
         trainloss_valid = np.mean(trainloss_valid)
         print(f"validation loss : {vl:.4e}")
-        print(f"validation-training loss : {validloss:.4e}")
+        print(f"validation-training loss : {trainloss_valid:.4e}")
         if vl < best_loss:
             best_loss = vl
             best_epoch = epoch
