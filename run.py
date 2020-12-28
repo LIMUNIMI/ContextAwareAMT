@@ -100,7 +100,8 @@ def main():
     if args.skopt:
         # if we are hyper-optimizing, change some settings
         from mpc2c.mytorchutils import hyperopt
-        s.DATASET_LEN = 0.1
+        import torch
+        s.DATASET_LEN = 0.05
         s.PLOT_LOSSES = False
     s.REDUMP = args.redump
 
@@ -121,10 +122,15 @@ def main():
         from mpc2c import training
         nmf_params = load_nmf_params()
         if args.skopt:
-            hyperopt(
-                s.PED_SKSPACE, s.SKCHECKPOINT,
-                s.SKITERATIONS, lambda x: training.train_pedaling(
-                    nmf_params, x, s.LR, s.WD, args.context))
+            hyperopt(s.PED_SKSPACE,
+                     s.SKCHECKPOINT,
+                     s.SKITERATIONS,
+                     lambda x: training.train_pedaling(nmf_params, x, s.LR, s.
+                                                       WD, args.context),
+                     space_constraint=training.model_test(
+                         training.build_pedaling_model,
+                         torch.rand(1, s.BINS, 100)),
+                     plot_graphs=s.PLOT_GRAPHS)
         else:
             training.train_pedaling(nmf_params,
                                     s.VEL_HYPERPARAMS,
@@ -136,10 +142,15 @@ def main():
         from mpc2c import training
         nmf_params = load_nmf_params()
         if args.skopt:
-            hyperopt(
-                s.VEL_SKSPACE, s.SKCHECKPOINT,
-                s.SKITERATIONS, lambda x: training.train_velocity(
-                    nmf_params, x, s.LR, s.WD, args.context))
+            hyperopt(s.VEL_SKSPACE,
+                     s.SKCHECKPOINT,
+                     s.SKITERATIONS,
+                     lambda x: training.train_velocity(nmf_params, x, s.LR, s.
+                                                       WD, args.context),
+                     space_constraint=training.model_test(
+                         training.build_velocity_model,
+                         torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)),
+                     plot_graphs=s.PLOT_GRAPHS)
         else:
             training.train_velocity(nmf_params,
                                     s.PED_HYPERPARAMS,
