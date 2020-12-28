@@ -1,7 +1,7 @@
 import os
 import sys
 from dataclasses import dataclass
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import visdom
@@ -13,12 +13,12 @@ from skopt.callbacks import CheckpointSaver, VerboseCallback
 from . import context
 
 
-def hyperopt(*args):
+def hyperopt(*args, **kwargs):
     """
     A functional interface to `SKOtimizer`.
     Just all the args to `SKOptimizer` and run `optimize`.
     """
-    skoptimizer = SKOptimizer(*args)
+    skoptimizer = SKOptimizer(*args, **kwargs)
     skoptimizer.optimize()
 
 
@@ -35,15 +35,20 @@ class SKOptimizer(object):
     `checkpoint_path` is a path where checkpoints are saved
 
     `num_iter` is a tuple[int] containing the number of iterations for the two
-        procedures: the first is the number of iterations to do using the uniform
-        random choice, the second is the number of iterations to do using the
-        `optimization_method` specified in this call
+        procedures: the first is the number of iterations to do using the
+        uniform random choice, the second is the number of iterations to do
+        using the `optimization_method` specified in this call
 
     `to_minimize` is a callable that accepts hyperparams in `space` as a dict
         and which returns one loss
 
     `optimization_method` a callable that implements he skopt interface;
         defaults to `skopt.dummy_minimize`
+
+    `space_constraint` a callable that implements a constraint for the space:
+        return True if the hyperparameters are valid
+
+    `plot_graphs` a boolean default to True; if False, no plot is produced
 
     Methods
     -------
@@ -63,6 +68,8 @@ class SKOptimizer(object):
     num_iter: Tuple[int]
     to_minimize: Callable
     optimization_method: Callable = skopt.forest_minimize
+    space_constraint: Optional[Callable] = None
+    plot_graphs: bool = True
     seed: int = 1992
 
     def _make_objective_func(self):
@@ -86,9 +93,26 @@ class SKOptimizer(object):
                 print("To view this error, set `context.DEBUG` to False")
                 loss = 1.0
             return loss
+
         return objective
 
+    def _make_constraint(self):
+        global constraint
+
+        if self.space_constraint is not None:
+
+            @skopt.utils.use_named_args(self.space)
+            def constraint(**hyperparams):
+                return self.space_constraint(hyperparams)
+
+            return constraint
+
+        else:
+            return None
+
     def plot(self):
+        if not self.plot_graphs:
+            return
         print("Plotting a res object, open visdom on localhost!")
         # plottings
         vis = visdom.Visdom()
@@ -106,40 +130,46 @@ class SKOptimizer(object):
         if os.path.exists(self.checkpoint_path):
             print("Loading and plotting previous checkpoint...")
             self._make_objective_func()
+            self._make_constraint()
             self.res = load(self.checkpoint_path)
             x0 = self.res.x_iters
             y0 = self.res.func_vals
+            random_state = self.res.random_state
             self.plot()
         else:
             print("Starting new optimization from scratch...")
             x0 = y0 = None
+            random_state = self.seed
 
         verbose_callback = VerboseCallback(1)
         checkpoint_saver = CheckpointSaver(self.checkpoint_path)
-        print("\n=================================\n")
-        print("\nUniform random init\n")
-        print("\n=================================\n")
+        print("\n=================================")
+        print("Uniform random init")
+        print("=================================\n")
         res = skopt.dummy_minimize(
             func=self._make_objective_func(),
             dimensions=self.space,
             x0=x0,  # already examined values for x
             y0=y0,  # observed values for x0
             callback=[verbose_callback, checkpoint_saver],
-            random_state=self.seed,
+            space_constraint=self._make_constraint(),
+            random_state=random_state,
             n_calls=self.num_iter[0])
         x0 = self.res.x_iters
         y0 = self.res.func_vals
+        random_state = self.res.random_state
 
-        print("\n=================================\n")
-        print("\nSpecific method optimization\n")
-        print("\n=================================\n")
+        print("\n=================================")
+        print("Specific method optimization")
+        print("=================================\n")
         res = self.optimization_method(
             func=self._make_objective_func(),
             dimensions=self.space,
             x0=x0,  # already examined values for x
             y0=y0,  # observed values for x0
             callback=[verbose_callback, checkpoint_saver],
-            random_state=self.seed,
+            space_constraint=self._make_constraint(),
+            random_state=random_state,
             n_calls=self.num_iter[1])
         skopt.utils.dump(res, "skopt_result.pkl")
         print("\n=================================\n")

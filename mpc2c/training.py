@@ -6,6 +6,46 @@ from . import settings as s
 from .mytorchutils import train_epochs
 
 
+def model_test(model_build_func, test_sample):
+    """
+    A function to build a constraint around the model size; the constraint
+    tries to build the model and use it with a random function
+    """
+    def constraint(hyperparams):
+        try:
+            model = model_build_func(hyperparams)
+            model(test_sample.to(s.DEVICE).to(s.DTYPE))
+            del model
+        except Exception as e:
+            # import traceback
+            # traceback.print_exc(e)
+            return False
+        else:
+            return True
+
+    return constraint
+
+
+def build_velocity_model(hyperparams):
+    return feature_extraction.MIDIParameterEstimation(
+        input_size=(s.BINS, s.MINI_SPEC_SIZE),
+        output_features=1,
+        note_level=True,
+        hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
+                     (hyperparams['stride_0'], hyperparams['stride_1']),
+                     (hyperparams['dilation_0'],
+                      hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
+
+
+def build_pedaling_model(hyperparams):
+    return feature_extraction.MIDIParameterEstimation(
+        input_size=(s.BINS, ),
+        output_features=3,
+        note_level=False,
+        hyperparams=((hyperparams['kernel_0'], ), (hyperparams['stride_0'], ),
+                     (hyperparams['dilation_0'], ))).to(s.DEVICE).to(s.DTYPE)
+
+
 def train_pedaling(nmf_params,
                    hyperparams,
                    lr,
@@ -20,13 +60,7 @@ def train_pedaling(nmf_params,
         nmf_params, 'pedaling')
     if s.REDUMP:
         return
-    model = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, ),
-        output_features=3,
-        note_level=False,
-        hyperparams=((hyperparams['kernel_0'], ), (hyperparams['stride_0'], ),
-                     (hyperparams['dilation_0'], ))).to(s.DEVICE).to(s.DTYPE)
-
+    model = build_pedaling_model()
     # TODO: if state_dict is not None, load it and fix initial weights
     return train(trainloader, validloader, model, lr, wd)
 
@@ -45,14 +79,8 @@ def train_velocity(nmf_params,
         nmf_params, 'velocity')
     if s.REDUMP:
         return
-    model = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, s.MINI_SPEC_SIZE),
-        output_features=1,
-        note_level=True,
-        hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
-                     (hyperparams['stride_0'], hyperparams['stride_1']),
-                     (hyperparams['dilation_0'],
-                      hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
+
+    model = build_velocity_model(hyperparams)
 
     # TODO: if state_dict is not None, load it and fix initial weights
     return train(trainloader, validloader, model, lr, wd)
