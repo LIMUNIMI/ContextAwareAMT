@@ -78,7 +78,8 @@ PED_SKSPACE = [
     space.Integer(1, 16, name='dilation_0')
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
-SKITERATIONS = (500, 5000)
+SKITERATIONS = (100, 1000)
+PLOT_GRAPHS = True
 
 # MAKE_TEMPLATE
 #: how many basis use in total
