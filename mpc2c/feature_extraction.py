@@ -83,14 +83,21 @@ class MIDIParameterEstimation(nn.Module):
             # computing size after the first block
             next_input_size = conv_output_size(input_size, dilation,
                                                kernel_size, stride)
-            if next_input_size[0] > 0:
-                # if we can reduce the features
-                if (note_level and next_input_size[1] <= 0) or not note_level:
+
+            if next_input_size[0] > 0 and \
+                    input_size[0] > 1 and \
+                    input_size[0] != next_input_size[0]:
+                # if after conv, size is not negative
+                # and if the input has something to be reduced
+                # and if the conv changes the size (it can happens that
+                # dilation creates such a situation)
+                if (note_level and next_input_size[1] < 1) or not note_level:
                     # if we cannot apply kernels on the frames, let's
                     # apply them framewise except for the last layer
                     k = (kernel_size[0], 1)
                     s = (stride[0], 1)
                     d = (dilation[0], 1)
+                    next_input_size = (next_input_size[0], input_size[1])
                 else:
                     k, s, d = kernel_size, stride, dilation
 
@@ -127,7 +134,7 @@ class MIDIParameterEstimation(nn.Module):
         else:
             k = input_size
 
-        if input_size[0] > 1:
+        if k[0] > 1 or k[1] > 1:
             self.stack += [
                 nn.Conv2d(input_features,
                           output_features,
@@ -136,11 +143,14 @@ class MIDIParameterEstimation(nn.Module):
                           dilation=1,
                           padding=0,
                           groups=input_features),
-                nn.BatchNorm2d(output_features),
+                # nn.BatchNorm2d(output_features),
                 nn.Sigmoid()
             ]
         else:
-            # change the last activation so that the outputs fits [0, 1)
+            # remove the batchnorm since the output has only one value
+            # and it cannot be run with these input size
+            del self.stack[-2]
+            # change the last activation so that the outputs are in (0, 1)
             self.stack[-1] = nn.Sigmoid()
         self.stack = nn.Sequential(*self.stack)
 
