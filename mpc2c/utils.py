@@ -205,7 +205,7 @@ def make_pianoroll(mat,
     if velocities are available, it will be filled with velocity values; to
     turn this off use `velocities=False`
 
-    if `only_onsets` is true, onle the attack is used and the other part of the
+    if `only_onsets` is true, only the attack is used and the other part of the
     notes are discarded (useful for aligning with amt). Similarly
     `only_offsets`
 
@@ -215,6 +215,9 @@ def make_pianoroll(mat,
 
     `eps_range` defines how to much is note is enlarged before onset and after
     offset in seconds, while `eps` defines the value to use for enlargement
+
+    Note that pitch 0 is not used and pitch 128 cannot be added if MIDI pitches
+    in [1, 128] are used (as in asmd)
     """
 
     L = int(np.max(mat[:, 2]) / res) + 1

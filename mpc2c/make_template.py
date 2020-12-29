@@ -10,6 +10,12 @@ import visdom
 
 
 def main():
+    """
+    Creates a template.
+
+    Note that pitch 0 is not used and pitch 128 cannot be added if MIDI pitches
+    in [1, 128] are used (as in asmd).
+    """
     import essentia.standard as esst
     spec = Spectrometer(s.FRAME_SIZE, s.SR)
 
