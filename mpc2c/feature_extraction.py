@@ -1,4 +1,6 @@
+import torch
 from torch import nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 def conv_output_size(size, dilation, kernel, stride):
@@ -34,6 +36,8 @@ class MIDIParameterEstimation(nn.Module):
             * kernel_size : tuple[int]
             * stride : tuple[int]
             * dilation : tuple[int]
+            * lstm_hidden_size: int
+            * lstm_layers: int
 
         * `input_size` is a tuple[int] containing the number of rows (features)
         and columns (frames) of each input. It can contain only one number if
@@ -69,8 +73,19 @@ class MIDIParameterEstimation(nn.Module):
 
         super().__init__()
 
+        self.note_level = note_level
+
         # setup the `note_level` stuffs
-        kernel_size, stride, dilation = hyperparams
+        kernel_size, stride, dilation, lstm_hidden_size, lstm_layers\
+            = hyperparams
+
+        if lstm_layers > 0:
+            self.lstm = nn.LSTM(input_size[0],
+                                lstm_hidden_size,
+                                num_layers=lstm_layers,
+                                batch_first=True)
+
+        conv_in_size = (lstm_hidden_size, input_size[1])
 
         def add_module(input_features):
             """
@@ -81,23 +96,24 @@ class MIDIParameterEstimation(nn.Module):
             """
 
             # computing size after the first block
-            next_input_size = conv_output_size(input_size, dilation,
-                                               kernel_size, stride)
+            next_conv_int_size = conv_output_size(conv_in_size, dilation,
+                                                  kernel_size, stride)
 
-            if next_input_size[0] > 0 and \
-                    input_size[0] > 1 and \
-                    input_size[0] != next_input_size[0]:
+            if next_conv_int_size[0] > 0 and \
+                    conv_in_size[0] > 1 and \
+                    conv_in_size[0] != next_conv_int_size[0]:
                 # if after conv, size is not negative
                 # and if the input has something to be reduced
                 # and if the conv changes the size (it can happens that
                 # dilation creates such a situation)
-                if (note_level and next_input_size[1] < 1) or not note_level:
+                if (note_level
+                        and next_conv_int_size[1] < 1) or not note_level:
                     # if we cannot apply kernels on the frames, let's
                     # apply them framewise except for the last layer
                     k = (kernel_size[0], 1)
                     s = (stride[0], 1)
                     d = (dilation[0], 1)
-                    next_input_size = (next_input_size[0], input_size[1])
+                    next_conv_int_size = (next_conv_int_size[0], input_size[1])
                 else:
                     k, s, d = kernel_size, stride, dilation
 
@@ -111,16 +127,16 @@ class MIDIParameterEstimation(nn.Module):
                     nn.BatchNorm2d(output_features),
                     nn.ReLU()
                 ]
-                return True, next_input_size
+                return True, next_conv_int_size
             else:
-                return False, input_size
+                return False, conv_in_size
 
         # start adding blocks until we can
         self.stack = []
         input_features = 1
         added = True
         while added:
-            added, input_size = add_module(input_features)
+            added, conv_in_size = add_module(input_features)
             input_features = output_features
 
         # add the last block to get size 1 along feature dimension and
@@ -130,9 +146,9 @@ class MIDIParameterEstimation(nn.Module):
                 "Network hyper-parameters would create a one-layer convnet")
 
         if not note_level:
-            k = (input_size[0], 1)
+            k = (conv_in_size[0], 1)
         else:
-            k = input_size
+            k = conv_in_size
 
         if k[0] > 1 or k[1] > 1:
             self.stack += [
@@ -154,13 +170,17 @@ class MIDIParameterEstimation(nn.Module):
             self.stack[-1] = nn.Sigmoid()
         self.stack = nn.Sequential(*self.stack)
 
-    def forward(self, x):
+    def forward(self, x, lens=torch.tensor(False)):
         """
         Arguments
         ---------
 
-        inp : torch.tensor
+        x : torch.tensor
             shape (batch, in_features, frames)
+
+        lens : torch.Tensor
+            should contains the lengths of each sample in `x`; do not use if
+            only one sample is used or if all the samples have the same length
 
         Returns
         -------
@@ -168,6 +188,20 @@ class MIDIParameterEstimation(nn.Module):
         torch.tensor
             shape (batch, out_features, frames)
         """
+        if hasattr(self, 'lstm'):
+            # put the frames before of the features (see nn.LSTM)
+            x = torch.transpose(x, 1, 2)
+            if lens != torch.tensor(False):
+                x = pack_padded_sequence(x, lens, batch_first=True)
+            x, _ = self.lstm(x)
+            if lens != torch.tensor(False):
+                x, lens = pad_packed_sequence(x,
+                                              batch_first=True,
+                                              padding_value=0)
+
+            # put the frames after the features (see nn.LSTM)
+            x = torch.transpose(x, 1, 2)
+
         # unsqueeze the channels dimension
         x = x.unsqueeze(1)
         # apply the stack
@@ -179,39 +213,8 @@ class MIDIParameterEstimation(nn.Module):
             x,
         ]
 
-    def predict(self, x):
-        return self.forward(x)
-
-
-# class MIDIVelocityEstimation(MIDIParameterEstimation):
-#     def __init__(self, input_features, note_frames, hyperparams):
-#         super().__init__(input_features, 1, hyperparams)
-#         self.linear = nn.Sequential(nn.Linear(note_frames, note_frames),
-#                                     nn.ReLU(),
-#                                     nn.Linear(note_frames, note_frames),
-#                                     nn.ReLU(), nn.Linear(note_frames, 1),
-#                                     nn.Sigmoid())
-
-#     def forward(self, x):
-#         """
-#         Arguments
-#         ---------
-
-#         inp : torch.tensor
-#             shape (batch, in_features, frames)
-
-#         Returns
-#         -------
-
-#         torch.tensor
-#             shape (batch,)
-#         """
-#         return [
-#             self.linear(super().forward(x)[0][:, 0])[:, 0],
-#         ]
-
-#     def predict(self, x):
-#         return self.forward(x)
+    def predict(self, *args, **kwargs):
+        return self.forward(*args, **kwargs)
 
 
 def init_weights(m, initializer):

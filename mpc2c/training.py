@@ -16,12 +16,17 @@ def model_test(model_build_func, test_sample):
             model = model_build_func(hyperparams)
             model(test_sample.to(s.DEVICE).to(s.DTYPE))
             del model
-        except Exception as e:
+        except Exception:
+            # except Exception as e:
             # import traceback
             # traceback.print_exc(e)
             return False
-        else:
-            return True
+
+        if hyperparams[
+                'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
+            return False
+
+        return True
 
     return constraint
 
@@ -33,8 +38,9 @@ def build_velocity_model(hyperparams):
         note_level=True,
         hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
                      (hyperparams['stride_0'], hyperparams['stride_1']),
-                     (hyperparams['dilation_0'],
-                      hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
+                     (hyperparams['dilation_0'], hyperparams['dilation_1']),
+                     hyperparams['lstm_hidden_size'],
+                     hyperparams['lstm_layers'])).to(s.DEVICE).to(s.DTYPE)
 
 
 def build_pedaling_model(hyperparams):
@@ -98,8 +104,8 @@ def train(trainloader, validloader, model, lr, wd):
         # different value for `y`
         y = y / 127
 
-        if not lens:
-            # if `lens` is False, then we are do not have features nor frames
+        if lens == torch.tensor(False):
+            # if `lens` is False, then it's like note_level
             x = x[..., 0, 0]
             return F.l1_loss(x, y)
 

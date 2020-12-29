@@ -106,7 +106,7 @@ def train_epochs(model,
                 targets[i] = targets[i].to(device).to(dtype)
 
             optim.zero_grad()
-            out = model(*inputs)
+            out = model(*inputs, *lens)
             loss = trainloss_fn(out, targets, lens)
             loss.backward()
             optim.step()
@@ -127,7 +127,7 @@ def train_epochs(model,
                 for i in range(len(targets)):
                     targets[i] = targets[i].to(device).to(dtype)
 
-                out = model.predict(*inputs)
+                out = model.predict(*inputs, *lens)
                 loss = validloss_fn(out, targets, lens).detach().cpu().numpy()
                 validloss.append(loss)
                 trainloss_valid.append(

@@ -65,6 +65,8 @@ DATASET_LEN = 1
 
 # SKOPT
 VEL_SKSPACE = [
+    space.Integer(1, 128, name='lstm_hidden_size'),
+    space.Integer(0, 5, name='lstm_layers'),
     space.Integer(1, 32, name='kernel_0'),
     space.Integer(1, 32, name='stride_0'),
     space.Integer(1, 16, name='dilation_0'),
@@ -73,6 +75,8 @@ VEL_SKSPACE = [
     space.Integer(1, 3, name='dilation_1')
 ]
 PED_SKSPACE = [
+    space.Integer(1, 128, name='lstm_hidden_size'),
+    space.Integer(0, 20, name='lstm_layers'),
     space.Integer(1, 32, name='kernel_0'),
     space.Integer(1, 32, name='stride_0'),
     space.Integer(1, 16, name='dilation_0')
