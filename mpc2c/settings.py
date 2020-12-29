@@ -62,6 +62,7 @@ LR = 1
 WD = 1e-6
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
+COMPLEXITY_PENALIZER = 1e-6
 
 # SKOPT
 VEL_SKSPACE = [

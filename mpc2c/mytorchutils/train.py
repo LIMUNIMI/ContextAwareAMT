@@ -7,6 +7,13 @@ from tqdm import tqdm
 from . import context
 
 
+def count_params(model):
+    """
+    Compute the number of parameters
+    """
+    return sum([p.numel() for p in model.parameters() if p.requires_grad])
+
+
 def train_epochs(model,
                  optim,
                  trainloss_fn,

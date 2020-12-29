@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 from . import data_management, feature_extraction
 from . import settings as s
-from .mytorchutils import train_epochs
+from .mytorchutils import count_params, train_epochs
 
 
 def model_test(model_build_func, test_sample):
@@ -94,8 +94,7 @@ def train_velocity(nmf_params,
 
 def train(trainloader, validloader, model, lr, wd):
     print(model)
-    print("Total number of parameters: ",
-          sum([p.numel() for p in model.parameters() if p.requires_grad]))
+    print("Total number of parameters: ", count_params(model))
     optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 
     def trainloss_fn(x, y, lens):
@@ -121,4 +120,5 @@ def train(trainloader, validloader, model, lr, wd):
                         validloss_fn,
                         trainloader,
                         validloader,
-                        plot_losses=s.PLOT_LOSSES)
+                        plot_losses=s.PLOT_LOSSES
+                        ) + count_params(model) * s.COMPLEXITY_PENALIZER
