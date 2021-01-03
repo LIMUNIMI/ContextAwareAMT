@@ -3,7 +3,7 @@ import torch.nn.functional as F
 
 from . import data_management, feature_extraction
 from . import settings as s
-from .mytorchutils import count_params, train_epochs
+from .mytorchutils import LossValue, count_params, train_epochs
 
 
 def model_test(model_build_func, test_sample):
@@ -22,9 +22,9 @@ def model_test(model_build_func, test_sample):
             # traceback.print_exc(e)
             return False
 
-        if hyperparams[
-                'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
-            return False
+        # if hyperparams[
+        #         'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
+        #     return False
 
         return True
 
@@ -38,9 +38,13 @@ def build_velocity_model(hyperparams):
         note_level=True,
         hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
                      (hyperparams['stride_0'], hyperparams['stride_1']),
-                     (hyperparams['dilation_0'], hyperparams['dilation_1']),
-                     hyperparams['lstm_hidden_size'],
-                     hyperparams['lstm_layers'])).to(s.DEVICE).to(s.DTYPE)
+                     (hyperparams['dilation_0'],
+                      hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
+    # hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
+    #              (hyperparams['stride_0'], hyperparams['stride_1']),
+    #              (hyperparams['dilation_0'], hyperparams['dilation_1']),
+    #              hyperparams['lstm_hidden_size'],
+    #              hyperparams['lstm_layers'])).to(s.DEVICE).to(s.DTYPE)
 
 
 def build_pedaling_model(hyperparams):
@@ -114,11 +118,15 @@ def train(trainloader, validloader, model, lr, wd):
         return loss
 
     validloss_fn = trainloss_fn
-    return train_epochs(model,
-                        optim,
-                        trainloss_fn,
-                        validloss_fn,
-                        trainloader,
-                        validloader,
-                        plot_losses=s.PLOT_LOSSES
-                        ) + count_params(model) * s.COMPLEXITY_PENALIZER
+    train_loss = train_epochs(model,
+                              optim,
+                              trainloss_fn,
+                              validloss_fn,
+                              trainloader,
+                              validloader,
+                              plot_losses=s.PLOT_LOSSES)
+    complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
+
+    return LossValue(train_loss + complexity_loss,
+                     train_loss=train_loss,
+                     complexity_loss=complexity_loss)

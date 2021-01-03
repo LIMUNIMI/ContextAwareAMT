@@ -76,16 +76,18 @@ class MIDIParameterEstimation(nn.Module):
         self.note_level = note_level
 
         # setup the `note_level` stuffs
-        kernel_size, stride, dilation, lstm_hidden_size, lstm_layers\
-            = hyperparams
+        # kernel_size, stride, dilation, lstm_hidden_size, lstm_layers\
+        #     = hyperparams
 
-        if lstm_layers > 0:
-            self.lstm = nn.LSTM(input_size[0],
-                                lstm_hidden_size,
-                                num_layers=lstm_layers,
-                                batch_first=True)
+        # if lstm_layers > 0:
+        #     self.lstm = nn.LSTM(input_size[0],
+        #                         lstm_hidden_size,
+        #                         num_layers=lstm_layers,
+        #                         batch_first=True)
 
-        conv_in_size = (lstm_hidden_size, input_size[1])
+        # conv_in_size = (lstm_hidden_size, input_size[1])
+        conv_in_size = input_size
+        kernel_size, stride, dilation = hyperparams
 
         def add_module(input_features):
             """
@@ -118,12 +120,13 @@ class MIDIParameterEstimation(nn.Module):
                     k, s, d = kernel_size, stride, dilation
 
                 self.stack += [
-                    nn.Conv2d(input_features,
-                              output_features,
-                              kernel_size=k,
-                              stride=s,
-                              padding=0,
-                              dilation=d),
+                    SpaceVariant(
+                        nn.Conv2d(input_features,
+                                  output_features,
+                                  kernel_size=k,
+                                  stride=s,
+                                  padding=0,
+                                  dilation=d), lambda x: x / len(x)),
                     nn.BatchNorm2d(output_features),
                     nn.ReLU()
                 ]
@@ -152,13 +155,14 @@ class MIDIParameterEstimation(nn.Module):
 
         if k[0] > 1 or k[1] > 1:
             self.stack += [
-                nn.Conv2d(input_features,
-                          output_features,
-                          kernel_size=k,
-                          stride=1,
-                          dilation=1,
-                          padding=0,
-                          groups=input_features),
+                SpaceVariant(
+                    nn.Conv2d(input_features,
+                              output_features,
+                              kernel_size=k,
+                              stride=1,
+                              dilation=1,
+                              padding=0,
+                              groups=input_features), lambda x: x / len(x)),
                 # nn.BatchNorm2d(output_features),
                 nn.Sigmoid()
             ]
@@ -215,6 +219,93 @@ class MIDIParameterEstimation(nn.Module):
 
     def predict(self, *args, **kwargs):
         return self.forward(*args, **kwargs)
+
+
+class SpaceVariant(nn.Module):
+    def __init__(self,
+                 module,
+                 normalize_func,
+                 activation=nn.ReLU(),
+                 shape=None):
+        """
+        A space-variant convolution.
+        1. `module` is applied to the input
+        2. `normalize_func` is used while creating the map of the positions
+        3. indices are extracted from that map
+        4. `activation` is applied to both points 2 and 3
+        5. the 2 outputs are multiplied entry-wise
+
+        Arguments
+        ---------
+
+        `module` : callable
+            e.g. a `torch.nn.Conv2d` object
+        `normalize_fun` : callable
+            a function which takes as arguments the ndices of one dimension (a
+            tensor) and returns another tensor with same dimensions
+        `activation` : callable
+            a function that is applied after `module` and `pos` have been
+            applied
+        `shape` : None or tuple
+            the shape expected as input; if you know that, insert it as it
+            improves performances
+        """
+        super().__init__()
+        self.module = module
+        self.pos = nn.Conv2d(4,
+                             1,
+                             module.kernel_size,
+                             module.stride,
+                             module.padding,
+                             module.dilation,
+                             groups=1,
+                             bias=module.bias,
+                             padding_mode=module.padding_mode)
+        self.normalize = normalize_func
+        self.act = activation
+        if shape:
+            self.positions = self.make_positions(shape)
+
+    def forward(self, x):
+        if hasattr(self, 'positions'):
+            positions = self.positions.to(x.dtype).to(x.device)
+        else:
+            positions = self.make_positions(x.shape).to(x.dtype).to(x.device)
+        x = self.act(self.module(x))
+        positions = self.act(self.pos(positions))
+        return x * positions
+
+    def make_positions(self, shape):
+        """
+        Arguments:
+        ----------
+
+        `shape` : tuple of int
+            the shape of the tensor for which positions should be built.
+            4 dimensions: (batches, channels, x, y)
+        """
+        # making arrays between -1 and +1
+        X = torch.arange(1, shape[-2] + 1)
+        X = self.normalize(X)
+        X = torch.stack([X, torch.flip(X, [0])])
+        # expand X to match Y
+        X = X.unsqueeze(2).expand(2, shape[-2], shape[-1])
+
+        Y = torch.arange(1, shape[-1] + 1)
+        Y = self.normalize(Y)
+        Y = torch.stack([Y, torch.flip(Y, [0])])
+        # expand Y to match X
+        Y = Y.unsqueeze(1).expand(2, shape[-2], shape[-1])
+
+        positions = torch.cat([X, Y], dim=0)
+        # positions = torch.stack([X, Y], dim=0)
+        # here `positions` has 3 dimensions:
+        #   0. dimension 0 has size 2 and contains (X, X_flip, Y, Y_flip)
+        #   1. dimension 1 has the indices for x
+        #   2. dimension 2 has the indices for y
+
+        # the returned whould have one more position for batches
+        return positions.unsqueeze(0).expand(shape[0], 4, shape[2], shape[3])
 
 
 def init_weights(m, initializer):

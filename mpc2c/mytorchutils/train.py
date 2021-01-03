@@ -7,6 +7,20 @@ from tqdm import tqdm
 from . import context
 
 
+class LossValue(float):
+    """
+    A float which is able to remember its parts
+    (e.g. LossValue(10, part_a=7, part_b=3 ))
+    """
+
+    def __new__(self, value, **kwargs):
+        return super().__new__(self, float(value))
+
+    def __init__(self, value, **kwargs):
+        super().__init__()
+        self.parts = kwargs
+
+
 def count_params(model):
     """
     Compute the number of parameters

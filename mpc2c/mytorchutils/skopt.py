@@ -127,6 +127,7 @@ class SKOptimizer(object):
         vis.matplot(axes.flatten()[0].figure)
 
     def optimize(self):
+        self.res = None
         if os.path.exists(self.checkpoint_path):
             print("Loading and plotting previous checkpoint...")
             self._make_objective_func()
@@ -143,35 +144,43 @@ class SKOptimizer(object):
 
         verbose_callback = VerboseCallback(1)
         checkpoint_saver = CheckpointSaver(self.checkpoint_path)
-        print("\n=================================")
-        print("Uniform random init")
-        print("=================================\n")
-        res = skopt.dummy_minimize(
-            func=self._make_objective_func(),
-            dimensions=self.space,
-            x0=x0,  # already examined values for x
-            y0=y0,  # observed values for x0
-            callback=[verbose_callback, checkpoint_saver],
-            space_constraint=self._make_constraint(),
-            random_state=random_state,
-            n_calls=self.num_iter[0])
-        x0 = self.res.x_iters
-        y0 = self.res.func_vals
-        random_state = self.res.random_state
+        if self.num_iter[0] > 0:
+            print("\n=================================")
+            print("Uniform random init")
+            print("=================================\n")
+            self.res = skopt.dummy_minimize(
+                func=self._make_objective_func(),
+                dimensions=self.space,
+                x0=x0,  # already examined values for x
+                y0=y0,  # observed values for x0
+                callback=[verbose_callback, checkpoint_saver],
+                space_constraint=self._make_constraint(),
+                random_state=random_state,
+                n_calls=self.num_iter[0])
+            __import__('ipdb').set_trace()
+            x0 = self.res.x_iters
+            y0 = self.res.func_vals
+            random_state = self.res.random_state
 
-        print("\n=================================")
-        print("Specific method optimization")
-        print("=================================\n")
-        res = self.optimization_method(
-            func=self._make_objective_func(),
-            dimensions=self.space,
-            x0=x0,  # already examined values for x
-            y0=y0,  # observed values for x0
-            callback=[verbose_callback, checkpoint_saver],
-            space_constraint=self._make_constraint(),
-            random_state=random_state,
-            n_calls=self.num_iter[1])
-        skopt.utils.dump(res, "skopt_result.pkl")
+        if self.num_iter[1] > 0:
+            print("\n=================================")
+            print("Specific method optimization")
+            print("=================================\n")
+            self.res = self.optimization_method(
+                func=self._make_objective_func(),
+                dimensions=self.space,
+                x0=x0,  # already examined values for x
+                y0=y0,  # observed values for x0
+                callback=[verbose_callback, checkpoint_saver],
+                space_constraint=self._make_constraint(),
+                random_state=random_state,
+                n_calls=self.num_iter[1])
+
+        if self.res is None:
+            print("No iteration!")
+            return
+
+        skopt.utils.dump(self.res, "skopt_result.pkl")
         print("\n=================================\n")
 
         self.plot()
