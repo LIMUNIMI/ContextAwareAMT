@@ -34,7 +34,7 @@ def model_test(model_build_func, test_sample):
 
 
 def build_velocity_model(hyperparams):
-    return feature_extraction.MIDIParameterEstimation(
+    m = feature_extraction.MIDIParameterEstimation(
         input_size=(s.BINS, s.MINI_SPEC_SIZE),
         output_features=1,
         note_level=True,
@@ -42,6 +42,8 @@ def build_velocity_model(hyperparams):
                      (hyperparams['stride_0'], hyperparams['stride_1']),
                      (hyperparams['dilation_0'],
                       hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
+    feature_extraction.init_weights(m, s.INIT_PARAMS)
+    return m
     # hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
     #              (hyperparams['stride_0'], hyperparams['stride_1']),
     #              (hyperparams['dilation_0'], hyperparams['dilation_1']),
@@ -50,12 +52,14 @@ def build_velocity_model(hyperparams):
 
 
 def build_pedaling_model(hyperparams):
-    return feature_extraction.MIDIParameterEstimation(
+    m = feature_extraction.MIDIParameterEstimation(
         input_size=(s.BINS, ),
         output_features=3,
         note_level=False,
         hyperparams=((hyperparams['kernel_0'], ), (hyperparams['stride_0'], ),
                      (hyperparams['dilation_0'], ))).to(s.DEVICE).to(s.DTYPE)
+    feature_extraction.init_weights(m, s.INIT_PARAMS)
+    return m
 
 
 def train_pedaling(nmf_params,
