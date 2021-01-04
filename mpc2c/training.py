@@ -107,23 +107,26 @@ def train(trainloader, validloader, model, lr, wd):
     print("Total number of parameters: ", count_params(model))
     optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 
-    def trainloss_fn(x, y, lens):
-        x, y, lens = x[0], y[0], lens[0]
-        # divide, but not in-place, otherwise successive operations would see a
-        # different value for `y`
-        y = y / 127
+    def make_loss_func(loss_func):
+        def _loss_fn(x, y, lens):
+            x, y, lens = x[0], y[0], lens[0]
+            # divide, but not in-place, otherwise successive operations would see a
+            # different value for `y`
+            y = y / 127
 
-        if lens == torch.tensor(False):
-            # if `lens` is False, then it's like note_level
-            x = x[..., 0, 0]
-            return F.l1_loss(x, y)
+            if lens == torch.tensor(False):
+                # if `lens` is False, then it's like note_level
+                x = x[..., 0, 0]
+                return loss_func(x, y)
 
-        loss = torch.zeros(len(lens))
-        for batch, L in enumerate(lens):
-            loss[batch] = F.l1_loss(x[batch, :L], y[batch, :L])
-        return loss
+            loss = torch.zeros(len(lens))
+            for batch, L in enumerate(lens):
+                loss[batch] = loss_func(x[batch, :L], y[batch, :L])
+            return loss
+        return _loss_fn
 
-    validloss_fn = trainloss_fn
+    trainloss_fn = make_loss_func(F.l1_loss)
+    validloss_fn = make_loss_func(F.l1_loss)
     train_loss = train_epochs(model,
                               optim,
                               trainloss_fn,

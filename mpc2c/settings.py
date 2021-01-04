@@ -59,7 +59,7 @@ EARLY_STOP = 10
 PLOT_LOSSES = True
 DTYPE = torch.float32
 LR = 1
-WD = 1e-6
+WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
 INIT_PARAMS = torch.nn.init.ones_

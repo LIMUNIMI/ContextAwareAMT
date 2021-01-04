@@ -127,8 +127,8 @@ class MIDIParameterEstimation(nn.Module):
                                   stride=s,
                                   padding=0,
                                   dilation=d), lambda x: x / len(x)),
-                    nn.BatchNorm2d(output_features),
-                    nn.ReLU()
+                    # nn.BatchNorm2d(output_features),
+                    nn.Hardsigmoid()
                 ]
                 return True, next_conv_int_size
             else:
@@ -164,14 +164,14 @@ class MIDIParameterEstimation(nn.Module):
                               padding=0,
                               groups=input_features), lambda x: x / len(x)),
                 # nn.BatchNorm2d(output_features),
-                nn.Sigmoid()
+                nn.Hardsigmoid()
             ]
-        else:
+        # else:
             # remove the batchnorm since the output has only one value
             # and it cannot be run with these input size
-            del self.stack[-2]
+            # del self.stack[-2]
             # change the last activation so that the outputs are in (0, 1)
-            self.stack[-1] = nn.Sigmoid()
+            # self.stack[-1] = nn.Hardsigmoid()
         self.stack = nn.Sequential(*self.stack)
 
     def forward(self, x, lens=torch.tensor(False)):
@@ -225,15 +225,13 @@ class SpaceVariant(nn.Module):
     def __init__(self,
                  module,
                  normalize_func,
-                 activation=nn.ReLU(),
                  shape=None):
         """
         A space-variant convolution.
         1. `module` is applied to the input
         2. `normalize_func` is used while creating the map of the positions
         3. indices are extracted from that map
-        4. `activation` is applied to both points 2 and 3
-        5. the 2 outputs are multiplied entry-wise
+        4. the 2 outputs are multiplied entry-wise
 
         Arguments
         ---------
@@ -243,9 +241,6 @@ class SpaceVariant(nn.Module):
         `normalize_fun` : callable
             a function which takes as arguments the ndices of one dimension (a
             tensor) and returns another tensor with same dimensions
-        `activation` : callable
-            a function that is applied after `module` and `pos` have been
-            applied
         `shape` : None or tuple
             the shape expected as input; if you know that, insert it as it
             improves performances
@@ -262,7 +257,6 @@ class SpaceVariant(nn.Module):
                              bias=module.bias,
                              padding_mode=module.padding_mode)
         self.normalize = normalize_func
-        self.act = activation
         if shape:
             self.positions = self.make_positions(shape)
 
@@ -271,8 +265,8 @@ class SpaceVariant(nn.Module):
             positions = self.positions.to(x.dtype).to(x.device)
         else:
             positions = self.make_positions(x.shape).to(x.dtype).to(x.device)
-        x = self.act(self.module(x))
-        positions = self.act(self.pos(positions))
+        x = self.module(x)
+        positions = self.pos(positions)
         return x * positions
 
     def make_positions(self, shape):
