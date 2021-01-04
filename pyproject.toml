@@ -19,7 +19,6 @@ torch = "^1.7.0"
 # TODO: change this when this branch is merged!
 scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
 pycarla = "^0.1.1"
-memory-profiler = "^0.58.0"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.4"
