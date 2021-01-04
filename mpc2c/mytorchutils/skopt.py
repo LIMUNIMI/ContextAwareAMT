@@ -157,7 +157,6 @@ class SKOptimizer(object):
                 space_constraint=self._make_constraint(),
                 random_state=random_state,
                 n_calls=self.num_iter[0])
-            __import__('ipdb').set_trace()
             x0 = self.res.x_iters
             y0 = self.res.func_vals
             random_state = self.res.random_state

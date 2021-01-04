@@ -1,9 +1,11 @@
 import torch
+from torch import nn
 import torch.nn.functional as F
+from memory_profiler import profile
 
 from . import data_management, feature_extraction
 from . import settings as s
-from .mytorchutils import LossValue, count_params, train_epochs
+from .mytorchutils import count_params, train_epochs
 
 
 def model_test(model_build_func, test_sample):
@@ -11,11 +13,11 @@ def model_test(model_build_func, test_sample):
     A function to build a constraint around the model size; the constraint
     tries to build the model and use it with a random function
     """
+    @profile
     def constraint(hyperparams):
         try:
             model = model_build_func(hyperparams)
             model(test_sample.to(s.DEVICE).to(s.DTYPE))
-            del model
         except Exception:
             # except Exception as e:
             # import traceback
@@ -127,6 +129,4 @@ def train(trainloader, validloader, model, lr, wd):
                               plot_losses=s.PLOT_LOSSES)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
 
-    return LossValue(train_loss + complexity_loss,
-                     train_loss=train_loss,
-                     complexity_loss=complexity_loss)
+    return train_loss + complexity_loss

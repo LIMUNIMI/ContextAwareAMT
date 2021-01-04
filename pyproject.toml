@@ -6,7 +6,7 @@ authors = ["Federico Simonetta <federico.simonetta@unimi.it>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.6.9"
+python = "^3.8.6"
 Cython = "^0.29.21"
 numpy = "^1.19.4"
 tqdm = "^4.52.0"
@@ -19,6 +19,7 @@ torch = "^1.7.0"
 # TODO: change this when this branch is merged!
 scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
 pycarla = "^0.1.1"
+memory-profiler = "^0.58.0"
 
 [tool.poetry.dev-dependencies]
 ipdb = "^0.13.4"
