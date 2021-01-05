@@ -76,18 +76,16 @@ class MIDIParameterEstimation(nn.Module):
         self.note_level = note_level
 
         # setup the `note_level` stuffs
-        # kernel_size, stride, dilation, lstm_hidden_size, lstm_layers\
-        #     = hyperparams
+        kernel_size, stride, dilation, lstm_hidden_size,\
+            lstm_layers, middle_features = hyperparams
 
-        # if lstm_layers > 0:
-        #     self.lstm = nn.LSTM(input_size[0],
-        #                         lstm_hidden_size,
-        #                         num_layers=lstm_layers,
-        #                         batch_first=True)
+        if lstm_layers > 0:
+            self.lstm = nn.LSTM(input_size[0],
+                                lstm_hidden_size,
+                                num_layers=lstm_layers,
+                                batch_first=True)
 
-        # conv_in_size = (lstm_hidden_size, input_size[1])
-        conv_in_size = input_size
-        kernel_size, stride, dilation = hyperparams
+        conv_in_size = (lstm_hidden_size, input_size[1])
 
         def add_module(input_features):
             """
@@ -98,39 +96,44 @@ class MIDIParameterEstimation(nn.Module):
             """
 
             # computing size after the first block
-            next_conv_int_size = conv_output_size(conv_in_size, dilation,
-                                                  kernel_size, stride)
+            next_conv_in_size = conv_output_size(conv_in_size, dilation,
+                                                 kernel_size, stride)
 
-            if next_conv_int_size[0] > 0 and \
+            if next_conv_in_size[0] > 0 and \
                     conv_in_size[0] > 1 and \
-                    conv_in_size[0] != next_conv_int_size[0]:
+                    conv_in_size[0] != next_conv_in_size[0]:
                 # if after conv, size is not negative
                 # and if the input has something to be reduced
                 # and if the conv changes the size (it can happens that
                 # dilation creates such a situation)
-                if (note_level
-                        and next_conv_int_size[1] < 1) or not note_level:
+                if (note_level and next_conv_in_size[1] < 1) or not note_level:
                     # if we cannot apply kernels on the frames, let's
                     # apply them framewise except for the last layer
                     k = (kernel_size[0], 1)
                     s = (stride[0], 1)
                     d = (dilation[0], 1)
-                    next_conv_int_size = (next_conv_int_size[0], input_size[1])
+                    next_conv_in_size = (next_conv_in_size[0], input_size[1])
                 else:
                     k, s, d = kernel_size, stride, dilation
+
+                if next_conv_in_size[0] == 1:
+                    # if this is the last layer
+                    conv_out_features = output_features
+                else:
+                    conv_out_features = middle_features
 
                 self.stack += [
                     SpaceVariant(
                         nn.Conv2d(input_features,
-                                  output_features,
+                                  conv_out_features,
                                   kernel_size=k,
                                   stride=s,
                                   padding=0,
                                   dilation=d), lambda x: x / len(x)),
                     # nn.BatchNorm2d(output_features),
-                    nn.Hardsigmoid()
+                    nn.Tanh()
                 ]
-                return True, next_conv_int_size
+                return True, next_conv_in_size
             else:
                 return False, conv_in_size
 
@@ -140,7 +143,7 @@ class MIDIParameterEstimation(nn.Module):
         added = True
         while added:
             added, conv_in_size = add_module(input_features)
-            input_features = output_features
+            input_features = middle_features
 
         # add the last block to get size 1 along feature dimension and
         # (optionally) along the frame dimension
@@ -166,12 +169,12 @@ class MIDIParameterEstimation(nn.Module):
                 # nn.BatchNorm2d(output_features),
                 nn.Hardsigmoid()
             ]
-        # else:
+        else:
+            # change the last activation so that the outputs are in (0, 1)
+            self.stack[-1] = nn.Hardsigmoid()
             # remove the batchnorm since the output has only one value
             # and it cannot be run with these input size
             # del self.stack[-2]
-            # change the last activation so that the outputs are in (0, 1)
-            # self.stack[-1] = nn.Hardsigmoid()
         self.stack = nn.Sequential(*self.stack)
 
     def forward(self, x, lens=torch.tensor(False)):
@@ -222,10 +225,7 @@ class MIDIParameterEstimation(nn.Module):
 
 
 class SpaceVariant(nn.Module):
-    def __init__(self,
-                 module,
-                 normalize_func,
-                 shape=None):
+    def __init__(self, module, normalize_func, shape=None):
         """
         A space-variant convolution.
         1. `module` is applied to the input
@@ -247,7 +247,7 @@ class SpaceVariant(nn.Module):
         """
         super().__init__()
         self.module = module
-        self.pos = nn.Conv2d(4,
+        self.pos = nn.Conv2d(2,
                              1,
                              module.kernel_size,
                              module.stride,
@@ -279,11 +279,11 @@ class SpaceVariant(nn.Module):
             4 dimensions: (batches, channels, x, y)
         """
         # making arrays between -1 and +1
-        X = torch.arange(1, shape[-2] + 1)
-        X = self.normalize(X)
-        X = torch.stack([X, torch.flip(X, [0])])
-        # expand X to match Y
-        X = X.unsqueeze(2).expand(2, shape[-2], shape[-1])
+        # X = torch.arange(1, shape[-2] + 1)
+        # X = self.normalize(X)
+        # X = torch.stack([X, torch.flip(X, [0])])
+        # # expand X to match Y
+        # X = X.unsqueeze(2).expand(2, shape[-2], shape[-1])
 
         Y = torch.arange(1, shape[-1] + 1)
         Y = self.normalize(Y)
@@ -291,7 +291,7 @@ class SpaceVariant(nn.Module):
         # expand Y to match X
         Y = Y.unsqueeze(1).expand(2, shape[-2], shape[-1])
 
-        positions = torch.cat([X, Y], dim=0)
+        # positions = torch.cat([X, Y], dim=0)
         # positions = torch.stack([X, Y], dim=0)
         # here `positions` has 3 dimensions:
         #   0. dimension 0 has size 2 and contains (X, X_flip, Y, Y_flip)
@@ -299,7 +299,7 @@ class SpaceVariant(nn.Module):
         #   2. dimension 2 has the indices for y
 
         # the returned whould have one more position for batches
-        return positions.unsqueeze(0).expand(shape[0], 4, shape[2], shape[3])
+        return Y.unsqueeze(0).expand(shape[0], 2, shape[2], shape[3])
 
 
 def init_weights(m, initializer):

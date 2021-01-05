@@ -66,21 +66,23 @@ INIT_PARAMS = torch.nn.init.ones_
 
 # SKOPT
 VEL_SKSPACE = [
-    # space.Integer(1, 128, name='lstm_hidden_size'),
-    # space.Integer(0, 1, name='lstm_layers'),
-    space.Integer(1, 32, name='kernel_0'),
-    space.Integer(1, 32, name='stride_0'),
-    space.Integer(1, 8, name='dilation_0'),
+    space.Integer(1, 128, name='lstm_hidden_size'),
+    space.Integer(0, 2, name='lstm_layers'),
+    space.Integer(1, 12, name='middle_features'),
+    space.Integer(1, 9, name='kernel_0'),
+    space.Integer(1, 6, name='stride_0'),
+    space.Integer(1, 3, name='dilation_0'),
     space.Integer(1, 5, name='kernel_1'),
     space.Integer(1, 3, name='stride_1'),
     space.Integer(1, 2, name='dilation_1')
 ]
 PED_SKSPACE = [
-    # space.Integer(1, 128, name='lstm_hidden_size'),
-    # space.Integer(0, 1, name='lstm_layers'),
-    space.Integer(1, 32, name='kernel_0'),
-    space.Integer(1, 32, name='stride_0'),
-    space.Integer(1, 8, name='dilation_0')
+    space.Integer(1, 128, name='lstm_hidden_size'),
+    space.Integer(0, 2, name='lstm_layers'),
+    space.Integer(1, 12, name='middle_features'),
+    space.Integer(1, 9, name='kernel_0'),
+    space.Integer(1, 9, name='stride_0'),
+    space.Integer(1, 3, name='dilation_0')
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
 SKITERATIONS = (0, 500)

@@ -1,7 +1,7 @@
 import torch
-from torch import nn
 import torch.nn.functional as F
-from memory_profiler import profile
+# from memory_profiler import profile
+from pprint import pprint
 
 from . import data_management, feature_extraction
 from . import settings as s
@@ -13,22 +13,29 @@ def model_test(model_build_func, test_sample):
     A function to build a constraint around the model size; the constraint
     tries to build the model and use it with a random function
     """
-    @profile
     def constraint(hyperparams):
-        try:
-            model = model_build_func(hyperparams)
-            model(test_sample.to(s.DEVICE).to(s.DTYPE))
-        except Exception:
-            # except Exception as e:
-            # import traceback
-            # traceback.print_exc(e)
-            return False
+        allowed = True
 
-        # if hyperparams[
-        #         'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
-        #     return False
+        if hyperparams[
+                'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
+            allowed = False
 
-        return True
+        if allowed:
+            try:
+                model = model_build_func(hyperparams)
+                model(test_sample.to(s.DEVICE).to(s.DTYPE))
+            except Exception:
+                # except Exception as e:
+                # import traceback
+                # traceback.print_exc(e)
+                allowed = False
+
+        if not allowed:
+            print("----------")
+            print("Refusing this set of hyperparams: ")
+            pprint(hyperparams)
+
+        return allowed
 
     return constraint
 
@@ -40,15 +47,12 @@ def build_velocity_model(hyperparams):
         note_level=True,
         hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
                      (hyperparams['stride_0'], hyperparams['stride_1']),
-                     (hyperparams['dilation_0'],
-                      hyperparams['dilation_1']))).to(s.DEVICE).to(s.DTYPE)
+                     (hyperparams['dilation_0'], hyperparams['dilation_1']),
+                     hyperparams['lstm_hidden_size'],
+                     hyperparams['lstm_layers'],
+                     hyperparams['middle_features'])).to(s.DEVICE).to(s.DTYPE)
     feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
-    # hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
-    #              (hyperparams['stride_0'], hyperparams['stride_1']),
-    #              (hyperparams['dilation_0'], hyperparams['dilation_1']),
-    #              hyperparams['lstm_hidden_size'],
-    #              hyperparams['lstm_layers'])).to(s.DEVICE).to(s.DTYPE)
 
 
 def build_pedaling_model(hyperparams):
@@ -57,7 +61,10 @@ def build_pedaling_model(hyperparams):
         output_features=3,
         note_level=False,
         hyperparams=((hyperparams['kernel_0'], ), (hyperparams['stride_0'], ),
-                     (hyperparams['dilation_0'], ))).to(s.DEVICE).to(s.DTYPE)
+                     (hyperparams['dilation_0'], ),
+                     hyperparams['lstm_hidden_size'],
+                     hyperparams['lstm_layers'],
+                     hyperparams['middle_features'])).to(s.DEVICE).to(s.DTYPE)
     feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
