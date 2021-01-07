@@ -14,6 +14,9 @@ def model_test(model_build_func, test_sample):
     tries to build the model and use it with a random function
     """
     def constraint(hyperparams):
+        print("----------")
+        print("checking this set of hyperparams: ")
+        pprint(hyperparams)
         allowed = True
 
         if hyperparams[
@@ -23,17 +26,14 @@ def model_test(model_build_func, test_sample):
         if allowed:
             try:
                 model = model_build_func(hyperparams)
+                print("model created")
                 model(test_sample.to(s.DEVICE).to(s.DTYPE))
+                print("model tested")
             except Exception:
                 # except Exception as e:
                 # import traceback
                 # traceback.print_exc(e)
                 allowed = False
-
-        if not allowed:
-            print("----------")
-            print("Refusing this set of hyperparams: ")
-            pprint(hyperparams)
 
         return allowed
 
@@ -45,6 +45,7 @@ def build_velocity_model(hyperparams):
         input_size=(s.BINS, s.MINI_SPEC_SIZE),
         output_features=1,
         note_level=True,
+        max_layers=s.MAX_LAYERS,
         hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
                      (hyperparams['stride_0'], hyperparams['stride_1']),
                      (hyperparams['dilation_0'], hyperparams['dilation_1']),
@@ -60,6 +61,7 @@ def build_pedaling_model(hyperparams):
         input_size=(s.BINS, ),
         output_features=3,
         note_level=False,
+        max_layers=s.MAX_LAYERS,
         hyperparams=((hyperparams['kernel_0'], ), (hyperparams['stride_0'], ),
                      (hyperparams['dilation_0'], ),
                      hyperparams['lstm_hidden_size'],

@@ -29,7 +29,7 @@ def conv_output_size(size, dilation, kernel, stride):
 
 
 class MIDIParameterEstimation(nn.Module):
-    def __init__(self, input_size, output_features, note_level, hyperparams):
+    def __init__(self, input_size, output_features, note_level, max_layers, hyperparams):
         """
         * `hyperparams` must contains 3 values:
 
@@ -87,7 +87,7 @@ class MIDIParameterEstimation(nn.Module):
 
         conv_in_size = (lstm_hidden_size, input_size[1])
 
-        def add_module(input_features):
+        def add_module(input_features, conv_in_size):
             """
             Add a module to the stack if the output size is >= 0
 
@@ -116,7 +116,7 @@ class MIDIParameterEstimation(nn.Module):
                 else:
                     k, s, d = kernel_size, stride, dilation
 
-                if next_conv_in_size[0] == 1:
+                if next_conv_in_size[0] == 1 and next_conv_in_size[1] == 1:
                     # if this is the last layer
                     conv_out_features = output_features
                 else:
@@ -141,8 +141,10 @@ class MIDIParameterEstimation(nn.Module):
         self.stack = []
         input_features = 1
         added = True
-        while added:
-            added, conv_in_size = add_module(input_features)
+        for i in range(max_layers):
+            added, conv_in_size = add_module(input_features, conv_in_size)
+            if not added:
+                break
             input_features = middle_features
 
         # add the last block to get size 1 along feature dimension and
@@ -165,7 +167,7 @@ class MIDIParameterEstimation(nn.Module):
                               stride=1,
                               dilation=1,
                               padding=0,
-                              groups=input_features), lambda x: x / len(x)),
+                              groups=1), lambda x: x / len(x)),
                 # nn.BatchNorm2d(output_features),
                 nn.Hardsigmoid()
             ]
@@ -254,7 +256,7 @@ class SpaceVariant(nn.Module):
                              module.padding,
                              module.dilation,
                              groups=1,
-                             bias=module.bias,
+                             bias=module.bias is not None,
                              padding_mode=module.padding_mode)
         self.normalize = normalize_func
         if shape:

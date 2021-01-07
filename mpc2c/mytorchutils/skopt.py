@@ -136,7 +136,6 @@ class SKOptimizer(object):
             x0 = self.res.x_iters
             y0 = self.res.func_vals
             random_state = self.res.random_state
-            self.plot()
         else:
             print("Starting new optimization from scratch...")
             x0 = y0 = None
