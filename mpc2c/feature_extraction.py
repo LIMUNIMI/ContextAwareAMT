@@ -1,3 +1,5 @@
+
+import math
 import torch
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
@@ -23,13 +25,14 @@ def conv_output_size(size, dilation, kernel, stride):
     out = []
     for dim in range(len(size)):
         out.append(
-            int((size[dim] - dilation[dim] *
-                 (kernel[dim] - 1)) / stride[dim]) + 1)
+            math.floor((size[dim] - dilation[dim] *
+                        (kernel[dim] - 1) - 1) / stride[dim] + 1))
     return tuple(out)
 
 
 class MIDIParameterEstimation(nn.Module):
-    def __init__(self, input_size, output_features, note_level, max_layers, hyperparams):
+    def __init__(self, input_size, output_features, note_level, max_layers,
+                 hyperparams):
         """
         * `hyperparams` must contains 3 values:
 
