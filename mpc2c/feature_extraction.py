@@ -1,5 +1,5 @@
-
 import math
+
 import torch
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
@@ -270,8 +270,8 @@ class SpaceVariant(nn.Module):
             positions = self.positions.to(x.dtype).to(x.device)
         else:
             positions = self.make_positions(x.shape).to(x.dtype).to(x.device)
-        x = self.module(x)
-        positions = self.pos(positions)
+        x = self.module(x)**2
+        positions = self.pos(positions)**2
         return x * positions
 
     def make_positions(self, shape):
