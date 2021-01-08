@@ -23,6 +23,12 @@ def model_test(model_build_func, test_sample):
                 'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
             allowed = False
 
+        if hyperparams['stride_0'] > hyperparams['kernel_0'] or\
+                hyperparams['dilation_0'] > hyperparams['kernel_0'] or\
+                hyperparams['dilation_1'] > hyperparams['kernel_1'] or\
+                hyperparams['stride_1'] > hyperparams['kernel_1']:
+            allowed = False
+
         if allowed:
             try:
                 model = model_build_func(hyperparams)
