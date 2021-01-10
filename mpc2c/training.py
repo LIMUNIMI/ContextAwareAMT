@@ -24,10 +24,12 @@ def model_test(model_build_func, test_sample):
             allowed = False
 
         if hyperparams['stride_0'] > hyperparams['kernel_0'] or\
-                hyperparams['dilation_0'] > hyperparams['kernel_0'] or\
-                hyperparams['dilation_1'] > hyperparams['kernel_1'] or\
-                hyperparams['stride_1'] > hyperparams['kernel_1']:
+                hyperparams['dilation_0'] > hyperparams['kernel_0']:
             allowed = False
+
+        if 'stride1' in hyperparams:
+            if hyperparams['stride_1'] > hyperparams['kernel_1']:
+                allowed = False
 
         if allowed:
             try:
@@ -54,7 +56,7 @@ def build_velocity_model(hyperparams):
         max_layers=s.MAX_LAYERS,
         hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
                      (hyperparams['stride_0'], hyperparams['stride_1']),
-                     (hyperparams['dilation_0'], hyperparams['dilation_1']),
+                     (hyperparams['dilation_0'], 1),
                      hyperparams['lstm_hidden_size'],
                      hyperparams['lstm_layers'],
                      hyperparams['middle_features'])).to(s.DEVICE).to(s.DTYPE)

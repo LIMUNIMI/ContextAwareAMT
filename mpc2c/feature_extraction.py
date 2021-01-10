@@ -126,15 +126,23 @@ class MIDIParameterEstimation(nn.Module):
                     conv_out_features = middle_features
 
                 self.stack += [
-                    SpaceVariant(
-                        nn.Conv2d(input_features,
-                                  conv_out_features,
-                                  kernel_size=k,
-                                  stride=s,
-                                  padding=0,
-                                  dilation=d), lambda x: x / len(x)),
+                    nn.Conv2d(input_features,
+                              conv_out_features,
+                              kernel_size=k,
+                              stride=s,
+                              padding=0,
+                              dilation=d),
+                    # SpaceVariant(
+                    #     nn.Conv2d(input_features,
+                    #               conv_out_features,
+                    #               kernel_size=k,
+                    #               stride=s,
+                    #               padding=0,
+                    #               dilation=d), lambda x: x / len(x)),
                     # nn.BatchNorm2d(output_features),
                     nn.Tanh()
+                    # nn.Hardtanh()
+                    # AbsLayer()
                 ]
                 return True, next_conv_in_size
             else:
@@ -163,16 +171,25 @@ class MIDIParameterEstimation(nn.Module):
 
         if k[0] > 1 or k[1] > 1:
             self.stack += [
-                SpaceVariant(
-                    nn.Conv2d(input_features,
-                              output_features,
-                              kernel_size=k,
-                              stride=1,
-                              dilation=1,
-                              padding=0,
-                              groups=1), lambda x: x / len(x)),
+                nn.Conv2d(input_features,
+                          output_features,
+                          kernel_size=k,
+                          stride=1,
+                          dilation=1,
+                          padding=0,
+                          groups=1),
+                # SpaceVariant(
+                #     nn.Conv2d(input_features,
+                #               output_features,
+                #               kernel_size=k,
+                #               stride=1,
+                #               dilation=1,
+                #               padding=0,
+                #               groups=1), lambda x: x / len(x)),
                 # nn.BatchNorm2d(output_features),
-                nn.Hardsigmoid()
+                # nn.Hardsigmoid()
+                nn.Sigmoid()
+                # AbsLayer()
             ]
         else:
             # change the last activation so that the outputs are in (0, 1)
@@ -229,6 +246,14 @@ class MIDIParameterEstimation(nn.Module):
         return self.forward(*args, **kwargs)
 
 
+class AbsLayer(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return torch.abs(x)
+
+
 class SpaceVariant(nn.Module):
     def __init__(self, module, normalize_func, shape=None):
         """
@@ -270,8 +295,8 @@ class SpaceVariant(nn.Module):
             positions = self.positions.to(x.dtype).to(x.device)
         else:
             positions = self.make_positions(x.shape).to(x.dtype).to(x.device)
-        x = self.module(x)**2
-        positions = self.pos(positions)**2
+        x = self.module(x)
+        positions = self.pos(positions)
         return x * positions
 
     def make_positions(self, shape):
