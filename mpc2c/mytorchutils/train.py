@@ -97,13 +97,18 @@ def train_epochs(model,
     approach allows you to monitor the metric of interest during validation, to
     use early stopping against your metric of interest and to monitor the
     validation comparing it with the training.
+
+    This function prints losses and optionally plots them. It also computes a
+    `dummy` loss as the valid loss function when the result is the mean of the
+    target. You should take care that your valid loss is less than this dummy
+    loss.
     """
     best_epoch = 0
     best_loss = 9999
     for epoch in range(epochs):
         epoch_ttt = time()
         print(f"-- Epoch {epoch} --")
-        trainloss, validloss, trainloss_valid = [], [], []
+        trainloss, validloss, trainloss_valid, dummyloss = [], [], [], []
         print("-> Training")
         model.train()
         for inputs, targets, lens in tqdm(trainloader):
@@ -141,11 +146,20 @@ def train_epochs(model,
                     trainloss_fn(out, targets, lens).detach().cpu().numpy())
                 if np.isnan(loss):
                     raise RuntimeError("Nan in training loss!")
+                dummy_out = [
+                    torch.full_like(targets[i], targets[i].mean())
+                    for i in range(len(targets))
+                ]
+                loss = validloss_fn(dummy_out, targets,
+                                    lens).detach().cpu().numpy()
+                dummyloss.append(loss)
 
         vl = np.mean(validloss)
         trainloss_valid = np.mean(trainloss_valid)
+        dl = np.mean(dummyloss)
         print(f"validation loss : {vl:.4e}")
         print(f"validation-training loss : {trainloss_valid:.4e}")
+        print(f"dummy loss : {dl:.4e}")
         if vl < best_loss:
             best_loss = vl
             best_epoch = epoch
