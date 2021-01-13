@@ -85,7 +85,7 @@ PED_SKSPACE = [
     space.Integer(1, 3, name='dilation_0')
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
-SKITERATIONS = (0, 100)
+SKITERATIONS = (0, 80)
 PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 1e-6
 
