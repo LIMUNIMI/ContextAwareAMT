@@ -88,7 +88,9 @@ class MIDIParameterEstimation(nn.Module):
                                 num_layers=lstm_layers,
                                 batch_first=True)
 
-        conv_in_size = (lstm_hidden_size, input_size[1])
+            conv_in_size = (lstm_hidden_size, input_size[1])
+        else:
+            conv_in_size = input_size
 
         def add_module(input_features, conv_in_size):
             """

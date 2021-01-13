@@ -19,9 +19,10 @@ def model_test(model_build_func, test_sample):
         pprint(hyperparams)
         allowed = True
 
-        if hyperparams[
-                'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
-            allowed = False
+        # this ends with preventing skopt to use lstm_layers = 0
+        # if hyperparams[
+        #         'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
+        #     allowed = False
 
         if hyperparams['stride_0'] > hyperparams['kernel_0'] or\
                 hyperparams['dilation_0'] > hyperparams['kernel_0']:
@@ -39,10 +40,11 @@ def model_test(model_build_func, test_sample):
                 print("model tested")
             except Exception:
                 # except Exception as e:
-                # import traceback
-                # traceback.print_exc(e)
+                #     import traceback
+                #     traceback.print_exc(e)
                 allowed = False
 
+        print(f"Hyperparams allowed: {allowed}")
         return allowed
 
     return constraint
@@ -66,12 +68,12 @@ def build_velocity_model(hyperparams):
 
 def build_pedaling_model(hyperparams):
     m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, ),
+        input_size=(s.BINS, 1),
         output_features=3,
         note_level=False,
         max_layers=s.MAX_LAYERS,
-        hyperparams=((hyperparams['kernel_0'], ), (hyperparams['stride_0'], ),
-                     (hyperparams['dilation_0'], ),
+        hyperparams=((hyperparams['kernel_0'], 1), (hyperparams['stride_0'], 1),
+                     (hyperparams['dilation_0'], 1),
                      hyperparams['lstm_hidden_size'],
                      hyperparams['lstm_layers'],
                      hyperparams['middle_features'])).to(s.DEVICE).to(s.DTYPE)
@@ -93,7 +95,7 @@ def train_pedaling(nmf_params,
         nmf_params, 'pedaling')
     if s.REDUMP:
         return
-    model = build_pedaling_model()
+    model = build_pedaling_model(hyperparams)
     # TODO: if state_dict is not None, load it and fix initial weights
     return train(trainloader, validloader, model, lr, wd)
 
