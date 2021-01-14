@@ -50,9 +50,12 @@ VEL_HYPERPARAMS = {
     "dilation_1": 1
 }
 PED_HYPERPARAMS = {
-    "kernel_0": 4,
-    "stride_0": 1,
-    "dilation_0": 5
+    'lstm_hidden_size': 0,
+    'lstm_layers': 0,
+    'middle_features': 2,
+    "kernel_0": 3,
+    "stride_0": 2,
+    "dilation_0": 1
 }
 VEL_BATCH_SIZE = 600
 PED_BATCH_SIZE = 1

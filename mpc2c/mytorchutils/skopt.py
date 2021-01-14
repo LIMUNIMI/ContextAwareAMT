@@ -181,4 +181,8 @@ class SKOptimizer(object):
         skopt.utils.dump(self.res, "skopt_result.pkl")
         print("\n=================================\n")
 
+        print("Best hyperparams:")
+        print("x:", self.res.x)
+        print("f(x):", self.res.fun)
+
         self.plot()
