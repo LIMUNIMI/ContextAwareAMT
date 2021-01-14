@@ -147,7 +147,7 @@ def train_epochs(model,
                 if np.isnan(loss):
                     raise RuntimeError("Nan in training loss!")
                 dummy_out = [
-                    torch.full_like(targets[i], targets[i].mean())
+                    torch.full_like(out[i], targets[i].mean())
                     for i in range(len(targets))
                 ]
                 loss = validloss_fn(dummy_out, targets,
