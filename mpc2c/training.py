@@ -129,9 +129,6 @@ def train(trainloader, validloader, model, lr, wd):
     def make_loss_func(loss_func):
         def _loss_fn(x, y, lens):
             x, y, lens = x[0], y[0], lens[0]
-            # divide, but not in-place, otherwise successive operations would see a
-            # different value for `y`
-            y = y / 127
 
             if lens == torch.tensor(False):
                 # if `lens` is False, then it's like note_level
