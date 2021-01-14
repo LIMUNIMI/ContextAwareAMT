@@ -16,12 +16,11 @@ def process_pedaling(i, dataset, nmf_params):
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
     diff_spec = nmf_tools.V - nmf_tools.W @ nmf_tools.H
+    diff_spec /= diff_spec.sum() + 1e-32
     winlen = s.FRAME_SIZE / s.SR
     hop = s.HOP_SIZE / s.SR
-    pedaling = dataset.get_pedaling(i,
-                                    frame_based=True,
-                                    winlen=winlen,
-                                    hop=hop)[0]
+    pedaling = dataset.get_pedaling(
+        i, frame_based=True, winlen=winlen, hop=hop)[0] / 127
     # padding so that pedaling and diff_spec have the same length
     pedaling, diff_spec = utils.pad(pedaling[:, 1:].T, diff_spec)
     return diff_spec[None], pedaling[None]
@@ -33,7 +32,8 @@ def process_velocities(i, dataset, nmf_params):
     score = dataset.get_score(i, score_type=['precise_alignment'])
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
-    velocities = dataset.get_score(i, score_type=['precise_alignment'])[:, 3]
+    velocities = dataset.get_score(i, score_type=['precise_alignment'
+                                                  ])[:, 3] / 127
     minispecs = nmf_tools.get_minispecs()
     return minispecs, velocities
 

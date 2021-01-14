@@ -82,9 +82,9 @@ class DatasetDump(TorchDataset):
                     path_x = dest_path / f"x{index}.npz"
                     path_y = dest_path / f"y{index}.npz"
                     # this while prevents filesystem errors
-                    while not path_x.exists() or not path_y.exists():
-                        np.savez(path_x, x)
-                        np.savez(path_y, y)
+                    # while not path_x.exists() or not path_y.exists():
+                    np.savez(path_x, x)
+                    np.savez(path_y, y)
                     index += 1
 
             self.dataset.parallel(pickle_fn, process_fn, *args, **kwargs)

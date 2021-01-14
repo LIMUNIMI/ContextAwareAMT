@@ -280,7 +280,7 @@ class NMFTools:
 
             # normalizing with rms
             # mini_spec /= (mini_spec**2).mean()**0.5
-            mini_spec /= (mini_spec.sum() + s.EPS)
+            # mini_spec /= (mini_spec.sum() + s.EPS)
 
             if mini_spec.shape[1] < s.MINI_SPEC_SIZE:
                 mini_spec = np.pad(mini_spec,
