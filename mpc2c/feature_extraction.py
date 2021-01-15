@@ -141,7 +141,6 @@ class MIDIParameterEstimation(nn.Module):
                     #               stride=s,
                     #               padding=0,
                     #               dilation=d), lambda x: x / len(x)),
-                    # nn.BatchNorm2d(output_features),
                     nn.Tanh()
                     # nn.Hardtanh()
                     # AbsLayer()
@@ -195,7 +194,7 @@ class MIDIParameterEstimation(nn.Module):
             ]
         else:
             # change the last activation so that the outputs are in (0, 1)
-            self.stack[-1] = nn.Hardsigmoid()
+            self.stack[-1] = nn.Sigmoid()
             # remove the batchnorm since the output has only one value
             # and it cannot be run with these input size
             # del self.stack[-2]

@@ -42,7 +42,7 @@ Datasets
 -------------
 
 #. Create the MIDI file for the initial template: ``python run.py -sc``
-#. Synthesize the midi scale and name it ``pianoteq_scales.mp3`` (TODO: resynthesize using jack_synth)
+#. Synthesize the midi scale and name it ``pianoteq_scales.mp3`` (TODO: resynthesize using pycarla)
 #. Compute the initial template and save it to file: ``python run.py --template``
 
 2. Training the generic model
