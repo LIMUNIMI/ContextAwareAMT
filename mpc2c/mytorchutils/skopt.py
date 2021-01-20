@@ -64,9 +64,9 @@ class SKOptimizer(object):
     """
 
     space: list
-    checkpoint_path: str
-    num_iter: Tuple[int]
-    to_minimize: Callable
+    checkpoint_path: str = 'skopt_checkpoint.pkl'
+    num_iter: Tuple[int] = (0, 100)
+    to_minimize: Callable = lambda x: 1
     optimization_method: Callable = skopt.forest_minimize
     space_constraint: Optional[Callable] = None
     plot_graphs: bool = True
@@ -128,11 +128,7 @@ class SKOptimizer(object):
 
     def optimize(self):
         self.res = None
-        if os.path.exists(self.checkpoint_path):
-            print("Loading and plotting previous checkpoint...")
-            self._make_objective_func()
-            self._make_constraint()
-            self.res = load(self.checkpoint_path)
+        if self.load_res():
             x0 = self.res.x_iters
             y0 = self.res.func_vals
             random_state = self.res.random_state
@@ -181,8 +177,33 @@ class SKOptimizer(object):
         skopt.utils.dump(self.res, "skopt_result.pkl")
         print("\n=================================\n")
 
+        self.plot()
+
         print("Best hyperparams:")
         print("x:", self.res.x)
         print("f(x):", self.res.fun)
 
-        self.plot()
+    def load_res(self, result_fname=None):
+        """
+        Simply loads checkpoint if `result_fname` is None, otherwise it loads
+        `result_fname`.
+
+        `self.res` is set.
+
+        Returns True if something is loaded, False otherwise
+        """
+        def _load(fname):
+            self._make_objective_func()
+            self._make_constraint()
+            print("Loading checkpoint...")
+            self.res = load(fname)
+            return True
+
+        if result_fname is None:
+            if os.path.exists(self.checkpoint_path):
+                return _load(self.checkpoint_path)
+
+        elif os.path.exists(result_fname):
+            return _load(result_fname)
+
+        return False
