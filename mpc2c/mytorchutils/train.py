@@ -154,14 +154,14 @@ def train_epochs(model,
                                     lens).detach().cpu().numpy()
                 dummyloss.append(loss)
 
-        vl = np.mean(validloss)
+        validloss = np.mean(validloss)
         trainloss_valid = np.mean(trainloss_valid)
         dl = np.mean(dummyloss)
-        print(f"validation loss : {vl:.4e}")
+        print(f"validation loss : {validloss:.4e}")
         print(f"validation-training loss : {trainloss_valid:.4e}")
         print(f"dummy loss : {dl:.4e}")
-        if vl < best_loss:
-            best_loss = vl
+        if validloss < best_loss:
+            best_loss = validloss
             best_epoch = epoch
             state_dict = model.state_dict()
             name = f"checkpoints/checkpoint{best_loss:.4f}.pt"
