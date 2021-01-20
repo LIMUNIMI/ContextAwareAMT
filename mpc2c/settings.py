@@ -42,20 +42,22 @@ MAX_LAYERS = 30
 DEVICE = 'cuda'
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    "kernel_0": 4,
-    "stride_0": 1,
-    "dilation_0": 5,
-    "kernel_1": 2,
-    "stride_1": 1,
-    "dilation_1": 1
+    'lstm_hidden_size': 0,
+    'lstm_layers': 0,
+    'middle_features': 4,
+    "kernel_0": 6,
+    "stride_0": 4,
+    "dilation_0": 3,
+    "kernel_1": 3,
+    "stride_1": 1
 }
 PED_HYPERPARAMS = {
     'lstm_hidden_size': 0,
     'lstm_layers': 0,
-    'middle_features': 2,
+    'middle_features': 1,
     "kernel_0": 3,
-    "stride_0": 2,
-    "dilation_0": 1
+    "stride_0": 3,
+    "dilation_0": 3
 }
 VEL_BATCH_SIZE = 600
 PED_BATCH_SIZE = 1
