@@ -133,7 +133,7 @@ def main():
                      plot_graphs=s.PLOT_GRAPHS)
         else:
             training.train_pedaling(nmf_params,
-                                    s.VEL_HYPERPARAMS,
+                                    s.PED_HYPERPARAMS,
                                     s.LR,
                                     s.WD,
                                     context=args.context)
@@ -153,7 +153,7 @@ def main():
                      plot_graphs=s.PLOT_GRAPHS)
         else:
             training.train_velocity(nmf_params,
-                                    s.PED_HYPERPARAMS,
+                                    s.VEL_HYPERPARAMS,
                                     s.LR,
                                     s.WD,
                                     context=args.context)
