@@ -96,7 +96,10 @@ def train_pedaling(nmf_params,
     if s.REDUMP:
         return
     model = build_pedaling_model(hyperparams)
-    # TODO: if state_dict is not None, load it and fix initial weights
+    if state_dict is not None:
+        model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
+        model.freeze(s.TRANSFER_PORTION)
+
     return train(trainloader, validloader, model, lr, wd)
 
 
@@ -117,7 +120,10 @@ def train_velocity(nmf_params,
 
     model = build_velocity_model(hyperparams)
 
-    # TODO: if state_dict is not None, load it and fix initial weights
+    if state_dict is not None:
+        model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
+        model.freeze(s.TRANSFER_PORTION)
+
     return train(trainloader, validloader, model, lr, wd)
 
 

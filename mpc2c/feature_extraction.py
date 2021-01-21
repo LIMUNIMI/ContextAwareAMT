@@ -1,4 +1,5 @@
 import math
+from copy import deepcopy
 
 import torch
 from torch import nn
@@ -245,6 +246,46 @@ class MIDIParameterEstimation(nn.Module):
 
     def predict(self, *args, **kwargs):
         return self.forward(*args, **kwargs)
+
+    def load_sate_dict(self, state_dict, start=0, end=1):
+        """
+        Load parameters contained in `state_dict` starting from `start` and
+        ending with `end`, where `start` and `end` are portions of layers of
+        the stack of this model, so that the first layer whose parameters are
+        loaded is layer with index `round(len(self.stack) * start)` while the
+        last is `round(len(self.stack) * end)` (not ncluded)
+
+
+        Only supports parameters (e.g. no batch normalization)
+        """
+        # back-up untouched parts
+        start = round(len(self.stack) * start)
+        cp1 = deepcopy(self.stack[:start])
+        end = round(len(self.stack) * end)
+        cp2 = deepcopy(self.stack[end:])
+
+        # load everything
+        super().load_state_dict(state_dict)
+
+        # restore backed-up parts
+        stack = list(self.stack)
+        stack[:start] = cp1
+        stack[end:] = cp2
+
+        self.stack = nn.Sequential(*stack)
+
+    def freeze(self, portion_fixed=0):
+        """
+
+        Set `requires_grad` to `False` for the first `portion_fixed` of layers
+        (up to `int(len(Self.stack) * portion_fixed)`)
+
+        """
+
+        for i in range(int(len(self.stack) * portion_fixed)):
+            m = self.stack[i]
+            for p in m.parameters():
+                p.requires_grad = False
 
 
 class AbsLayer(nn.Module):
