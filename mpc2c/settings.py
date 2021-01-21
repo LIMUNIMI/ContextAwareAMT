@@ -64,11 +64,12 @@ PED_BATCH_SIZE = 1
 EARLY_STOP = 10
 PLOT_LOSSES = True
 DTYPE = torch.float32
-LR = 1
+LR = 1e-3
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
 INIT_PARAMS = torch.nn.init.ones_
+TRANSFER_PORTION = 0.66
 
 # SKOPT
 VEL_SKSPACE = [

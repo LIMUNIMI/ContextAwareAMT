@@ -58,8 +58,8 @@ Datasets
    and loss function of 0.2005.
 #. Fully train velocity model on the original context: ``python run.py -tv -c orig``
 
-   * Dummy loss:
-   * Validation loss:
+   * Dummy loss: 0.10528
+   * Validation loss: 0.12042
    * Model: 417 parameters
      MIDIParameterEstimation(
        (stack): Sequential(
@@ -74,8 +74,21 @@ Datasets
 
 #. Fully train pedaling model on the original context: ``python run.py -tp -c orig``
 
-   * Dummy loss:
-   * Validation loss:
+   * Dummy loss: 0.36847
+   * Validation loss: 0.33685
+   * Model: 24 parameters
+     MIDIParameterEstimation(
+        (stack): Sequential(
+          (0): Conv2d(1, 1, kernel_size=(3, 1), stride=(3, 1), dilation=(3, 1))
+          (1): Tanh()
+          (2): Conv2d(1, 1, kernel_size=(3, 1), stride=(3, 1), dilation=(3, 1))
+          (3): Tanh()
+          (4): Conv2d(1, 1, kernel_size=(3, 1), stride=(3, 1), dilation=(3, 1))
+          (5): Tanh()
+          (6): Conv2d(1, 3, kernel_size=(3, 1), stride=(3, 1), dilation=(3, 1))
+          (7): Sigmoid()
+         )
+     )
 
 ---
 
