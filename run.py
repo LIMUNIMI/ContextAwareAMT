@@ -1,4 +1,5 @@
 # from mpc2c import nmf
+import torch
 import argparse
 
 # from cylang import cylang
@@ -100,10 +101,21 @@ def main():
     if args.skopt:
         # if we are hyper-optimizing, change some settings
         from mpc2c.mytorchutils import hyperopt
-        import torch
         s.DATASET_LEN = 0.05
         s.PLOT_LOSSES = False
+        s.LR = 1
     s.REDUMP = args.redump
+
+    if args.generic_model:
+        generic_model = torch.load(args.generic_model)['state_dict']
+        s.LR = 0.01
+    else:
+        generic_model = None
+
+    if args.context_model:
+        context_model = torch.load(args.context_model)['state_dict']
+    else:
+        context_model = None
 
     if args.template:
         from mpc2c import make_template
@@ -136,7 +148,8 @@ def main():
                                     s.PED_HYPERPARAMS,
                                     s.LR,
                                     s.WD,
-                                    context=args.context)
+                                    context=args.context,
+                                    state_dict=generic_model)
 
     if args.train_velocity:
         from mpc2c import training
@@ -156,7 +169,8 @@ def main():
                                     s.VEL_HYPERPARAMS,
                                     s.LR,
                                     s.WD,
-                                    context=args.context)
+                                    context=args.context,
+                                    state_dict=generic_model)
 
 
 if __name__ == "__main__":
