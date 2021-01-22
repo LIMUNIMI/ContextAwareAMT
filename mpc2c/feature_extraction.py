@@ -247,7 +247,7 @@ class MIDIParameterEstimation(nn.Module):
     def predict(self, *args, **kwargs):
         return self.forward(*args, **kwargs)
 
-    def load_sate_dict(self, state_dict, start=0, end=1):
+    def load_state_dict(self, state_dict, start=0, end=1):
         """
         Load parameters contained in `state_dict` starting from `start` and
         ending with `end`, where `start` and `end` are portions of layers of
