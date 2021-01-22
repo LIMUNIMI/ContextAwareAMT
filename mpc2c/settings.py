@@ -1,6 +1,8 @@
 import torch
 from skopt import space
 
+from . import spectrogram
+
 # PATHS
 VELOCITY_DATA_PATH = '/datasets/mpc2c/resynth/velocity/'
 PEDALING_DATA_PATH = '/datasets/mpc2c/resynth/pedaling/'
@@ -20,7 +22,11 @@ SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
-NJOBS = 5
+NJOBS = 1
+SPEC = spectrogram.Spectrometer(FRAME_SIZE,
+                                SR,
+                                proctransform=spectrogram.ProcTransform.BARK)
+RETUNING = True
 
 # NMF
 #: epsilon value used inside the nmf to prevent divisons by 0
@@ -68,8 +74,14 @@ LR = 1e-3
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
-INIT_PARAMS = torch.nn.init.ones_
-TRANSFER_PORTION = 0.66
+
+
+def INIT_PARAMS(x):
+    return x  # torch.nn.init.ones_
+
+
+TRANSFER_PORTION = 1
+FREEZE_PORTION = 0
 
 # SKOPT
 VEL_SKSPACE = [
@@ -96,11 +108,8 @@ PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 1e-6
 
 # MAKE_TEMPLATE
-#: how many basis use in total
-BASIS = 20
-#: number of bins expected from the spectrogram (this depends on the number of
-#: bins per semitone...)
-BINS = 256
+#: how many basis use in total (except the last one)
+BASIS = 19
 #: the number of frames for the attack
 ATTACK = 1
 #: the number of frames for the other basis

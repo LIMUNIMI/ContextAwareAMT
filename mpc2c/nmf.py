@@ -3,8 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from . import settings as s
-from .utils import (find_start_stop, make_pianoroll, pad, spectrogram,
-                    stretch_pianoroll)
+from .utils import find_start_stop, make_pianoroll, pad, stretch_pianoroll
 
 
 def NMF(V,
@@ -154,6 +153,7 @@ class NMFTools:
                  initW,
                  minpitch,
                  maxpitch,
+                 spec=s.SPEC,
                  realign=False,
                  sr=s.SR,
                  cost_func=s.NMF_COST_FUNC):
@@ -161,6 +161,7 @@ class NMFTools:
         self.minpitch = minpitch
         self.maxpitch = maxpitch
         self.sr = sr
+        self.spec = spec
         self.realign = realign
         self.cost_func = cost_func
 
@@ -171,14 +172,12 @@ class NMFTools:
         # remove stoping and starting silence in audio
         start, stop = find_start_stop(audio, sample_rate=self.sr)
         audio = audio[start:stop]
-        self.V = spectrogram(audio, s.FRAME_SIZE, s.HOP_SIZE, s.SR)
+        self.V = self.spec.spectrogram(audio, s.HOP_SIZE,
+                                       440 if s.RETUNING else 0)
+        __import__('ipdb').set_trace()
 
         # normalize to unit sum
         self.V /= self.V.sum()
-
-        # save onsets
-        self.onsets = score[:, (0, 1)]
-        self.onsets[:, 0] -= self.minpitch
 
         # computing resolution of the pianoroll (seconds per column)
         self.res = len(audio) / self.sr / self.V.shape[1]

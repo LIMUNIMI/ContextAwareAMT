@@ -1,37 +1,88 @@
-import pretty_midi as pm
-import numpy as np
 import pickle
-import sys
+import time
+from typing import Tuple
+
+import essentia.standard as esst
+import numpy as np
 import plotly.graph_objects as go
-from tqdm import trange
-from . import settings as s
-from .utils import Spectrometer
-import visdom
+import pretty_midi as pm
+
+from .spectrogram import Spectrometer, peaks_enhance
 
 
-def main():
+def make_template(scale_path: Tuple[str, str],
+                  sr: int,
+                  frame_size: int,
+                  hop_size: int,
+                  spec: Spectrometer,
+                  basis: int,
+                  basis_frames: Tuple[int, int],
+                  retuning: bool = False,
+                  peaks_enhancing=False) -> np.ndarray:
     """
     Creates a template.
 
-    Note that pitch 0 is not used and pitch 128 cannot be added if MIDI pitches
-    in [1, 128] are used (as in asmd).
+    In the template, column 0 contains pitch 1 and columns 127 contains pitch
+    128
+
+    Arguments
+    ---------
+
+    `scale_path` : Tuple[str, str]
+        paths to the MIDI and audio file containing the scale
+    `sr` : int
+        sample rate
+    `frame_size` : int
+        number of samples in each frame for the analysis
+    `hop_size` : int
+        hop size for the analysis
+    `spec` : Spectrometer
+        The object used for computing the spectrograms
+    `basis` : int
+        number of basis, including one for the attack. One more basis are used
+        to take into account parts of the note that continue after the
+        specified number of basis.
+    `basis_frames` : Tuple[int, int]
+        how many frames to use for each basis, namely for the attack and for
+        the other basis; you can use this argument to prevent attack and/or
+        other basis by using 0 frames for each field.
+    `retuning` : bool
+        If True, spectrograms are retuned to 440 Hz
+    `peaks_enhancing` : bool
+        if True, `peaks_enhancing` function is applied after having normalized
+        the max value in each column to 1
+
+
+    Returns
+    -------
+
+    np.ndarray :
+        The template with shape (bins, 128 * (basis[0] + basis[1])
     """
-    import essentia.standard as esst
-    spec = Spectrometer(s.FRAME_SIZE, s.SR)
 
     print("Loading midi")
-    notes = pm.PrettyMIDI(midi_file=s.SCALE_PATH[0]).instruments[0].notes
+    notes = pm.PrettyMIDI(midi_file=scale_path[0]).instruments[0].notes
     print("Loading audio")
-    audio = esst.EasyLoader(filename=s.SCALE_PATH[1], sampleRate=s.SR)()
+    ttt = time.time()
+    audio = esst.EasyLoader(filename=scale_path[1], sampleRate=sr)()
+    print(f"Needed time: {time.time() - ttt: .2f}s")
 
-    # template = np.zeros((FRAME_SIZE // 2 + 1, 128, BASIS))
-    template = np.zeros((s.BINS, 128, s.BASIS))
-    counter = np.zeros((128, s.BASIS))
+    # compute the whole spectrogram
+    print("Computing spectrogram...")
+    retuning = 440 if retuning else 0
+    ttt = time.time()
+    audio = spec.spectrogram(audio, hop_size, retuning=retuning)
+    print(f"Needed time: {time.time() - ttt: .2f}s")
+
+    template = np.zeros((audio.shape[0], 128, basis + 1))
+    counter = np.zeros((128, basis + 1))
 
     maxpitch = 0
     minpitch = 128
 
-    for i in trange(len(notes)):
+    print("Computing template")
+    ttt = time.time()
+    for i in range(len(notes)):
         note = notes[i]
         if maxpitch < note.pitch:
             maxpitch = note.pitch
@@ -39,50 +90,81 @@ def main():
             minpitch = note.pitch
 
         # start and end frame
-        start = int(np.round((note.start) * s.SR))
-        end = int(np.round((note.end) * s.SR))
-        ENDED = False
+        pitch = note.pitch - 1
+        start = int(note.start / (hop_size / sr))
+        note_end = int(note.end / (hop_size / sr))
 
-        spd = np.zeros((s.BINS, s.BASIS))
-        frames = esst.FrameGenerator(audio[start:end],
-                                     frameSize=s.FRAME_SIZE,
-                                     hopSize=s.HOP_SIZE)
         # attack
-        for a in range(s.ATTACK):
-            try:
-                frame = next(frames)
-            except StopIteration:
-                print("Error: notes timing not correct")
-                print(f"note: {start}, {end}, {len(audio)}")
-                sys.exit(99)
-            spd[:, 0] += spec.apply(frame)
-        counter[note.pitch, 0] += s.ATTACK
+        if basis_frames[0] > 0:
+            end = min(start + basis_frames[0], note_end)
+            template[:, pitch, 0] += audio[:, start:end].sum(axis=1)
+            counter[pitch, 0] += (end - start)
+            start = end
 
         # other basis except the last one
-        for b in range(1, s.BASIS-1):
-            if not ENDED:
-                for a in range(s.BASIS_L):
-                    try:
-                        frame = next(frames)
-                    except StopIteration:
-                        # note is shorter than the number of basis
-                        ENDED = True
-                        break
-                    spd[:, b] += spec(frame)
-                    counter[note.pitch, b] += 1
+        if basis_frames[1] > 0:
+            end = min(start + basis * basis_frames[1], note_end)
+            # padding is needed to account for the case in which a note has not
+            # all the basis
+            pad_width = ((0, 0), (0,
+                                  start + basis * basis_frames[1] - note_end))
+            if pad_width[1][1] > 0:
+                note_basis = np.pad(audio[:, start:end],
+                                    pad_width,
+                                    constant_values=0)
+                full_basis = (end - start) // basis_frames[1]
+                counter[pitch, 1:full_basis + 1] += basis_frames[1]
+                half_basis = (end - start) % basis_frames[1]
+                counter[pitch, 1:full_basis + 2] += half_basis
+            else:
+                note_basis = audio[:, start:end]
+                counter[pitch, 1:basis + 1] += basis_frames[1]
+
+            template[:, pitch, 1:basis + 1] += note_basis.reshape(
+                -1, basis, basis_frames[1]).sum(axis=2)
+            start = end
 
         # last basis
-        if not ENDED:
-            for frame in frames:
-                spd[:, s.BASIS-1] += spec(frame)
-                counter[note.pitch, s.BASIS-1] += 1
-        template[:, note.pitch, :] += spd
+        if note_end > start:
+            template[:, pitch, -1] += audio[:, start:note_end].sum(axis=1)
+            counter[pitch, -1] += note_end - start
 
+    # normalizing template
     idx = np.nonzero(counter)
     template[:, idx[0], idx[1]] /= counter[idx]
 
     # collapsing basis and pitch dimension
-    template = template.reshape((-1, 128 * s.BASIS), order='C')
+    template = template.reshape((-1, 128 * (basis + 1)), order='C')
+
+    if peaks_enhancing:
+        # normalize to max
+        template /= template.max(axis=0) + 1e-15
+        # apply peaks_enhancing function
+        template = peaks_enhance(template, 2, 0.25, axis=0)
+
+    # normalizing so that each column sums to 1
+    sum_ = template.sum(axis=0)
+    idx = np.nonzero(sum_)
+    template[:, idx[0]] /= sum_[idx]
+
+    print(f"Needed time: {time.time() - ttt: .2f}s")
+
+    return template
+
+
+def main():
+    import visdom
+
+    from . import settings as s
+
+    template = make_template(scale_path=s.SCALE_PATH,
+                             sr=s.SR,
+                             frame_size=s.FRAME_SIZE,
+                             hop_size=s.HOP_SIZE,
+                             spec=s.SPEC,
+                             basis=s.BASIS,
+                             basis_frames=(s.ATTACK, s.BASIS_L),
+                             retuning=s.RETUNING)
 
     # plot template
     fig = go.Figure(data=go.Heatmap(z=template))
@@ -93,7 +175,7 @@ def main():
         fig.show()
 
     # saving template
-    pickle.dump((template, minpitch, maxpitch), open(s.TEMPLATE_PATH, 'wb'))
+    pickle.dump(template, open(s.TEMPLATE_PATH, 'wb'))
 
 
 if __name__ == "__main__":
