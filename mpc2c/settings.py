@@ -22,10 +22,12 @@ SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
-NJOBS = 1
+NJOBS = 5
 SPEC = spectrogram.Spectrometer(FRAME_SIZE,
                                 SR,
                                 proctransform=spectrogram.ProcTransform.BARK)
+# Bark has 40 bands..
+BINS = 40
 RETUNING = True
 
 # NMF

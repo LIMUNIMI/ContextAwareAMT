@@ -174,7 +174,6 @@ class NMFTools:
         audio = audio[start:stop]
         self.V = self.spec.spectrogram(audio, s.HOP_SIZE,
                                        440 if s.RETUNING else 0)
-        __import__('ipdb').set_trace()
 
         # normalize to unit sum
         self.V /= self.V.sum()
@@ -225,14 +224,14 @@ class NMFTools:
             B=s.BASIS,
             num_iter=5,
             cost_func=self.cost_func,
-            fixH=True,
+            fixH=False,
             fixW=False)
 
         NMF(self.V,
             self.W,
             self.H,
             B=s.BASIS,
-            num_iter=5,
+            num_iter=3,
             cost_func=self.cost_func,
             fixH=False,
             fixW=True)

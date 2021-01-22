@@ -149,7 +149,7 @@ def make_template(scale_path: Tuple[str, str],
 
     print(f"Needed time: {time.time() - ttt: .2f}s")
 
-    return template
+    return template, minpitch, maxpitch
 
 
 def main():
@@ -167,7 +167,7 @@ def main():
                              retuning=s.RETUNING)
 
     # plot template
-    fig = go.Figure(data=go.Heatmap(z=template))
+    fig = go.Figure(data=go.Heatmap(z=template[0]))
     try:
         vis = visdom.Visdom()
         vis.plotlyplot(fig)
