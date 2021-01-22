@@ -275,8 +275,7 @@ class NMFTools:
             end = min(start + s.MINI_SPEC_SIZE, self.H.shape[2], offset + 1)
 
             # compute the mini_spec
-            mini_spec = self.W[:, int(pitch - self.minpitch), :] @\
-                self.H[pitch, :, start:end]
+            mini_spec = self.W[:, pitch, :] @ self.H[pitch, :, start:end]
 
             # normalizing with rms
             # mini_spec /= (mini_spec**2).mean()**0.5
@@ -328,7 +327,7 @@ class NMFTools:
         Yields
         ------
 
-        `int` : pitch starting from 0 - a row in the pianoroll
+        `int` : pitch starting from 0 (0 is midi pitch self.minpitch)
         `int` : onset column index in the activation/spectrogram
         `int` : offset column index in the activation/spectrogram
         """
@@ -337,20 +336,14 @@ class NMFTools:
         if onsets_from_H:
             input_onsets = np.argwhere(self.initH[:, 0, :] > 0)
         else:
-            input_onsets = self.onsets
+            input_onsets = self.score
         for note in input_onsets:
             # compute offset
-            pitch, onset = note
+            pitch, onset, offset = note[:3]
             if not onsets_from_H:
-                onset = round(onset * self.res)
-                pitch = int(pitch)
-            offset = -1
-            for i in range(onset, summed_pr.shape[1]):
-                if summed_pr[pitch, i] == 0:
-                    offset = i - 1
-                    break
-            if offset == -1:
-                offset = summed_pr.shape[1]
+                onset = int(onset / self.res)
+                offset = min(int(offset / self.res), summed_pr.shape[1] - 1)
+                pitch = int(pitch - self.minpitch)
 
             # argmax = np.argmax(self.H[pitch, :, onset:offset + 1]) + onset
             yield pitch, onset, offset
