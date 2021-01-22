@@ -59,7 +59,7 @@ Datasets
 #. Fully train velocity model on the original context: ``python run.py -tv -c orig``
 
    * Dummy loss: 0.10528
-   * Validation loss: 0.12042
+   * Validation loss: 0.12034 (21 epochs, early-stop)
    * Model: 417 parameters
      MIDIParameterEstimation(
        (stack): Sequential(
@@ -75,7 +75,7 @@ Datasets
 #. Fully train pedaling model on the original context: ``python run.py -tp -c orig``
 
    * Dummy loss: 0.36847
-   * Validation loss: 0.33685
+   * Validation loss: 0.23026 (500 epochs, no early-stop)
    * Model: 24 parameters
      MIDIParameterEstimation(
         (stack): Sequential(
