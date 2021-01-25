@@ -154,7 +154,7 @@ def train(trainloader, validloader, model, lr, wd):
         y1 = torch.min(y)
         y2 = torch.max(y)
         y1_idx = torch.argmin(y)
-        y2_idx = torch.argmin(y)
+        y2_idx = torch.argmax(y)
         x1 = x.flatten()[y1_idx]
         x2 = x.flatten()[y2_idx]
         if x1 != x2:
