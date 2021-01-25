@@ -24,7 +24,9 @@ def train_epochs(model,
                  early_stop: int = 15,
                  plot_losses: bool = True,
                  device: str = 'cuda',
-                 dtype=torch.float32):
+                 dtype=torch.float32,
+                 dummy_loss: bool = True,
+                 trainloss_on_valid: bool = False):
     """
     A typical training algorithm with early stopping and loss plotting
 
@@ -81,6 +83,12 @@ def train_epochs(model,
 
     `dtype` : torch.dtype
         the dtype to use for the data (defaults to torch.float32)
+
+    `dummy_loss` : bool
+        if True, this computes the dummy loss against the average of the target
+
+    `trainloss_on_valid` : bool
+        if True, this computes the train loss on the validation set too
 
     Note
     ----
@@ -144,23 +152,27 @@ def train_epochs(model,
                 validloss.append(loss)
                 if np.isnan(loss):
                     raise RuntimeError("Nan in training loss!")
-                dummy_out = [
-                    torch.full_like(out[i], targets[i].mean())
-                    for i in range(len(targets))
-                ]
-                loss = validloss_fn(dummy_out, targets,
-                                    lens).detach().cpu().numpy()
-                dummyloss.append(loss)
-                out = model(*inputs, *lens)
-                trainloss_valid.append(
-                    trainloss_fn(out, targets, lens).detach().cpu().numpy())
+                if dummy_loss:
+                    dummy_out = [
+                        torch.full_like(out[i], targets[i].mean())
+                        for i in range(len(targets))
+                    ]
+                    loss = validloss_fn(dummy_out, targets,
+                                        lens).detach().cpu().numpy()
+                    dummyloss.append(loss)
+                if trainloss_on_valid:
+                    out = model(*inputs, *lens)
+                    trainloss_valid.append(
+                        trainloss_fn(out, targets, lens).detach().cpu().numpy())
 
         validloss = np.mean(validloss)
-        trainloss_valid = np.mean(trainloss_valid)
-        dl = np.mean(dummyloss)
         print(f"validation loss : {validloss:.4e}")
-        print(f"validation-training loss : {trainloss_valid:.4e}")
-        print(f"dummy loss : {dl:.4e}")
+        if trainloss_on_valid:
+            trainloss_valid = np.mean(trainloss_valid)
+            print(f"validation-training loss : {trainloss_valid:.4e}")
+        if dummy_loss:
+            dl = np.mean(dummyloss)
+            print(f"dummy loss : {dl:.4e}")
         if validloss < best_loss:
             best_loss = validloss
             best_epoch = epoch
@@ -180,10 +192,10 @@ def train_epochs(model,
     return best_loss
 
 
-def plot_losses_func(trainloss, validloss, trainloss_valid, epoch):
-    context.vis.line(torch.tensor([[trainloss, validloss, trainloss_valid]]),
+def plot_losses_func(*losses, epoch):
+    context.vis.line(torch.tensor([losses]),
                      X=torch.tensor([epoch]),
                      update='append',
                      win="losses",
-                     opts=dict(legend=['train', 'valid', 'trainloss-valid'],
+                     opts=dict(legend=[f'loss{i}' for i in range(len(losses))],
                                title="losses!"))
