@@ -142,8 +142,6 @@ def train_epochs(model,
                 out = model.predict(*inputs, *lens)
                 loss = validloss_fn(out, targets, lens).detach().cpu().numpy()
                 validloss.append(loss)
-                trainloss_valid.append(
-                    trainloss_fn(out, targets, lens).detach().cpu().numpy())
                 if np.isnan(loss):
                     raise RuntimeError("Nan in training loss!")
                 dummy_out = [
@@ -153,6 +151,9 @@ def train_epochs(model,
                 loss = validloss_fn(dummy_out, targets,
                                     lens).detach().cpu().numpy()
                 dummyloss.append(loss)
+                out = model(*inputs, *lens)
+                trainloss_valid.append(
+                    trainloss_fn(out, targets, lens).detach().cpu().numpy())
 
         validloss = np.mean(validloss)
         trainloss_valid = np.mean(trainloss_valid)

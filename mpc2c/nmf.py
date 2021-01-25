@@ -155,12 +155,11 @@ class NMFTools:
                  maxpitch,
                  spec=s.SPEC,
                  realign=False,
-                 sr=s.SR,
                  cost_func=s.NMF_COST_FUNC):
         self.initW = initW[:, minpitch * s.BASIS:(maxpitch + 1) * s.BASIS]
         self.minpitch = minpitch
         self.maxpitch = maxpitch
-        self.sr = sr
+        self.sr = spec.sample_rate
         self.spec = spec
         self.realign = realign
         self.cost_func = cost_func
@@ -172,7 +171,7 @@ class NMFTools:
         # remove stoping and starting silence in audio
         start, stop = find_start_stop(audio, sample_rate=self.sr)
         audio = audio[start:stop]
-        self.V = self.spec.spectrogram(audio, s.HOP_SIZE,
+        self.V = self.spec.spectrogram(audio,
                                        440 if s.RETUNING else 0)
 
         # normalize to unit sum

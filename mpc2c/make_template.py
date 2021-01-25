@@ -11,9 +11,6 @@ from .spectrogram import Spectrometer, peaks_enhance
 
 
 def make_template(scale_path: Tuple[str, str],
-                  sr: int,
-                  frame_size: int,
-                  hop_size: int,
                   spec: Spectrometer,
                   basis: int,
                   basis_frames: Tuple[int, int],
@@ -30,12 +27,6 @@ def make_template(scale_path: Tuple[str, str],
 
     `scale_path` : Tuple[str, str]
         paths to the MIDI and audio file containing the scale
-    `sr` : int
-        sample rate
-    `frame_size` : int
-        number of samples in each frame for the analysis
-    `hop_size` : int
-        hop size for the analysis
     `spec` : Spectrometer
         The object used for computing the spectrograms
     `basis` : int
@@ -59,6 +50,8 @@ def make_template(scale_path: Tuple[str, str],
     np.ndarray :
         The template with shape (bins, 128 * (basis[0] + basis[1])
     """
+    sr = spec.sample_rate
+    hop_size = spec.hop_size
 
     print("Loading midi")
     notes = pm.PrettyMIDI(midi_file=scale_path[0]).instruments[0].notes
@@ -71,7 +64,7 @@ def make_template(scale_path: Tuple[str, str],
     print("Computing spectrogram...")
     retuning = 440 if retuning else 0
     ttt = time.time()
-    audio = spec.spectrogram(audio, hop_size, retuning=retuning)
+    audio = spec.spectrogram(audio, retuning=retuning)
     print(f"Needed time: {time.time() - ttt: .2f}s")
 
     template = np.zeros((audio.shape[0], 128, basis + 1))
@@ -158,9 +151,6 @@ def main():
     from . import settings as s
 
     template = make_template(scale_path=s.SCALE_PATH,
-                             sr=s.SR,
-                             frame_size=s.FRAME_SIZE,
-                             hop_size=s.HOP_SIZE,
                              spec=s.SPEC,
                              basis=s.BASIS,
                              basis_frames=(s.ATTACK, s.BASIS_L),

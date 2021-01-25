@@ -154,32 +154,43 @@ class ProcTransform(metaclass=ClassCollection):
             return self.spec(x)[0]
 
     class PITCH_BANDS(EssentiaClass):
-        def __init__(self, sample_rate, spectrum_size, **kwargs):
+        def __init__(self, sample_rate, spectrum_size, log=False, **kwargs):
+            """
+            This uses `FrequencyBands` because 128 bands are too many for
+            `TriangularBands`; however, it accept a keyword parameter `log`.
+            """
             super().__init__(sample_rate, spectrum_size, **kwargs)
             self.spec = esst.FrequencyBands(sampleRate=sample_rate,
                                             frequencyBands=[
                                                 midi_pitch_to_f0(pitch - 0.5)
                                                 for pitch in range(1, 130)
                                             ])
+            self.log = log
 
         def __call__(self, x):
-            return self.spec(x)
+            if self.log:
+                return np.log10(1 + self.spec(x))
+            else:
+                return self.spec(x)
 
     class BARK(EssentiaClass):
         def __init__(self, sample_rate, spectrum_size, **kwargs):
             super().__init__(sample_rate, spectrum_size, **kwargs)
-            self.spec = esst.BFCC(sampleRate=sample_rate,
-                                  inputSize=spectrum_size,
-                                  **kwargs)
+            self.spec = esst.TriangularBarkBands(
+                sampleRate=sample_rate,
+                inputSize=spectrum_size,
+                highFrequencyBound=sample_rate // 2,
+                **kwargs)
 
         def __call__(self, x):
-            return self.spec(x)[0]
+            return self.spec(x)
 
     class BFCC(EssentiaClass):
         def __init__(self, sample_rate, spectrum_size, **kwargs):
             super().__init__(sample_rate, spectrum_size, **kwargs)
             self.spec = esst.BFCC(sampleRate=sample_rate,
                                   inputSize=spectrum_size,
+                                  highFrequencyBound=sample_rate // 2,
                                   **kwargs)
 
         def __call__(self, x):
@@ -188,18 +199,20 @@ class ProcTransform(metaclass=ClassCollection):
     class MEL(EssentiaClass):
         def __init__(self, sample_rate, spectrum_size, **kwargs):
             super().__init__(sample_rate, spectrum_size, **kwargs)
-            self.spec = esst.MFCC(sampleRate=sample_rate,
-                                  inputSize=spectrum_size,
-                                  **kwargs)
+            self.spec = esst.MelBands(sampleRate=sample_rate,
+                                      inputSize=spectrum_size,
+                                      highFrequencyBound=sample_rate // 2,
+                                      **kwargs)
 
         def __call__(self, x):
-            return self.spec(x)[0]
+            return self.spec(x)
 
     class MFCC(EssentiaClass):
         def __init__(self, sample_rate, spectrum_size, **kwargs):
             super().__init__(sample_rate, spectrum_size, **kwargs)
             self.spec = esst.MFCC(sampleRate=sample_rate,
                                   inputSize=spectrum_size,
+                                  highFrequencyBound=sample_rate // 2,
                                   **kwargs)
 
         def __call__(self, x):
@@ -208,18 +221,20 @@ class ProcTransform(metaclass=ClassCollection):
     class ERB(EssentiaClass):
         def __init__(self, sample_rate, spectrum_size, **kwargs):
             super().__init__(sample_rate, spectrum_size, **kwargs)
-            self.spec = esst.GFCC(sampleRate=sample_rate,
-                                  inputSize=spectrum_size,
-                                  **kwargs)
+            self.spec = esst.ERBBands(sampleRate=sample_rate,
+                                      inputSize=spectrum_size,
+                                      highFrequencyBound=sample_rate // 2,
+                                      **kwargs)
 
         def __call__(self, x):
-            return self.spec(x)[0]
+            return self.spec(x)
 
     class GFCC(EssentiaClass):
         def __init__(self, sample_rate, spectrum_size, **kwargs):
             super().__init__(sample_rate, spectrum_size, **kwargs)
             self.spec = esst.GFCC(sampleRate=sample_rate,
                                   inputSize=spectrum_size,
+                                  highFrequencyBound=sample_rate // 2,
                                   **kwargs)
 
         def __call__(self, x):
@@ -273,14 +288,26 @@ class Spectrometer():
                                        mode='constant',
                                        cval=0)
 
-        return self.procstransform(data)
+        return self.proctransform(data)
 
-    def spectrogram(self, audio: np.array, hop: int, retuning: float = 440.0):
+    def spectrogram(self,
+                    audio: np.array,
+                    hop: int = 0,
+                    retuning: float = 440.0):
         """
         Process a full audio array using the specified hop size
         If `retuning` is > 0, this function also tries to retune "audio" to the
         specified value; this is only supported if using FFT.
+
+        If `hop` is 0 (default), the one provided in the constructor is used.
+        If that one is 0 too, an exception is raised
         """
+        if hop == 0:
+            if self.hop_size == 0:
+                raise RuntimeError("Hop-size specified is 0!")
+            else:
+                hop = self.hop_size
+
         if retuning > 0 and self.transform.bin_width is not None:
             retuning_step = retuning - esst.TuningFrequencyExtractor(
                 frameSize=self.frame_size, hopSize=hop)(audio).mean()
@@ -303,7 +330,8 @@ class Spectrometer():
                  transform: Transform = Transform.FFT,
                  proctransform: ProcTransform = ProcTransform.LOG,
                  transform_params: dict = {},
-                 proctransform_params: dict = {}):
+                 proctransform_params: dict = {},
+                 hop: int = 0):
         """
         Arguments
         ---------
@@ -323,14 +351,31 @@ class Spectrometer():
             any other arameter to be passed to the transform function
         `proctransform_params` : dict
             any other parameter to be passed to the postprocess function
+        `hop` : int
+            the hop size used for the spectrogram. If 0 (default) you should
+            specify it when calling `spectrogram` method
         """
         self.frame_size = int(frame_size)
         self.sample_rate = int(sample_rate)
+        self.hop_size = hop
+        self.transform_params = transform_params
+        self.proctransform_params = transform_params
+        self.hop = hop
 
         self.transform = transform(size=frame_size,
                                    sample_rate=sample_rate,
                                    **transform_params)
 
-        self.procstransform = proctransform(spectrum_size=frame_size // 2 + 1,
-                                            sample_rate=sample_rate,
-                                            **proctransform_params)
+        self.proctransform = proctransform(spectrum_size=frame_size // 2 + 1,
+                                           sample_rate=sample_rate,
+                                           **proctransform_params)
+
+    def __repr__(self):
+        return f"""<Spectrometer:
+    frame_size: {self.frame_size},
+    sample_rate: {self.sample_rate},
+    hop_size: {self.hop},
+    transform: {self.transform},
+    proctransform: {self.proctransform},
+    transform_params: {self.transform_params},
+    proctransform_params: {self.proctransform_params}"""

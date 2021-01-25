@@ -23,11 +23,12 @@ FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
 NJOBS = 5
+BINS = 24
 SPEC = spectrogram.Spectrometer(FRAME_SIZE,
                                 SR,
-                                proctransform=spectrogram.ProcTransform.BARK)
-# Bark has 40 bands..
-BINS = 40
+                                hop=HOP_SIZE,
+                                proctransform=spectrogram.ProcTransform.MEL,
+                                proctransform_params=dict(numberBands=BINS))
 RETUNING = True
 
 # NMF
