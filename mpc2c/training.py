@@ -157,7 +157,7 @@ def train(trainloader, validloader, model, lr, wd):
         y2_idx = torch.argmax(y)
         x1 = x.flatten()[y1_idx]
         x2 = x.flatten()[y2_idx]
-        if x1 != x2:
+        if torch.abs(x1 - x2) > 1e-3:
             # retta passante per due punti
             m = (y1 - y2) / (x1 - x2)
             q = (x1 * y2 - x2 * y1) / (x1 - x2)
