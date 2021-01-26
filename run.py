@@ -101,7 +101,7 @@ def main():
     if args.skopt:
         # if we are hyper-optimizing, change some settings
         from mpc2c.mytorchutils import hyperopt
-        s.DATASET_LEN = 0.05
+        s.DATASET_LEN = 0.01
         s.PLOT_LOSSES = False
         s.LR = 1
     s.REDUMP = args.redump

@@ -20,29 +20,17 @@ def model_test(model_build_func, test_sample):
         pprint(hyperparams)
         allowed = True
 
-        # this ends with preventing skopt to use lstm_layers = 0
-        # if hyperparams[
-        #         'lstm_layers'] == 0 and hyperparams['lstm_hidden_size'] > 1:
-        #     allowed = False
-
-        if hyperparams['stride_0'] > hyperparams['kernel_0'] or\
-                hyperparams['dilation_0'] > hyperparams['kernel_0']:
-            allowed = False
-
-        if 'stride1' in hyperparams:
-            if hyperparams['stride_1'] > hyperparams['kernel_1']:
-                allowed = False
-
         if allowed:
             try:
                 model = model_build_func(hyperparams)
                 print("model created")
                 model(test_sample.to(s.DEVICE).to(s.DTYPE))
                 print("model tested")
-            except Exception:
+            except Exception as e:
                 # except Exception as e:
                 #     import traceback
                 #     traceback.print_exc(e)
+                print(e)
                 allowed = False
 
         print(f"Hyperparams allowed: {allowed}")
@@ -58,12 +46,11 @@ def build_velocity_model(hyperparams):
         note_level=True,
         max_layers=s.MAX_LAYERS,
         hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
-                     (hyperparams['stride_0'],
-                      hyperparams['stride_1']), (hyperparams['dilation_0'], 1),
+                     (1, 1), (1, 1),
                      hyperparams['lstm_hidden_size'],
                      hyperparams['lstm_layers'],
                      hyperparams['middle_features'])).to(s.DEVICE).to(s.DTYPE)
-    feature_extraction.init_weights(m, s.INIT_PARAMS)
+    # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
@@ -74,12 +61,10 @@ def build_pedaling_model(hyperparams):
         note_level=False,
         max_layers=s.MAX_LAYERS,
         hyperparams=((hyperparams['kernel_0'],
-                      1), (hyperparams['stride_0'],
-                           1), (hyperparams['dilation_0'],
-                                1), hyperparams['lstm_hidden_size'],
+                      1), (1, 1), (1, 1), hyperparams['lstm_hidden_size'],
                      hyperparams['lstm_layers'],
                      hyperparams['middle_features'])).to(s.DEVICE).to(s.DTYPE)
-    feature_extraction.init_weights(m, s.INIT_PARAMS)
+    # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
@@ -157,24 +142,27 @@ def train(trainloader, validloader, model, lr, wd):
         y2_idx = torch.argmax(y)
         x1 = x.flatten()[y1_idx]
         x2 = x.flatten()[y2_idx]
-        if torch.abs(x1 - x2) > 1e-3:
+        if torch.abs(x1 - x2) > 1e-1:
             # retta passante per due punti
             m = (y1 - y2) / (x1 - x2)
             q = (x1 * y2 - x2 * y1) / (x1 - x2)
+            print(f"Computed m: {m:.2f}, q: {q:.2f}")
+            x = m * x + q
         else:
             print("Warning: min and max are predicted with the same value!")
-            m, q = 1, 0
 
-        return F.l1_loss(m * x + q, y)
+        return F.l1_loss(x, y)
 
     trainloss_fn = make_loss_func(F.l1_loss)
-    validloss_fn = make_loss_func(remap)
+    validloss_fn = make_loss_func(F.l1_loss)
     train_loss = train_epochs(model,
                               optim,
                               trainloss_fn,
                               validloss_fn,
                               trainloader,
                               validloader,
+                              dummy_loss=False,
+                              trainloss_on_valid=False,
                               plot_losses=s.PLOT_LOSSES)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
 

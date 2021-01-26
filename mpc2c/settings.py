@@ -22,13 +22,13 @@ SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
-NJOBS = 5
-BINS = 24
+NJOBS = 1
+BINS = 40
 SPEC = spectrogram.Spectrometer(FRAME_SIZE,
                                 SR,
                                 hop=HOP_SIZE,
-                                proctransform=spectrogram.ProcTransform.MEL,
-                                proctransform_params=dict(numberBands=BINS))
+                                proctransform=spectrogram.ProcTransform.MFCC)
+                                # proctransform_params=dict(numberBands=BINS))
 RETUNING = True
 
 # NMF
@@ -46,70 +46,6 @@ EPS_ACTIVATIONS = 0
 #: if True, recreate data (also set by --redump)
 REDUMP = False
 
-# NN
-MAX_LAYERS = 30
-DEVICE = 'cuda'
-EPOCHS = 500
-VEL_HYPERPARAMS = {
-    'lstm_hidden_size': 0,
-    'lstm_layers': 0,
-    'middle_features': 4,
-    "kernel_0": 6,
-    "stride_0": 4,
-    "dilation_0": 3,
-    "kernel_1": 3,
-    "stride_1": 1
-}
-PED_HYPERPARAMS = {
-    'lstm_hidden_size': 0,
-    'lstm_layers': 0,
-    'middle_features': 1,
-    "kernel_0": 3,
-    "stride_0": 3,
-    "dilation_0": 3
-}
-VEL_BATCH_SIZE = 600
-PED_BATCH_SIZE = 1
-EARLY_STOP = 10
-PLOT_LOSSES = True
-DTYPE = torch.float32
-LR = 1e-3
-WD = 0
-#: percentage of the dataset to use, use it for debugging or for skopt
-DATASET_LEN = 1
-
-
-def INIT_PARAMS(x):
-    return x  # torch.nn.init.ones_
-
-
-TRANSFER_PORTION = 1
-FREEZE_PORTION = 0
-
-# SKOPT
-VEL_SKSPACE = [
-    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='lstm_hidden_size'),
-    space.Integer(0, 1, name='lstm_layers'),
-    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='middle_features'),
-    space.Integer(3, 6, name='kernel_0'),
-    space.Integer(1, 4, name='stride_0'),
-    space.Integer(1, 3, name='dilation_0'),
-    space.Integer(3, 5, name='kernel_1'),
-    space.Integer(1, 2, name='stride_1')
-]
-PED_SKSPACE = [
-    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='lstm_hidden_size'),
-    space.Integer(0, 2, name='lstm_layers'),
-    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='middle_features'),
-    space.Integer(3, 6, name='kernel_0'),
-    space.Integer(1, 4, name='stride_0'),
-    space.Integer(1, 3, name='dilation_0')
-]
-SKCHECKPOINT = 'skopt_checkpoint.pkl'
-SKITERATIONS = (0, 80)
-PLOT_GRAPHS = True
-COMPLEXITY_PENALIZER = 1e-6
-
 # MAKE_TEMPLATE
 #: how many basis use in total (except the last one)
 BASIS = 19
@@ -121,6 +57,56 @@ BASIS_L = 1
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
 #: same length; just use "pad" for Maestro
 PREPROCESSING = "pad"
+
+
+# NN
+MAX_LAYERS = 30
+DEVICE = 'cuda'
+EPOCHS = 500
+VEL_HYPERPARAMS = {
+    'lstm_hidden_size': 0,
+    'lstm_layers': 0,
+    'middle_features': 4,
+    "kernel_0": 6,
+    "kernel_1": 3,
+}
+PED_HYPERPARAMS = {
+    'lstm_hidden_size': 0,
+    'lstm_layers': 0,
+    'middle_features': 1,
+    "kernel_0": 3,
+}
+VEL_BATCH_SIZE = 100
+PED_BATCH_SIZE = 1
+EARLY_STOP = 10
+PLOT_LOSSES = True
+DTYPE = torch.float32
+LR = 1e-3
+WD = 0
+#: percentage of the dataset to use, use it for debugging or for skopt
+DATASET_LEN = 1
+
+TRANSFER_PORTION = 1
+FREEZE_PORTION = 0
+
+# SKOPT
+VEL_SKSPACE = [
+    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='lstm_hidden_size'),
+    space.Integer(0, 1, name='lstm_layers'),
+    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='middle_features'),
+    space.Integer(3, 6, name='kernel_0'),
+    space.Integer(3, 5, name='kernel_1'),
+]
+PED_SKSPACE = [
+    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='lstm_hidden_size'),
+    space.Integer(0, 2, name='lstm_layers'),
+    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='middle_features'),
+    space.Integer(3, 6, name='kernel_0'),
+]
+SKCHECKPOINT = 'skopt_checkpoint.pkl'
+SKITERATIONS = (0, 80)
+PLOT_GRAPHS = True
+COMPLEXITY_PENALIZER = 1e-6
 
 #: If compiling code with cython in pure-python mode
 BUILD = False
