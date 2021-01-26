@@ -224,7 +224,7 @@ class NMFTools:
         self.initV_sum = self.initV.sum()
 
     def renormalize(self, arr):
-        return arr / arr.sum() * self.initV_sum
+        return arr / (arr.sum() + s.EPS) * self.initV_sum
 
     def perform_nmf(self, audio, score):
         self.to2d()
