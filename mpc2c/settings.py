@@ -77,7 +77,7 @@ PED_HYPERPARAMS = {
     'middle_features': 1,
     "kernel_0": 3,
 }
-VEL_BATCH_SIZE = 100
+VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1
 EARLY_STOP = 10
 PLOT_LOSSES = True
