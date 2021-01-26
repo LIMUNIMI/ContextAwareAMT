@@ -93,10 +93,19 @@ class Transform(metaclass=ClassCollection):
     transformed array. If the field `bin_width` is not None, it can be used
     for retuning
     """
-    class FFT(EssentiaClass):
+    class Spectrum(EssentiaClass):
         def __init__(self, size, sample_rate, **kwargs):
             super().__init__(size, sample_rate, **kwargs)
             self.spec = esst.Spectrum(size=size, **kwargs)
+            self.bin_width = (sample_rate // 2) / (size // 2 + 1)
+
+        def __call__(self, x):
+            return self.spec(x)
+
+    class PowerSpectrum(EssentiaClass):
+        def __init__(self, size, sample_rate, **kwargs):
+            super().__init__(size, sample_rate, **kwargs)
+            self.spec = esst.PowerSpectrum(size=size, **kwargs)
             self.bin_width = (sample_rate // 2) / (size // 2 + 1)
 
         def __call__(self, x):
@@ -264,10 +273,7 @@ class Spectrometer():
 
     def apply(self,
               frame: np.array,
-              retuning_step: float = 0.0,
-              sub_bins: np.array = None,
-              sub_bins_width: np.array = None,
-              new_bins: np.array = None):
+              retuning_step: float = 0.0):
         """
         If `retuning_step` is != 0, this function also tries to retune "audio"
         by increasing/decreasing of the specified frequency step; this is only
@@ -327,7 +333,7 @@ class Spectrometer():
     def __init__(self,
                  frame_size: int,
                  sample_rate: int = 44100,
-                 transform: Transform = Transform.FFT,
+                 transform: Transform = Transform.Spectrum,
                  proctransform: ProcTransform = ProcTransform.LOG,
                  transform_params: dict = {},
                  proctransform_params: dict = {},
