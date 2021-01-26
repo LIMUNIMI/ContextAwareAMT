@@ -22,14 +22,15 @@ SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
-NJOBS = 1
-BINS = 40
+NJOBS = 5
+BINS = 13
 SPEC = spectrogram.Spectrometer(FRAME_SIZE,
                                 SR,
                                 hop=HOP_SIZE,
-                                proctransform=spectrogram.ProcTransform.MFCC)
-                                # proctransform_params=dict(numberBands=BINS))
-RETUNING = True
+                                transform=spectrogram.Transform.PowerSpectrum,
+                                proctransform=spectrogram.ProcTransform.NONE)
+MFCC = spectrogram.ProcTransform.MFCC(SR, FRAME_SIZE // 2 + 1, logType='dbpow')
+RETUNING = False
 
 # NMF
 #: epsilon value used inside the nmf to prevent divisons by 0

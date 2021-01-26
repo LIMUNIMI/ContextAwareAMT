@@ -66,14 +66,14 @@ def NMF(V,
     B : int
         the number of basis for template
     """
-    # normalize template
-    # W /= W.sum(axis=0) + s.EPS
+    # normalize to unit sum
+    V /= V.sum()
+
+    # normalize activations
+    W /= W.sum(axis=0) + s.EPS
 
     # normalize H
-    # this is because otherwise regions with no notes are 0ed in the output
-    # spec (we need to model the noise...
-    H += s.EPS * 10
-    # H /= H.sum()
+    H /= H.sum()
 
     # get important params
     K, M = V.shape
@@ -172,7 +172,8 @@ class NMFTools:
                  spec=s.SPEC,
                  realign=False,
                  cost_func=s.NMF_COST_FUNC):
-        self.initW = initW[:, minpitch * s.BASIS:(maxpitch + 1) * s.BASIS]
+        self.initW = initW[:, minpitch * s.BASIS:(maxpitch + 1) *
+                           s.BASIS].astype(np.float32)
         self.minpitch = minpitch
         self.maxpitch = maxpitch
         self.sr = spec.sample_rate
@@ -197,7 +198,7 @@ class NMFTools:
                                     velocities=False,
                                     attack=s.ATTACK,
                                     eps=s.EPS_ACTIVATIONS,
-                                    eps_range=s.EPS_RANGE)
+                                    eps_range=s.EPS_RANGE).astype(np.float32)
 
         if s.PREPROCESSING == "stretch":
             # remove trailing zeros in H
@@ -220,18 +221,19 @@ class NMFTools:
         assert self.initH.shape[0] == self.initW.shape[1],\
             "W, H have different ranks"
 
+        self.initV_sum = self.initV.sum()
+
+    def renormalize(self, arr):
+        return arr / arr.sum() * self.initV_sum
+
     def perform_nmf(self, audio, score):
         self.to2d()
-        # set initH and V
+        # set initH and initV
         self.initialize(audio, score)
         # prepare matrices that will be modified by nmf
         self.H = self.initH.copy()
-        # don't make H non-negative as it already is and we *need* 0 where
-        # there are no notes..
-        self.W = self.initW.copy()[1:]
-        make_nonnegative(self.W)
-        self.V = self.initV.copy()[1:]
-        make_nonnegative(self.V)
+        self.W = self.initW.copy()
+        self.V = self.initV.copy()
 
         # perform nfm
         NMF(self.V,
@@ -241,28 +243,34 @@ class NMFTools:
             num_iter=5,
             cost_func=self.cost_func,
             fixH=False,
-            fixW=True)
-
-        err = np.abs(self.V - self.W @ self.H)
-        print(
-            f"error before (avg, std): {np.mean(err):.4e}, {np.std(err):.4e}")
-        import visdom
-        vis = visdom.Visdom()
-        vis.heatmap(self.W @ self.H[:, :512])
-
-        NMF(self.V,
-            self.W,
-            self.H,
-            B=s.BASIS,
-            num_iter=3,
-            cost_func=self.cost_func,
-            fixH=True,
             fixW=False)
+        # rec = self.renormalize(self.W @ self.H)
+        # err = np.abs(self.initV - rec)
+        # print(
+        #     f"error before (avg, std): {np.mean(err):.4e}, {np.std(err):.4e}")
+        # import visdom
+        # vis = visdom.Visdom()
+        # vis.heatmap(self.initV[:, :512])
+        # vis.heatmap(self.H[:, :512])
+        # vis.heatmap(self.W)
+        # vis.heatmap(rec[:, :512])
 
-        err = np.abs(self.V - self.W @ self.H)
-        print(f"error after (avg, std): {np.mean(err):.4e}, {np.std(err):.4e}")
-        vis.heatmap(self.W @ self.H[:, :512])
-        __import__('ipdb').set_trace()
+        # from .data_management import transform_func
+        # vis.heatmap(transform_func(self.initV[:, :512]))
+        # vis.heatmap(transform_func(self.W))
+        # vis.heatmap(transform_func(rec[:, :512]))
+
+        # NMF(self.V,
+        #     self.W,
+        #     self.H,
+        #     B=s.BASIS,
+        #     num_iter=3,
+        #     cost_func=self.cost_func,
+        #     fixH=True,
+        #     fixW=False)
+        # print(
+        #     f"error after (avg, std): {np.mean(err):.4e}, {np.std(err):.4e}")
+        # vis.heatmap(self.W @ self.H[:, :512])
 
     def to3d(self):
         if self.initW.ndim != 3:
@@ -301,7 +309,8 @@ class NMFTools:
             end = min(start + s.MINI_SPEC_SIZE, self.H.shape[2], offset + 1)
 
             # compute the mini_spec
-            mini_spec = self.W[:, pitch, :] @ self.H[pitch, :, start:end]
+            mini_spec = self.renormalize(
+                self.W[:, pitch, :] @ self.H[pitch, :, start:end])
 
             # normalizing with rms
             # mini_spec /= (mini_spec**2).mean()**0.5
@@ -319,20 +328,20 @@ class NMFTools:
 
             yield mini_spec
 
-    def get_minispecs(self, onsets_from_H=False):
+    def get_minispecs(self, transform=None, onsets_from_H=False):
         """
         Arguments
         ---------
 
         `onsets_from_H` : bool
             see `gen_notes_from_H`
+        `transform` : Optional[Callable]
+            a callable that is applied to each mini spec
         """
         mini_specs = []
         for mini_spec in self.generate_minispecs(onsets_from_H):
-            import visdom
-            vis = visdom.Visdom()
-            vis.heatmap(mini_spec)
-            __import__('ipdb').set_trace()
+            if transform is not None:
+                mini_spec = transform(mini_spec)
             mini_specs.append(mini_spec)
         return np.array(mini_specs)
 
