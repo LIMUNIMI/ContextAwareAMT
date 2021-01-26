@@ -1,5 +1,6 @@
 import pathlib
 
+import essentia as es
 from asmd import asmd
 from torch.utils.data import DataLoader
 
@@ -9,14 +10,22 @@ from . import utils
 from .mytorchutils import DatasetDump, dummy_collate, pad_collate
 
 
+def transform_func(arr):
+    out = []
+    for col in range(arr.shape[1]):
+        out.append(s.MFCC(arr[:, col]))
+
+    return es.array(out)
+
+
 def process_pedaling(i, dataset, nmf_params):
     nmf_tools = nmf.NMFTools(*nmf_params)
     audio, sr = dataset.get_mix(i, sr=s.SR)
     score = dataset.get_score(i, score_type=['precise_alignment'])
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
-    diff_spec = nmf_tools.V - nmf_tools.W @ nmf_tools.H
-    diff_spec /= diff_spec.sum() + 1e-32
+    diff_spec = transform_func(nmf_tools.initV) - transform_func(
+        nmf_tools.renormalize(nmf_tools.W @ nmf_tools.H))
     winlen = s.FRAME_SIZE / s.SR
     hop = s.HOP_SIZE / s.SR
     pedaling = dataset.get_pedaling(
@@ -34,7 +43,7 @@ def process_velocities(i, dataset, nmf_params):
     nmf_tools.to2d()
     velocities = dataset.get_score(i, score_type=['precise_alignment'
                                                   ])[:, 3] / 127
-    minispecs = nmf_tools.get_minispecs()
+    minispecs = nmf_tools.get_minispecs(transform=transform_func)
     return minispecs, velocities
 
 
