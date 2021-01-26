@@ -1,4 +1,5 @@
 from time import time
+from typing import Optional, Callable
 
 import numpy as np
 import torch
@@ -25,7 +26,7 @@ def train_epochs(model,
                  plot_losses: bool = True,
                  device: str = 'cuda',
                  dtype=torch.float32,
-                 dummy_loss: bool = True,
+                 dummy_loss: Optional[Callable] = None,
                  trainloss_on_valid: bool = False):
     """
     A typical training algorithm with early stopping and loss plotting
@@ -84,8 +85,10 @@ def train_epochs(model,
     `dtype` : torch.dtype
         the dtype to use for the data (defaults to torch.float32)
 
-    `dummy_loss` : bool
-        if True, this computes the dummy loss against the average of the target
+    `dummy_loss` : None or Callable
+        if Callable, it should accept the list of targets and return one value
+        that is used as dummy prediction; this computes the dummy loss against
+        the average of the target
 
     `trainloss_on_valid` : bool
         if True, this computes the train loss on the validation set too
@@ -154,7 +157,7 @@ def train_epochs(model,
                     raise RuntimeError("Nan in training loss!")
                 if dummy_loss:
                     dummy_out = [
-                        torch.full_like(out[i], targets[i].mean())
+                        torch.full_like(out[i], dummy_loss(targets))
                         for i in range(len(targets))
                     ]
                     loss = validloss_fn(dummy_out, targets,

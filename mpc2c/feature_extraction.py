@@ -5,6 +5,9 @@ import torch
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
+import visdom
+vis = visdom.Visdom()
+
 
 def conv_output_size(size, dilation, kernel, stride):
     """
@@ -44,8 +47,8 @@ class MIDIParameterEstimation(nn.Module):
             * lstm_layers: int
 
         * `input_size` is a tuple[int] containing the number of rows (features)
-        and columns (frames) of each input. It can contain only one number if
-        the number of columns is unknwon.
+        and columns (frames) of each input. It can contain 1 if the size of a
+        dimension is unknwon e.g. the number of frames
 
         * Size of the inputs are expected to be 3d:
 
@@ -84,12 +87,12 @@ class MIDIParameterEstimation(nn.Module):
             lstm_layers, middle_features = hyperparams
 
         if lstm_layers > 0:
+            conv_in_size = (lstm_hidden_size, input_size[1])
             self.lstm = nn.LSTM(input_size[0],
                                 lstm_hidden_size,
                                 num_layers=lstm_layers,
-                                batch_first=True)
+                                batch_first=True),
 
-            conv_in_size = (lstm_hidden_size, input_size[1])
         else:
             conv_in_size = input_size
 
@@ -118,7 +121,7 @@ class MIDIParameterEstimation(nn.Module):
                     k = (kernel_size[0], 1)
                     s = (stride[0], 1)
                     d = (dilation[0], 1)
-                    next_conv_in_size = (next_conv_in_size[0], input_size[1])
+                    next_conv_in_size = (next_conv_in_size[0], conv_in_size[1])
                 else:
                     k, s, d = kernel_size, stride, dilation
 
@@ -134,7 +137,10 @@ class MIDIParameterEstimation(nn.Module):
                               kernel_size=k,
                               stride=s,
                               padding=0,
-                              dilation=d),
+                              dilation=d,
+                              bias=False),
+                    # nn.LayerNorm([conv_out_features, *next_conv_in_size]),
+                    # nn.BatchNorm2d(conv_out_features),
                     # SpaceVariant(
                     #     nn.Conv2d(input_features,
                     #               conv_out_features,
@@ -142,9 +148,9 @@ class MIDIParameterEstimation(nn.Module):
                     #               stride=s,
                     #               padding=0,
                     #               dilation=d), lambda x: x / len(x)),
-                    nn.Tanh()
+                    # nn.SELU()
                     # nn.Hardtanh()
-                    # AbsLayer()
+                    AbsLayer()
                 ]
                 return True, next_conv_in_size
             else:
@@ -179,7 +185,8 @@ class MIDIParameterEstimation(nn.Module):
                           stride=1,
                           dilation=1,
                           padding=0,
-                          groups=1),
+                          groups=1,
+                          bias=False),
                 # SpaceVariant(
                 #     nn.Conv2d(input_features,
                 #               output_features,
@@ -189,6 +196,7 @@ class MIDIParameterEstimation(nn.Module):
                 #               padding=0,
                 #               groups=1), lambda x: x / len(x)),
                 # nn.BatchNorm2d(output_features),
+                # nn.LayerNorm([output_features, 1, 1]),
                 # nn.Hardsigmoid()
                 nn.Sigmoid()
                 # AbsLayer()
@@ -200,6 +208,16 @@ class MIDIParameterEstimation(nn.Module):
             # and it cannot be run with these input size
             # del self.stack[-2]
         self.stack = nn.Sequential(*self.stack)
+        # self.stack = nn.Sequential(
+        #     nn.Conv2d(1, 256, kernel_size=input_size, bias=False),
+        #     nn.SELU(),
+        #     nn.Conv2d(256, 256, kernel_size=1, bias=False),
+        #     nn.SELU(),
+        #     nn.Conv2d(256, 256, kernel_size=1, bias=False),
+        #     nn.SELU(),
+        #     nn.Conv2d(256, 1, kernel_size=1, bias=False),
+        #     nn.Sigmoid()
+        # )
 
     def forward(self, x, lens=torch.tensor(False)):
         """

@@ -146,23 +146,23 @@ def train(trainloader, validloader, model, lr, wd):
             # retta passante per due punti
             m = (y1 - y2) / (x1 - x2)
             q = (x1 * y2 - x2 * y1) / (x1 - x2)
-            print(f"Computed m: {m:.2f}, q: {q:.2f}")
+            # print(f"Computed m: {m:.2f}, q: {q:.2f}")
             x = m * x + q
-        else:
-            print("Warning: min and max are predicted with the same value!")
+        # else:
+        #     print("Warning: min and max are predicted with the same value!")
 
         return F.l1_loss(x, y)
 
     trainloss_fn = make_loss_func(F.l1_loss)
-    validloss_fn = make_loss_func(F.l1_loss)
+    validloss_fn = make_loss_func(remap)
     train_loss = train_epochs(model,
                               optim,
                               trainloss_fn,
                               validloss_fn,
                               trainloader,
                               validloader,
-                              dummy_loss=False,
-                              trainloss_on_valid=False,
+                              dummy_loss=lambda x: 0.5,
+                              trainloss_on_valid=True,
                               plot_losses=s.PLOT_LOSSES)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
 
