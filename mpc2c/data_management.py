@@ -15,7 +15,7 @@ def transform_func(arr):
     for col in range(arr.shape[1]):
         out.append(s.MFCC(arr[:, col]))
 
-    return es.array(out)
+    return es.array(out).T
 
 
 def process_pedaling(i, dataset, nmf_params):
