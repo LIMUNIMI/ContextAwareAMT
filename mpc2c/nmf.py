@@ -66,11 +66,14 @@ def NMF(V,
     B : int
         the number of basis for template
     """
-    # normalize activations
-    W /= W.sum(axis=0) + s.EPS
+    # normalize template
+    # W /= W.sum(axis=0) + s.EPS
 
     # normalize H
-    H /= H.sum() + s.EPS
+    # this is because otherwise regions with no notes are 0ed in the output
+    # spec (we need to model the noise...
+    H += s.EPS * 10
+    # H /= H.sum()
 
     # get important params
     K, M = V.shape
@@ -148,6 +151,19 @@ def NMF(V,
             raise ValueError('Unknown cost function')
 
 
+def make_nonnegative(arr: np.ndarray, th: int = 1):
+    """
+    Make `arr` have values in [0, 1], where [0, 0.5] corresponds to [-K, 0],
+    while (0.5, 1] corresponds to (0, K], and
+
+        K = max(|arr|) = max(min(arr), max(arr))
+    """
+    # the new threshold is 1, not 0 anymore...
+    arr /= np.abs(arr).max()
+    arr += th
+    arr /= 2*th
+
+
 class NMFTools:
     def __init__(self,
                  initW,
@@ -171,14 +187,10 @@ class NMFTools:
         # remove stoping and starting silence in audio
         start, stop = find_start_stop(audio, sample_rate=self.sr)
         audio = audio[start:stop]
-        self.V = self.spec.spectrogram(audio,
-                                       440 if s.RETUNING else 0)
-
-        # normalize to unit sum
-        self.V /= self.V.sum()
+        self.initV = self.spec.spectrogram(audio, 440 if s.RETUNING else 0)
 
         # computing resolution of the pianoroll (seconds per column)
-        self.res = len(audio) / self.sr / self.V.shape[1]
+        self.res = len(audio) / self.sr / self.initV.shape[1]
         self.initH = make_pianoroll(score,
                                     res=self.res,
                                     basis=s.BASIS,
@@ -195,15 +207,15 @@ class NMFTools:
             self.initH = self.H[:, start:stop + 1]
 
             # stretch pianoroll
-            self.initH = stretch_pianoroll(self.initH, self.V.shape[1])
+            self.initH = stretch_pianoroll(self.initH, self.initV.shape[1])
         elif s.PREPROCESSING == "pad":
-            self.V, self.initH = pad(self.V, self.initH)
+            self.initV, self.initH = pad(self.initV, self.initH)
 
         self.initH = self.initH[self.minpitch * s.BASIS:(self.maxpitch + 1) *
                                 s.BASIS, :]
 
         # check shapes
-        assert self.V.shape == (self.initW.shape[0], self.initH.shape[1]),\
+        assert self.initV.shape == (self.initW.shape[0], self.initH.shape[1]),\
             "V, W, H shapes are not comparable"
         assert self.initH.shape[0] == self.initW.shape[1],\
             "W, H have different ranks"
@@ -214,7 +226,12 @@ class NMFTools:
         self.initialize(audio, score)
         # prepare matrices that will be modified by nmf
         self.H = self.initH.copy()
-        self.W = self.initW.copy()
+        # don't make H non-negative as it already is and we *need* 0 where
+        # there are no notes..
+        self.W = self.initW.copy()[1:]
+        make_nonnegative(self.W)
+        self.V = self.initV.copy()[1:]
+        make_nonnegative(self.V)
 
         # perform nfm
         NMF(self.V,
@@ -224,7 +241,14 @@ class NMFTools:
             num_iter=5,
             cost_func=self.cost_func,
             fixH=False,
-            fixW=False)
+            fixW=True)
+
+        err = np.abs(self.V - self.W @ self.H)
+        print(
+            f"error before (avg, std): {np.mean(err):.4e}, {np.std(err):.4e}")
+        import visdom
+        vis = visdom.Visdom()
+        vis.heatmap(self.W @ self.H[:, :512])
 
         NMF(self.V,
             self.W,
@@ -232,8 +256,13 @@ class NMFTools:
             B=s.BASIS,
             num_iter=3,
             cost_func=self.cost_func,
-            fixH=False,
-            fixW=True)
+            fixH=True,
+            fixW=False)
+
+        err = np.abs(self.V - self.W @ self.H)
+        print(f"error after (avg, std): {np.mean(err):.4e}, {np.std(err):.4e}")
+        vis.heatmap(self.W @ self.H[:, :512])
+        __import__('ipdb').set_trace()
 
     def to3d(self):
         if self.initW.ndim != 3:
@@ -300,6 +329,10 @@ class NMFTools:
         """
         mini_specs = []
         for mini_spec in self.generate_minispecs(onsets_from_H):
+            import visdom
+            vis = visdom.Visdom()
+            vis.heatmap(mini_spec)
+            __import__('ipdb').set_trace()
             mini_specs.append(mini_spec)
         return np.array(mini_specs)
 

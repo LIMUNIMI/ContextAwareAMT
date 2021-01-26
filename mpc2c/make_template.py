@@ -135,11 +135,6 @@ def make_template(scale_path: Tuple[str, str],
         # apply peaks_enhancing function
         template = peaks_enhance(template, 2, 0.25, axis=0)
 
-    # normalizing so that each column sums to 1
-    sum_ = template.sum(axis=0)
-    idx = np.nonzero(sum_)
-    template[:, idx[0]] /= sum_[idx]
-
     print(f"Needed time: {time.time() - ttt: .2f}s")
 
     return template, minpitch, maxpitch
