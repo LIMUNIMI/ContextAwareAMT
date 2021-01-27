@@ -103,7 +103,7 @@ def main():
         from mpc2c.mytorchutils import hyperopt
         s.DATASET_LEN = 0.015
         s.PLOT_LOSSES = False
-        s.LR = 0.01
+        # s.LR = 0.1
     s.REDUMP = args.redump
 
     if args.generic_model:
