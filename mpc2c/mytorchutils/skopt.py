@@ -5,7 +5,6 @@ from typing import Callable, Optional, Tuple
 from pprint import pprint
 
 import matplotlib.pyplot as plt
-import visdom
 
 import skopt
 from skopt import load, plots
@@ -116,16 +115,15 @@ class SKOptimizer(object):
             return
         print("Plotting a res object, open visdom on localhost!")
         # plottings
-        vis = visdom.Visdom()
         fig = plt.figure()
         plots.plot_convergence(self.res)
-        vis.matplot(fig)
+        context.vis.matplot(fig)
 
         # the previous method doesn't work here (matplotlib sucks)
         axes = plots.plot_objective(self.res)
-        vis.matplot(axes.flatten()[0].figure)
+        context.vis.matplot(axes.flatten()[0].figure)
         axes = plots.plot_evaluations(self.res)
-        vis.matplot(axes.flatten()[0].figure)
+        context.vis.matplot(axes.flatten()[0].figure)
 
     def optimize(self):
         self.res = None

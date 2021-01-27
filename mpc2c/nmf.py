@@ -244,33 +244,6 @@ class NMFTools:
             cost_func=self.cost_func,
             fixH=False,
             fixW=False)
-        # rec = self.renormalize(self.W @ self.H)
-        # err = np.abs(self.initV - rec)
-        # print(
-        #     f"error before (avg, std): {np.mean(err):.4e}, {np.std(err):.4e}")
-        # import visdom
-        # vis = visdom.Visdom()
-        # vis.heatmap(self.initV[:, :512])
-        # vis.heatmap(self.H[:, :512])
-        # vis.heatmap(self.W)
-        # vis.heatmap(rec[:, :512])
-
-        # from .data_management import transform_func
-        # vis.heatmap(transform_func(self.initV[:, :512]))
-        # vis.heatmap(transform_func(self.W))
-        # vis.heatmap(transform_func(rec[:, :512]))
-
-        # NMF(self.V,
-        #     self.W,
-        #     self.H,
-        #     B=s.BASIS,
-        #     num_iter=3,
-        #     cost_func=self.cost_func,
-        #     fixH=True,
-        #     fixW=False)
-        # print(
-        #     f"error after (avg, std): {np.mean(err):.4e}, {np.std(err):.4e}")
-        # vis.heatmap(self.W @ self.H[:, :512])
 
     def to3d(self):
         if self.initW.ndim != 3:
@@ -304,7 +277,6 @@ class NMFTools:
         self.to3d()
         for pitch, onset, offset in self.gen_notes_from_H(onsets_from_H):
             # select the sorrounding space in H
-            # start = max(0, argmax - s.MINI_SPEC_SIZE // 2)
             start = onset
             end = min(start + s.MINI_SPEC_SIZE, self.H.shape[2], offset + 1)
 
@@ -313,9 +285,6 @@ class NMFTools:
                 self.W[:, pitch, :] @ self.H[pitch, :, start:end])
 
             # normalizing with rms
-            # mini_spec /= (mini_spec**2).mean()**0.5
-            # mini_spec /= (mini_spec.sum() + s.EPS)
-
             if mini_spec.shape[1] < s.MINI_SPEC_SIZE:
                 mini_spec = np.pad(mini_spec,
                                    pad_width=[

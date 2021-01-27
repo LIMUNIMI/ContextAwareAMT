@@ -2,11 +2,8 @@ import math
 from copy import deepcopy
 
 import torch
-import visdom
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-
-vis = visdom.Visdom()
 
 
 def conv_output_size(size, dilation, kernel, stride):
