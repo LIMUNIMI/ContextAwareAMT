@@ -25,7 +25,8 @@ FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
 NJOBS = 5
-BINS = 13
+# one less because the first is discarded (in nn forward...)
+BINS = 12
 SPEC = spectrogram.Spectrometer(FRAME_SIZE,
                                 SR,
                                 hop=HOP_SIZE,
@@ -60,7 +61,6 @@ BASIS_L = 1
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
 #: same length; just use "pad" for Maestro
 PREPROCESSING = "pad"
-
 
 # NN
 MAX_LAYERS = 30
