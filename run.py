@@ -1,4 +1,3 @@
-# from mpc2c import nmf
 import argparse
 
 import torch
@@ -97,6 +96,7 @@ def load_nmf_params():
 
 
 def main():
+
     args = parse_args()
     if args.skopt:
         # if we are hyper-optimizing, change some settings

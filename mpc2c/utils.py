@@ -4,63 +4,6 @@ import numpy as np
 import pretty_midi as pm
 
 
-class Spectrometer():
-    """
-    Creates an object to compute spectrograms with given parameters.
-    Log-spectrogram is designed for usual music frequencies between 23 and 5000
-    Hz. Piano f0 are between 27.5 abd 4186 Hz.
-
-    see ``spectrogram`` function for more details.
-    """
-
-    def __call__(self, frame: np.array):
-        return self.apply(frame)
-
-    def apply(self, frame: np.array):
-        return self.spec(frame)
-
-    def __init__(self, frame_size, sr, binsPerSemitone=3, log=True):
-        spectrometer = esst.Spectrum(size=frame_size)
-        if log:
-            logspec = esst.LogSpectrum(frameSize=frame_size // 2 + 1,
-                                       sampleRate=sr,
-                                       binsPerSemitone=binsPerSemitone)
-
-            # LogSpectrum also return a tuning estimation...
-            self.spec = lambda x: logspec(spectrometer(x))[0]
-        else:
-            self.spec = spectrometer
-
-
-def spectrogram(audio, frame_size, hop, sr, log=True, binsPerSemitone=3):
-    """
-    Computes a spectrogram with given parameters.
-    Log-spectrogram is designed for usual music frequencies between 23 and 5000
-    Hz. Piano f0 are between 27.5 abd 4186 Hz.
-
-    Example to test:
-    >>> import visdom
-    >>> import numpy as np
-    >>> vis = visdom.Visdom()
-    >>> time = np.arange(0, 10, 1/22050)
-    >>> audio_5000 = np.sin(2 * np.pi * 5000 * time)
-    >>> vis.heatmap(spectrogram(audio_5000, 2048, 512, 22050, True))
-    >>> audio_23 = np.sin(2 * np.pi * 23 * time)
-    >>> vis.heatmap(spectrogram(audio_23, 2048, 512, 22050, True))
-    """
-
-    chromas = []
-    spectrometer = Spectrometer(frame_size, sr, binsPerSemitone, log)
-    for frame in esst.FrameGenerator(audio,
-                                     frameSize=frame_size,
-                                     hopSize=hop,
-                                     startFromZero=True):
-        chromas.append(spectrometer.apply(frame))
-
-    spec = es.array(chromas).T
-    return spec
-
-
 def pad(arr1, arr2):
     """
     Pad 2 2d-arrays so that they have the same length over axis 1.
