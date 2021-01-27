@@ -84,7 +84,7 @@ class MIDIParameterEstimation(nn.Module):
 
         # setup the `note_level` stuffs
         kernel_size, stride, dilation, lstm_hidden_size,\
-            lstm_layers, middle_features = hyperparams
+            lstm_layers, middle_features, middle_activation = hyperparams
 
         if lstm_layers > 0:
             conv_in_size = (lstm_hidden_size, input_size[1])
@@ -139,14 +139,17 @@ class MIDIParameterEstimation(nn.Module):
                               padding=0,
                               dilation=d,
                               bias=False),
+                    nn.InstanceNorm2d(conv_out_features,
+                                      affine=True,
+                                      track_running_stats=True)
+                    if conv_out_features > 1 else nn.Identity(),
                     # nn.LayerNorm([*next_conv_in_size]),
-                    nn.InstanceNorm2d(conv_out_features)
-                    if conv_out_features > 1 else nn.LayerNorm(
-                        [*next_conv_in_size]),
                     # nn.BatchNorm2d(conv_out_features),
                     # nn.SELU()
                     # nn.Hardtanh()
-                    AbsLayer()
+                    # nn.ReLU()
+                    # AbsLayer()
+                    middle_activation()
                 ]
                 return True, next_conv_in_size
             else:
@@ -189,7 +192,6 @@ class MIDIParameterEstimation(nn.Module):
                           groups=output_features,
                           kernel_size=1),
                 # nn.Hardsigmoid()
-                # AbsLayer()
             ]
         else:
             # change the last activation so that the outputs are in (0, 1)
@@ -201,8 +203,8 @@ class MIDIParameterEstimation(nn.Module):
                           kernel_size=1))
 
         # initialize like a line
-        nn.init.ones_(self.stack[-1].weight)
-        nn.init.zeros_(self.stack[-1].bias)
+        # nn.init.ones_(self.stack[-1].weight)
+        # nn.init.zeros_(self.stack[-1].bias)
 
         self.stack = nn.Sequential(*self.stack)
 

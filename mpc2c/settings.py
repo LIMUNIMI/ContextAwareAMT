@@ -1,7 +1,9 @@
 import torch
 from skopt import space
+from torch import nn
 
 from . import spectrogram
+from .feature_extraction import AbsLayer
 
 # PATHS
 VELOCITY_DATA_PATH = '/datasets/mpc2c/resynth/velocity/'
@@ -95,6 +97,8 @@ VEL_SKSPACE = [
     space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='lstm_hidden_size'),
     space.Integer(0, 1, name='lstm_layers'),
     space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='middle_features'),
+    space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
+                      name='middle_activation'),
     space.Integer(3, 6, name='kernel_0'),
     space.Integer(3, 5, name='kernel_1'),
 ]
@@ -102,6 +106,8 @@ PED_SKSPACE = [
     space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='lstm_hidden_size'),
     space.Integer(0, 2, name='lstm_layers'),
     space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='middle_features'),
+    space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
+                      name='middle_activation'),
     space.Integer(3, 6, name='kernel_0'),
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
