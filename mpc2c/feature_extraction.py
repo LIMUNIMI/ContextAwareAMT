@@ -2,10 +2,10 @@ import math
 from copy import deepcopy
 
 import torch
+import visdom
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-import visdom
 vis = visdom.Visdom()
 
 
@@ -139,15 +139,11 @@ class MIDIParameterEstimation(nn.Module):
                               padding=0,
                               dilation=d,
                               bias=False),
-                    # nn.LayerNorm([conv_out_features, *next_conv_in_size]),
+                    # nn.LayerNorm([*next_conv_in_size]),
+                    nn.InstanceNorm2d(conv_out_features)
+                    if conv_out_features > 1 else nn.LayerNorm(
+                        [*next_conv_in_size]),
                     # nn.BatchNorm2d(conv_out_features),
-                    # SpaceVariant(
-                    #     nn.Conv2d(input_features,
-                    #               conv_out_features,
-                    #               kernel_size=k,
-                    #               stride=s,
-                    #               padding=0,
-                    #               dilation=d), lambda x: x / len(x)),
                     # nn.SELU()
                     # nn.Hardtanh()
                     AbsLayer()
@@ -187,37 +183,28 @@ class MIDIParameterEstimation(nn.Module):
                           padding=0,
                           groups=1,
                           bias=False),
-                # SpaceVariant(
-                #     nn.Conv2d(input_features,
-                #               output_features,
-                #               kernel_size=k,
-                #               stride=1,
-                #               dilation=1,
-                #               padding=0,
-                #               groups=1), lambda x: x / len(x)),
-                # nn.BatchNorm2d(output_features),
-                # nn.LayerNorm([output_features, 1, 1]),
+                nn.Sigmoid(),
+                nn.Conv2d(output_features,
+                          output_features,
+                          groups=output_features,
+                          kernel_size=1),
                 # nn.Hardsigmoid()
-                nn.Sigmoid()
                 # AbsLayer()
             ]
         else:
             # change the last activation so that the outputs are in (0, 1)
             self.stack[-1] = nn.Sigmoid()
-            # remove the batchnorm since the output has only one value
-            # and it cannot be run with these input size
-            # del self.stack[-2]
+            self.stack.append(
+                nn.Conv2d(output_features,
+                          output_features,
+                          groups=output_features,
+                          kernel_size=1))
+
+        # initialize like a line
+        nn.init.ones_(self.stack[-1].weight)
+        nn.init.zeros_(self.stack[-1].bias)
+
         self.stack = nn.Sequential(*self.stack)
-        # self.stack = nn.Sequential(
-        #     nn.Conv2d(1, 256, kernel_size=input_size, bias=False),
-        #     nn.SELU(),
-        #     nn.Conv2d(256, 256, kernel_size=1, bias=False),
-        #     nn.SELU(),
-        #     nn.Conv2d(256, 256, kernel_size=1, bias=False),
-        #     nn.SELU(),
-        #     nn.Conv2d(256, 1, kernel_size=1, bias=False),
-        #     nn.Sigmoid()
-        # )
 
     def forward(self, x, lens=torch.tensor(False)):
         """
