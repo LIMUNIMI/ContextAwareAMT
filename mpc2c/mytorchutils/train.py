@@ -1,5 +1,5 @@
 from time import time
-from typing import Optional, Callable
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -142,6 +142,7 @@ def train_epochs(model,
         print(f"training loss : {trainloss:.4e}")
 
         print("-> Validating")
+        values_same = []
         with torch.no_grad():
             model.eval()
             for inputs, targets, lens in tqdm(validloader):
@@ -151,6 +152,9 @@ def train_epochs(model,
                     targets[i] = targets[i].to(device).to(dtype)
 
                 out = model.predict(*inputs, *lens)
+                values_same.append(
+                    any([torch.min(x) == torch.max(x) for x in out]))
+
                 loss = validloss_fn(out, targets, lens).detach().cpu().numpy()
                 validloss.append(loss)
                 if np.isnan(loss):
@@ -166,7 +170,17 @@ def train_epochs(model,
                 if trainloss_on_valid:
                     out = model(*inputs, *lens)
                     trainloss_valid.append(
-                        trainloss_fn(out, targets, lens).detach().cpu().numpy())
+                        trainloss_fn(out, targets,
+                                     lens).detach().cpu().numpy())
+
+        if any(values_same):
+            print(
+                "Warning: all the predicted values are the same in at least\
+one output in at least one validation batch!")
+        if all(values_same):
+            print(
+                "Warning: all the predicted values are the same in at least\
+one output in all the validation batches!")
 
         validloss = np.mean(validloss)
         print(f"validation loss : {validloss:.4e}")
