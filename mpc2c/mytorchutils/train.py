@@ -175,11 +175,11 @@ def train_epochs(model,
 
         if any(values_same):
             print(
-                "Warning: all the predicted values are the same in at least\
+                "Warning: all the predicted values are the same in at least \
 one output in at least one validation batch!")
         if all(values_same):
             print(
-                "Warning: all the predicted values are the same in at least\
+                "Warning: all the predicted values are the same in at least \
 one output in all the validation batches!")
 
         validloss = np.mean(validloss)

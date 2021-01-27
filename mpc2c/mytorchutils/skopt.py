@@ -2,6 +2,7 @@ import os
 import sys
 from dataclasses import dataclass
 from typing import Callable, Optional, Tuple
+from pprint import pprint
 
 import matplotlib.pyplot as plt
 import visdom
@@ -80,7 +81,7 @@ class SKOptimizer(object):
 
             print("--------------------")
             print("Testing hyperparams:")
-            print(hyperparams)
+            pprint(hyperparams)
 
             try:
                 loss = self.to_minimize(hyperparams)
