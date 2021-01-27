@@ -10,10 +10,14 @@ from . import utils
 from .mytorchutils import DatasetDump, dummy_collate, pad_collate
 
 
-def transform_func(arr):
+def transform_func(arr: es.array):
+    """
+    Takes a 2d array in float32 and computes the first 13 MFCC, on each column,
+    and discards the first one, resulting in a new 2darray with 12 columns
+    """
     out = []
     for col in range(arr.shape[1]):
-        out.append(s.MFCC(arr[:, col]))
+        out.append(s.MFCC(arr[:, col])[1:])
 
     return es.array(out).T
 

@@ -41,7 +41,7 @@ def model_test(model_build_func, test_sample):
 
 def build_velocity_model(hyperparams):
     m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, s.MINI_SPEC_SIZE),
+        input_size=(s.BINS - 1, s.MINI_SPEC_SIZE),
         output_features=1,
         note_level=True,
         max_layers=s.MAX_LAYERS,
@@ -57,7 +57,7 @@ def build_velocity_model(hyperparams):
 
 def build_pedaling_model(hyperparams):
     m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, 1),
+        input_size=(s.BINS - 1, 1),
         output_features=3,
         note_level=False,
         max_layers=s.MAX_LAYERS,
@@ -137,24 +137,6 @@ def train(trainloader, validloader, model, lr, wd):
             return loss
 
         return _loss_fn
-
-    # def remap(x, y):
-    #     y1 = torch.min(y)
-    #     y2 = torch.max(y)
-    #     y1_idx = torch.argmin(y)
-    #     y2_idx = torch.argmax(y)
-    #     x1 = x.flatten()[y1_idx]
-    #     x2 = x.flatten()[y2_idx]
-    #     if torch.abs(x1 - x2) > 1e-1:
-    #         # retta passante per due punti
-    #         m = (y1 - y2) / (x1 - x2)
-    #         q = (x1 * y2 - x2 * y1) / (x1 - x2)
-    #         # print(f"Computed m: {m:.2f}, q: {q:.2f}")
-    #         x = m * x + q
-    #     # else:
-    #     #     print("Warning: min and max are predicted with the same value!")
-
-    #     return F.l1_loss(x, y)
 
     trainloss_fn = make_loss_func(F.l1_loss)
     validloss_fn = make_loss_func(F.l1_loss)

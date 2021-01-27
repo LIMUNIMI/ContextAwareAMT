@@ -1,7 +1,7 @@
 # from mpc2c import nmf
-import torch
 import argparse
 
+import torch
 # from cylang import cylang
 # cylang.compile()
 from Cython.Build import Cythonize
@@ -124,8 +124,9 @@ def main():
         from mpc2c import create_midi_scale
         create_midi_scale.main()
     if args.datasets:
-        from mpc2c.asmd_resynth import split_resynth
         from pathlib import Path
+
+        from mpc2c.asmd_resynth import split_resynth
         split_resynth(s.DATASETS,
                       Path(s.CARLA_PROJ), Path(s.RESYNTH_DATA_PATH),
                       Path(s.METADATASET_PATH), s.CONTEXT_SPLITS,
@@ -141,7 +142,7 @@ def main():
                                                        WD, args.context),
                      space_constraint=training.model_test(
                          training.build_pedaling_model,
-                         torch.rand(1, s.BINS, 100)),
+                         torch.rand(1, s.BINS - 1, 100)),
                      plot_graphs=s.PLOT_GRAPHS)
         else:
             training.train_pedaling(nmf_params,
@@ -162,7 +163,7 @@ def main():
                                                        WD, args.context),
                      space_constraint=training.model_test(
                          training.build_velocity_model,
-                         torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)),
+                         torch.rand(1, s.BINS - 1, s.MINI_SPEC_SIZE)),
                      plot_graphs=s.PLOT_GRAPHS)
         else:
             training.train_velocity(nmf_params,

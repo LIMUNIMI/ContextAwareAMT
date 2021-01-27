@@ -226,8 +226,6 @@ class MIDIParameterEstimation(nn.Module):
         torch.tensor
             shape (batch, out_features, frames)
         """
-        # discard mfcc 0...
-        x = x[:, 1:]
         if hasattr(self, 'lstm'):
             # put the frames before of the features (see nn.LSTM)
             x = torch.transpose(x, 1, 2)

@@ -25,8 +25,8 @@ FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
 NJOBS = 5
-# one less because the first is discarded (in nn forward...)
-BINS = 12
+# number of mfcc
+BINS = 13
 SPEC = spectrogram.Spectrometer(FRAME_SIZE,
                                 SR,
                                 hop=HOP_SIZE,
