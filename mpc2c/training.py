@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from . import data_management, feature_extraction
 from . import settings as s
-from .mytorchutils import count_params, train_epochs
+from .mytorchutils import count_params, train_epochs, compute_average
 
 
 def model_test(model_build_func, test_sample):
@@ -81,7 +81,15 @@ def train_pedaling(nmf_params, hpar, lr, wd, context=None, state_dict=None):
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
         model.freeze(s.FREEZE_PORTION)
 
-    return train(trainloader, validloader, model, lr, wd)
+    dummy_avg = compute_average(trainloader, -1)
+    print(dummy_avg)
+
+    return train(trainloader,
+                 validloader,
+                 model,
+                 lr,
+                 wd,
+                 dummy_loss=lambda x: dummy_avg)
 
 
 def train_velocity(nmf_params, hpar, lr, wd, context=None, state_dict=None):
@@ -100,10 +108,17 @@ def train_velocity(nmf_params, hpar, lr, wd, context=None, state_dict=None):
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
         model.freeze(s.FREEZE_PORTION)
 
-    return train(trainloader, validloader, model, lr, wd)
+    dummy_avg = compute_average(trainloader)
+
+    return train(trainloader,
+                 validloader,
+                 model,
+                 lr,
+                 wd,
+                 dummy_loss=lambda x: dummy_avg)
 
 
-def train(trainloader, validloader, model, lr, wd):
+def train(trainloader, validloader, model, lr, wd, dummy_loss):
     print(model)
     print("Total number of parameters: ", count_params(model))
     optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
@@ -132,7 +147,7 @@ def train(trainloader, validloader, model, lr, wd):
                               validloss_fn,
                               trainloader,
                               validloader,
-                              dummy_loss=lambda x: 0.5,
+                              dummy_loss=dummy_loss,
                               trainloss_on_valid=True,
                               plot_losses=s.PLOT_LOSSES)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER

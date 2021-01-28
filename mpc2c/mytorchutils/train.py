@@ -8,6 +8,86 @@ from tqdm import tqdm
 from . import context
 
 
+def compute_average(dataloader, *axes: int):
+    """
+    A functional interface to AveragePredictor using dataloaders
+    """
+    predictor = AveragePredictor(*axes)
+    predictor.add_dataloader(dataloader)
+    return predictor.predict()
+
+
+class AveragePredictor(object):
+    """
+    A simple predictor which computes an average and use that one for any
+    sample
+
+    Example:
+
+    .. code:
+        predictor = AveragePredictor()
+        for sample in samples:
+            predictor.add_to_average(sample)
+        predictor.predict()
+
+        # if you add other samples, you also need to manually update the
+        # tracking average:
+        for sample in new_samples:
+            predictor.add_to_average(sample)
+        predictor.update_tracking_avg()
+        predictor.predict()
+    """
+
+    def __init__(self, *axes: int):
+        """
+        `axes` : int
+            the axes along which the data will be summed
+        """
+        self.axes = axes
+        self.__sum_values__: torch.Tensor = None
+        self.__counter__: int = 0
+
+    def update_tracking_avg(self):
+        self.__avg__ = self.__sum_values__ / self.__counter__
+        for ax in self.axes:
+            self.__avg__ = self.__avg__.unsqueeze(ax)
+
+    def add_to_average(self, sample: torch.Tensor, update_tracking_avg=False):
+        if self.__sum_values__ is None:
+            self.__sum_values__ = sample.sum(dim=self.axes)
+        else:
+            self.__sum_values__ += sample.sum(dim=self.axes)
+        # computing the number of elements that were summed
+        if self.axes:
+            size = 1
+            for ax in self.axes:
+                size *= sample.shape[ax]
+        else:
+            size = sample.numel()
+
+        self.__counter__ += size
+        if update_tracking_avg:
+            self.update_tracking_avg()
+
+    def add_dataloader(self, dataloader: torch.utils.data.DataLoader):
+        """
+        Add the targets retrieved by the dataloader, also considering the
+        `lens` argument if it is not False
+        """
+        for inputs, targets, lens in dataloader:
+            for i, target in enumerate(targets):
+                if lens == torch.tensor(False):
+                    self.add_to_average(target)
+                else:
+                    for batch, L in enumerate(lens[i]):
+                        self.add_to_average(target[None, batch, :L])
+
+    def predict(self, *x):
+        if not hasattr(self, '__avg__'):
+            self.update_tracking_avg()
+        return self.__avg__
+
+
 def count_params(model):
     """
     Compute the number of parameters
@@ -161,7 +241,7 @@ def train_epochs(model,
                     raise RuntimeError("Nan in training loss!")
                 if dummy_loss:
                     dummy_out = [
-                        torch.full_like(out[i], dummy_loss(targets))
+                        dummy_loss(targets).expand_as(out[i]).to(device)
                         for i in range(len(targets))
                     ]
                     loss = validloss_fn(dummy_out, targets,
@@ -174,12 +254,10 @@ def train_epochs(model,
                                      lens).detach().cpu().numpy())
 
         if any(values_same):
-            print(
-                "Warning: all the predicted values are the same in at least \
+            print("Warning: all the predicted values are the same in at least \
 one output in at least one validation batch!")
         if all(values_same):
-            print(
-                "Warning: all the predicted values are the same in at least \
+            print("Warning: all the predicted values are the same in at least \
 one output in all the validation batches!")
 
         validloss = np.mean(validloss)
