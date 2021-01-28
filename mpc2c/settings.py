@@ -94,21 +94,23 @@ FREEZE_PORTION = 0
 
 # SKOPT
 VEL_SKSPACE = [
-    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='lstm_hidden_size'),
-    space.Integer(0, 1, name='lstm_layers'),
-    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='middle_features'),
-    space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
-                      name='middle_activation'),
+    space.Integer(0, 2, name='lstm_layers'),
+    space.Integer(0, 7, name='lstm_hidden_size'),
+    space.Integer(0, 7, name='middle_features'),
     space.Integer(3, 6, name='kernel_0'),
     space.Integer(3, 5, name='kernel_1'),
-]
-PED_SKSPACE = [
-    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='lstm_hidden_size'),
-    space.Integer(0, 2, name='lstm_layers'),
-    space.Categorical([128, 64, 32, 16, 8, 4, 2, 1], name='middle_features'),
     space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
                       name='middle_activation'),
+    space.Categorical([1, 3], name='k'),
+]
+PED_SKSPACE = [
+    space.Integer(0, 4, name='lstm_layers'),
+    space.Integer(0, 7, name='lstm_hidden_size'),
+    space.Integer(0, 7, name='middle_features'),
     space.Integer(3, 6, name='kernel_0'),
+    space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
+                      name='middle_activation'),
+    space.Categorical([1, 3], name='k'),
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
 SKITERATIONS = (0, 80)

@@ -40,8 +40,11 @@ class MIDIParameterEstimation(nn.Module):
             * kernel_size : tuple[int]
             * stride : tuple[int]
             * dilation : tuple[int]
-            * lstm_hidden_size: int
+            * lstm_hidden_size: int [x in 2^x]
             * lstm_layers: int
+            * middle_features: int [x in k*(2^x)]
+            * middle_activation: int
+            * k: int
 
         * `input_size` is a tuple[int] containing the number of rows (features)
         and columns (frames) of each input. It can contain 1 if the size of a
@@ -81,14 +84,15 @@ class MIDIParameterEstimation(nn.Module):
 
         # setup the `note_level` stuffs
         kernel_size, stride, dilation, lstm_hidden_size,\
-            lstm_layers, middle_features, middle_activation = hyperparams
+            lstm_layers, middle_features, middle_activation, k = hyperparams
+        middle_features = k * (2**middle_features)
 
         if lstm_layers > 0:
             conv_in_size = (lstm_hidden_size, input_size[1])
             self.lstm = nn.LSTM(input_size[0],
-                                lstm_hidden_size,
+                                2**lstm_hidden_size,
                                 num_layers=lstm_layers,
-                                batch_first=True),
+                                batch_first=True)
 
         else:
             conv_in_size = input_size
