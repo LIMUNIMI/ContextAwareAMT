@@ -14,69 +14,60 @@ def model_test(model_build_func, test_sample):
     A function to build a constraint around the model size; the constraint
     tries to build the model and use it with a random function
     """
-    def constraint(hyperparams):
+    def constraint(hpar):
         print("----------")
-        print("checking this set of hyperparams: ")
-        pprint(hyperparams)
+        print("checking this set of hpar: ")
+        pprint(hpar)
         allowed = True
 
         if allowed:
             try:
-                model = model_build_func(hyperparams)
+                model = model_build_func(hpar)
                 print("model created")
                 model(test_sample.to(s.DEVICE).to(s.DTYPE))
                 print("model tested")
+            # except Exception as e:
+            #     import traceback
+            #     traceback.print_exc(e)
             except Exception as e:
-                # except Exception as e:
-                #     import traceback
-                #     traceback.print_exc(e)
                 print(e)
                 allowed = False
 
-        print(f"Hyperparams allowed: {allowed}")
+        print(f"hyper-parameters allowed: {allowed}")
         return allowed
 
     return constraint
 
 
-def build_velocity_model(hyperparams):
+def build_velocity_model(hpar):
     m = feature_extraction.MIDIParameterEstimation(
         input_size=(s.BINS - 1, s.MINI_SPEC_SIZE),
         output_features=1,
         note_level=True,
         max_layers=s.MAX_LAYERS,
-        hyperparams=((hyperparams['kernel_0'], hyperparams['kernel_1']),
-                     (1, 1), (1, 1), hyperparams['lstm_hidden_size'],
-                     hyperparams['lstm_layers'],
-                     hyperparams['middle_features'],
-                     hyperparams['middle_activation'])).to(s.DEVICE).to(
-                         s.DTYPE)
+        hyperparams=((hpar['kernel_0'], hpar['kernel_1']), (1, 1), (1, 1),
+                     hpar['lstm_hidden_size'], hpar['lstm_layers'],
+                     hpar['middle_features'], hpar['middle_activation'],
+                     hpar['k'])).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
-def build_pedaling_model(hyperparams):
+def build_pedaling_model(hpar):
     m = feature_extraction.MIDIParameterEstimation(
         input_size=(s.BINS - 1, 1),
         output_features=3,
         note_level=False,
         max_layers=s.MAX_LAYERS,
-        hyperparams=((hyperparams['kernel_0'],
-                      1), (1, 1), (1, 1), hyperparams['lstm_hidden_size'],
-                     hyperparams['lstm_layers'],
-                     hyperparams['middle_features'],
-                     hyperparams['middle_activation'])).to(s.DEVICE).to(
-                         s.DTYPE)
+        hyperparams=((hpar['kernel_0'], 1), (1, 1), (1, 1),
+                     hpar['lstm_hidden_size'], hpar['lstm_layers'],
+                     hpar['middle_features'], hpar['middle_activation'],
+                     hpar['k'])).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
-def train_pedaling(nmf_params,
-                   hyperparams,
-                   lr,
-                   wd,
-                   context=None,
-                   state_dict=None):
+def train_pedaling(nmf_params, hpar, lr, wd, context=None, state_dict=None):
     trainloader = data_management.get_loader(
         ['train', context] if context is not None else ['train'], nmf_params,
         'pedaling')
@@ -85,7 +76,7 @@ def train_pedaling(nmf_params,
         nmf_params, 'pedaling')
     if s.REDUMP:
         return
-    model = build_pedaling_model(hyperparams)
+    model = build_pedaling_model(hpar)
     if state_dict is not None:
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
         model.freeze(s.FREEZE_PORTION)
@@ -93,12 +84,7 @@ def train_pedaling(nmf_params,
     return train(trainloader, validloader, model, lr, wd)
 
 
-def train_velocity(nmf_params,
-                   hyperparams,
-                   lr,
-                   wd,
-                   context=None,
-                   state_dict=None):
+def train_velocity(nmf_params, hpar, lr, wd, context=None, state_dict=None):
     trainloader = data_management.get_loader(
         ['train', context] if context is not None else ['train'], nmf_params,
         'velocity')
@@ -108,7 +94,7 @@ def train_velocity(nmf_params,
     if s.REDUMP:
         return
 
-    model = build_velocity_model(hyperparams)
+    model = build_velocity_model(hpar)
 
     if state_dict is not None:
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
