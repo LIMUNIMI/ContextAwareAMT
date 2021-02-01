@@ -52,12 +52,13 @@ Datasets
 #. Apply NMF and extract frames for pedaling estimation: ``python run.py -tp -r -c orig``
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -tv -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.1115.
+   and loss function of 0.10514. Note the preference for `AbsLayer` on `ReLU`.
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -tp -sk -c orig``. We obtained hyperparams defined in ``settings.py``
    and loss function of 0.2005.
 #. Fully train velocity model on the original context: ``python run.py -tv -c orig``
 
+    TODO
    * Dummy loss: 0.10528
    * Validation loss: 0.12034 (21 epochs, early-stop)
    * Model: 417 parameters
@@ -74,6 +75,7 @@ Datasets
 
 #. Fully train pedaling model on the original context: ``python run.py -tp -c orig``
 
+    TODO
    * Dummy loss: 0.36847
    * Validation loss: 0.23026 (500 epochs, no early-stop)
    * Model: 24 parameters
