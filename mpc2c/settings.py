@@ -67,11 +67,13 @@ MAX_LAYERS = 30
 DEVICE = 'cuda'
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    'lstm_hidden_size': 0,
     'lstm_layers': 0,
-    'middle_features': 4,
-    "kernel_0": 6,
-    "kernel_1": 3,
+    'lstm_hidden_size': 0,
+    'middle_features': 0,
+    "kernel_0": 3,
+    "kernel_1": 4,
+    "middle_activation": AbsLayer,
+    "k": 1
 }
 PED_HYPERPARAMS = {
     'lstm_hidden_size': 0,
@@ -84,7 +86,7 @@ PED_BATCH_SIZE = 1
 EARLY_STOP = 10
 PLOT_LOSSES = True
 DTYPE = torch.float32
-LR = 1e-3
+LR = 1e-4
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
