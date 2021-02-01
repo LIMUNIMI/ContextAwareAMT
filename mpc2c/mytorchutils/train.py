@@ -107,7 +107,6 @@ class AveragePredictor(object):
         #   Tuple[float, float], Tuple[float, float], Tuple[float, float], ...
         # `zip(*out)` is:
         #   Tuple[float, float, float, ...], Tuple[float, float, float, ...]
-        __import__('ipdb').set_trace()
         out = list(zip(*out))
         self.__sum_values__ = sum(out[0])
         self.__counter__ = sum(out[1])
