@@ -76,10 +76,14 @@ class AveragePredictor(object):
         """
         for inputs, targets, lens in dataloader:
             for i, target in enumerate(targets):
-                if lens == torch.tensor(False):
-                    self.add_to_average(target)
+                if lens[i] == torch.tensor(False):
+                    # None here so that the batch dimension is kept and the
+                    # predicted value still has it
+                    self.add_to_average(target[None])
                 else:
                     for batch, L in enumerate(lens[i]):
+                        # None here so that the batch dimension is kept and the
+                        # predicted value still has it
                         self.add_to_average(target[None, batch, :L])
 
     def predict(self, *x):
