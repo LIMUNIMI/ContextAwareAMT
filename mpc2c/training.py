@@ -107,7 +107,7 @@ def train_velocity(nmf_params, hpar, lr, wd, context=None, state_dict=None):
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
         model.freeze(s.FREEZE_PORTION)
 
-    dummy_avg = compute_average(trainloader)
+    dummy_avg = compute_average(trainloader, n_jobs=10)
 
     return train(trainloader,
                  validloader,
