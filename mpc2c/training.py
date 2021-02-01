@@ -81,7 +81,7 @@ def train_pedaling(nmf_params, hpar, lr, wd, context=None, state_dict=None):
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
         model.freeze(s.FREEZE_PORTION)
 
-    dummy_avg = compute_average(trainloader, -1)
+    dummy_avg = compute_average(trainloader.dataset, -1, n_jobs=s.NJOBS)
 
     return train(trainloader,
                  validloader,
@@ -107,7 +107,7 @@ def train_velocity(nmf_params, hpar, lr, wd, context=None, state_dict=None):
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
         model.freeze(s.FREEZE_PORTION)
 
-    dummy_avg = compute_average(trainloader, n_jobs=10)
+    dummy_avg = compute_average(trainloader.dataset, n_jobs=s.NJOBS)
 
     return train(trainloader,
                  validloader,

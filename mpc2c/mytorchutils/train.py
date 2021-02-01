@@ -7,6 +7,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 from . import context
+from .data import DatasetDump
 
 
 def compute_average(dataloader, *axes: int, **joblib_kwargs):
@@ -22,6 +23,7 @@ class AveragePredictor(object):
     """
     A simple predictor which computes an average and use that one for any
     sample
+     Doesn't support multiple targets for now.
 
     Example:
 
@@ -70,28 +72,46 @@ class AveragePredictor(object):
         if update_tracking_avg:
             self.update_tracking_avg()
 
-    def add_dataloader(self, dataloader: torch.utils.data.DataLoader,
+    def add_dataloader(self, dataset: DatasetDump,
                        **joblib_kwargs):
         """
-        Add the targets retrieved by the dataloader, also considering the
-        `lens` argument if it is not False
+        Add the targets retrieved by the DatasetDump object.
 
         `joblib_kwargs` are keyword arguments for joblib.Parallel
-        """
-        def proc(inputs, targets, lens):
-            for i, target in enumerate(targets):
-                if lens[i] == torch.tensor(False):
-                    # None here so that the batch dimension is kept and the
-                    # predicted value still has it
-                    self.add_to_average(target[None])
-                else:
-                    for batch, L in enumerate(lens[i]):
-                        # None here so that the batch dimension is kept and the
-                        # predicted value still has it
-                        self.add_to_average(target[None, batch, :L])
 
-        Parallel(**joblib_kwargs)(delayed(proc)(inputs, targets, lens)
-                                  for inputs, targets, lens in dataloader)
+        N.B. DatasetDump allows to iterate over targets only, making the
+        loading of data much lighter.
+        """
+
+        def proc(self, targets):
+            self.add_to_average(targets[None])
+            # for i, target in enumerate(targets):
+            #     if lens[i] == torch.tensor(False):
+            #         # None here so that the batch dimension is kept and the
+            #         # predicted value still has it
+            #         self.add_to_average(target[None])
+            #     else:
+            #         for batch, L in enumerate(lens[i]):
+            #             # None here so that the batch dimension is kept and the
+            #             # predicted value still has it
+            #             self.add_to_average(target[None, batch, :L])
+            return self.__sum_values__, self.__counter__
+
+        out = Parallel(**joblib_kwargs)(
+            delayed(proc)(type(self)(*self.axes), targets)
+            for targets in dataset.itertargets())
+
+        # `out` is:
+        #   List[Tuple[float, float]]
+        # `*out` is:
+        #   Tuple[float, float], Tuple[float, float], Tuple[float, float], ...
+        # `zip(*out)` is:
+        #   Tuple[float, float, float, ...], Tuple[float, float, float, ...]
+        __import__('ipdb').set_trace()
+        out = list(zip(*out))
+        self.__sum_values__ = sum(out[0])
+        self.__counter__ = sum(out[1])
+        self.update_tracking_avg()
 
     def predict(self, *x):
         if not hasattr(self, '__avg__'):

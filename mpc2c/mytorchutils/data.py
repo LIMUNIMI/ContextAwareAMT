@@ -99,16 +99,32 @@ class DatasetDump(TorchDataset):
         """
         return self.root / str(index // self.folder_size)
 
+    def get_target(self, i):
+        y = np.load(self.get_folder(i) / f"y{i}.npz")['arr_0']
+        y = torch.from_numpy(y)
+        return y
+
+    def get_input(self, i):
+        x = np.load(self.get_folder(i) / f"x{i}.npz")['arr_0']
+        x = torch.from_numpy(x)
+        return x
+
     def __getitem__(self, i):
         assert self.dumped, "Dataset not dumped!"
-        x = np.load(self.get_folder(i) / f"x{i}.npz")['arr_0']
-        y = np.load(self.get_folder(i) / f"y{i}.npz")['arr_0']
-        x = torch.from_numpy(x)
-        y = torch.from_numpy(y)
+        x = self.get_input(i)
+        y = self.get_target(i)
         return x, y
 
     def __len__(self):
         return sum(self.num_samples)
+
+    def itertargets(self):
+        for i in range(len(self)):
+            yield self.get_target(i)
+
+    def iterinputs(self):
+        for i in range(len(self)):
+            yield self.get_input(i)
 
 
 def pad_collate(batch):
