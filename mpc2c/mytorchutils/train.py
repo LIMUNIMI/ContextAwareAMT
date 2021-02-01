@@ -3,17 +3,18 @@ from typing import Callable, Optional
 
 import numpy as np
 import torch
+from joblib import Parallel, delayed
 from tqdm import tqdm
 
 from . import context
 
 
-def compute_average(dataloader, *axes: int):
+def compute_average(dataloader, *axes: int, **joblib_kwargs):
     """
     A functional interface to AveragePredictor using dataloaders
     """
     predictor = AveragePredictor(*axes)
-    predictor.add_dataloader(dataloader)
+    predictor.add_dataloader(dataloader, **joblib_kwargs)
     return predictor.predict()
 
 
@@ -69,12 +70,15 @@ class AveragePredictor(object):
         if update_tracking_avg:
             self.update_tracking_avg()
 
-    def add_dataloader(self, dataloader: torch.utils.data.DataLoader):
+    def add_dataloader(self, dataloader: torch.utils.data.DataLoader,
+                       **joblib_kwargs):
         """
         Add the targets retrieved by the dataloader, also considering the
         `lens` argument if it is not False
+
+        `joblib_kwargs` are keyword arguments for joblib.Parallel
         """
-        for inputs, targets, lens in dataloader:
+        def proc(inputs, targets, lens):
             for i, target in enumerate(targets):
                 if lens[i] == torch.tensor(False):
                     # None here so that the batch dimension is kept and the
@@ -85,6 +89,9 @@ class AveragePredictor(object):
                         # None here so that the batch dimension is kept and the
                         # predicted value still has it
                         self.add_to_average(target[None, batch, :L])
+
+        Parallel(**joblib_kwargs)(delayed(proc)(inputs, targets, lens)
+                                  for inputs, targets, lens in dataloader)
 
     def predict(self, *x):
         if not hasattr(self, '__avg__'):
@@ -285,13 +292,16 @@ one output in all the validation batches!")
             print(f"{epoch - best_epoch} from early stop!!")
 
         if plot_losses:
-            plot_losses_func(trainloss, validloss, trainloss_valid, epoch)
+            plot_losses_func(trainloss,
+                             validloss,
+                             trainloss_valid,
+                             epoch=epoch)
 
         print("Time for this epoch: ", time() - epoch_ttt)
     return best_loss
 
 
-def plot_losses_func(*losses, epoch):
+def plot_losses_func(*losses, epoch=0):
     context.vis.line(torch.tensor([losses]),
                      X=torch.tensor([epoch]),
                      update='append',
