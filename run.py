@@ -101,7 +101,10 @@ def main():
     if args.skopt:
         # if we are hyper-optimizing, change some settings
         from mpc2c.mytorchutils import hyperopt
-        s.DATASET_LEN = 0.015
+        if args.train_velocity:
+            s.DATASET_LEN = 0.015
+        elif args.train_pedaling:
+            s.DATASET_LEN = 0.1
         s.PLOT_LOSSES = False
         # s.LR = 0.1
     s.REDUMP = args.redump
