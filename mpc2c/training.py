@@ -82,7 +82,6 @@ def train_pedaling(nmf_params, hpar, lr, wd, context=None, state_dict=None):
         model.freeze(s.FREEZE_PORTION)
 
     dummy_avg = compute_average(trainloader, -1)
-    print(dummy_avg)
 
     return train(trainloader,
                  validloader,
