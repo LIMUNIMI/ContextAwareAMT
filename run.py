@@ -106,12 +106,10 @@ def main():
         elif args.train_pedaling:
             s.DATASET_LEN = 0.1
         s.PLOT_LOSSES = False
-        # s.LR = 0.1
     s.REDUMP = args.redump
 
     if args.generic_model:
         generic_model = torch.load(args.generic_model)['state_dict']
-        s.LR = 0.01
     else:
         generic_model = None
 
@@ -141,8 +139,8 @@ def main():
             hyperopt(s.PED_SKSPACE,
                      s.SKCHECKPOINT,
                      s.SKITERATIONS,
-                     lambda x: training.train_pedaling(nmf_params, x, s.LR, s.
-                                                       WD, args.context),
+                     lambda x: training.train_pedaling(nmf_params, x, s.WD,
+                                                       args.context),
                      space_constraint=training.model_test(
                          training.build_pedaling_model,
                          torch.rand(1, s.BINS - 1, 100)),
@@ -150,7 +148,6 @@ def main():
         else:
             training.train_pedaling(nmf_params,
                                     s.PED_HYPERPARAMS,
-                                    s.LR,
                                     s.WD,
                                     context=args.context,
                                     state_dict=generic_model)
@@ -162,8 +159,8 @@ def main():
             hyperopt(s.VEL_SKSPACE,
                      s.SKCHECKPOINT,
                      s.SKITERATIONS,
-                     lambda x: training.train_velocity(nmf_params, x, s.LR, s.
-                                                       WD, args.context),
+                     lambda x: training.train_velocity(nmf_params, x, s.WD,
+                                                       args.context),
                      space_constraint=training.model_test(
                          training.build_velocity_model,
                          torch.rand(1, s.BINS - 1, s.MINI_SPEC_SIZE)),
@@ -171,7 +168,6 @@ def main():
         else:
             training.train_velocity(nmf_params,
                                     s.VEL_HYPERPARAMS,
-                                    s.LR,
                                     s.WD,
                                     context=args.context,
                                     state_dict=generic_model)

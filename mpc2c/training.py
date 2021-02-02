@@ -67,7 +67,7 @@ def build_pedaling_model(hpar):
     return m
 
 
-def train_pedaling(nmf_params, hpar, lr, wd, context=None, state_dict=None):
+def train_pedaling(nmf_params, hpar, wd, context=None, state_dict=None):
     trainloader = data_management.get_loader(
         ['train', context] if context is not None else ['train'], nmf_params,
         'pedaling')
@@ -86,12 +86,11 @@ def train_pedaling(nmf_params, hpar, lr, wd, context=None, state_dict=None):
     return train(trainloader,
                  validloader,
                  model,
-                 lr,
                  wd,
                  dummy_loss=lambda x: dummy_avg)
 
 
-def train_velocity(nmf_params, hpar, lr, wd, context=None, state_dict=None):
+def train_velocity(nmf_params, hpar, wd, context=None, state_dict=None):
     trainloader = data_management.get_loader(
         ['train', context] if context is not None else ['train'], nmf_params,
         'velocity')
@@ -112,14 +111,15 @@ def train_velocity(nmf_params, hpar, lr, wd, context=None, state_dict=None):
     return train(trainloader,
                  validloader,
                  model,
-                 lr,
                  wd,
                  dummy_loss=lambda x: dummy_avg)
 
 
-def train(trainloader, validloader, model, lr, wd, dummy_loss):
+def train(trainloader, validloader, model, wd, dummy_loss):
     print(model)
     print("Total number of parameters: ", count_params(model))
+    lr = 10 / len(trainloader)
+    print(f"Using learning rate {lr:.2e}")
     optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 
     def make_loss_func(loss_func):

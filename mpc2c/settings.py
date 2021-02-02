@@ -86,7 +86,6 @@ PED_BATCH_SIZE = 1
 EARLY_STOP = 10
 PLOT_LOSSES = True
 DTYPE = torch.float32
-LR = 1e-4
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
