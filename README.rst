@@ -51,46 +51,47 @@ Datasets
 #. Apply NMF and extract notes for velocity estimation: ``python run.py -tv -r -c orig``
 #. Apply NMF and extract frames for pedaling estimation: ``python run.py -tp -r -c orig``
 #. Look for hyper-parameters for velocity using the original context: ``python
-   run.py -tv -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.10514. Note the preference for `AbsLayer` on `ReLU`.
+   run.py -tv -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
+   and loss function of TODO. Note the preference for `AbsLayer` on `ReLU`.
+   Learning rate: 6.41e-04
 #. Look for hyper-parameters for pedaling using the original context: ``python
-   run.py -tp -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.2005.
+   run.py -tp -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
+   and loss function of TODO. Learning rate: 1.19e-02
 #. Fully train velocity model on the original context: ``python run.py -tv -c orig``
 
-    TODO
-   * Dummy loss: 0.10528
-   * Validation loss: 0.12034 (21 epochs, early-stop)
-   * Model: 417 parameters
-     MIDIParameterEstimation(
-       (stack): Sequential(
-         (0): Conv2d(1, 4, kernel_size=(6, 3), stride=(4, 1), dilation=(3, 1))
-         (1): Tanh()
-         (2): Conv2d(4, 4, kernel_size=(6, 3), stride=(4, 1), dilation=(3, 1))
-         (3): Tanh()
-         (4): Conv2d(4, 1, kernel_size=(12, 1), stride=(1, 1))
-         (5): Sigmoid()
-       )
-     )
+   * Model: 30 parameters::
+
+      MIDIParameterEstimation(
+        (stack): Sequential(
+          (0): Conv2d(1, 1, kernel_size=(3, 4), stride=(1, 1), bias=False)
+          (1): Identity()
+          (2): AbsLayer()
+          (3): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (4): Identity()
+          (5): AbsLayer()
+          (6): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (7): Identity()
+          (8): AbsLayer()
+          (9): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (10): Identity()
+          (11): AbsLayer()
+          (12): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (13): Identity()
+          (14): AbsLayer()
+          (15): Conv2d(1, 1, kernel_size=(2, 2), stride=(1, 1), bias=False)
+          (16): Sigmoid()
+          (17): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
+        )
+      )
+
+   * Dummy loss: 0.12082
+   * Validation loss: TODO (TODO epochs, early-stop)
+   * 1.004.974 batches in training
+   * 73.066 batches in validation
 
 #. Fully train pedaling model on the original context: ``python run.py -tp -c orig``
 
     TODO
-   * Dummy loss: 0.36847
-   * Validation loss: 0.23026 (500 epochs, no early-stop)
-   * Model: 24 parameters
-     MIDIParameterEstimation(
-        (stack): Sequential(
-          (0): Conv2d(1, 1, kernel_size=(3, 1), stride=(3, 1), dilation=(3, 1))
-          (1): Tanh()
-          (2): Conv2d(1, 1, kernel_size=(3, 1), stride=(3, 1), dilation=(3, 1))
-          (3): Tanh()
-          (4): Conv2d(1, 1, kernel_size=(3, 1), stride=(3, 1), dilation=(3, 1))
-          (5): Tanh()
-          (6): Conv2d(1, 3, kernel_size=(3, 1), stride=(3, 1), dilation=(3, 1))
-          (7): Sigmoid()
-         )
-     )
 
 ---
 
