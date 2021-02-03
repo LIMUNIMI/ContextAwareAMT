@@ -92,3 +92,12 @@ def get_loader(groups, nmf_params, mode, redump):
                           num_workers=s.NJOBS,
                           pin_memory=True,
                           collate_fn=pad_collate)
+
+
+def multiple_splits_one_context(splits, context, *args):
+    ret = []
+    for split in splits:
+        ret.append(
+            get_loader([split, context] if context is not None else [split],
+                       *args))
+    return *ret

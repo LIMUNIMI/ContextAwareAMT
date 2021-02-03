@@ -129,8 +129,12 @@ def main():
             space = s.PED_SKSPACE
 
             def objective(x):
-                return training.train_pedaling(nmf_params, x, s.WD,
-                                               args.context)
+                return training.train(nmf_params,
+                                      x,
+                                      s.WD,
+                                      'pedaling',
+                                      args.context,
+                                      copy_checkpoint=False)
 
             space_constraint = training.model_test(
                 training.build_pedaling_model, torch.rand(1, s.BINS - 1, 100))
@@ -142,8 +146,12 @@ def main():
                 torch.rand(1, s.BINS - 1, s.MINI_SPEC_SIZE))
 
             def objective(x):
-                return training.train_velocity(nmf_params, x, s.WD,
-                                               args.context)
+                return training.train(nmf_params,
+                                      x,
+                                      s.WD,
+                                      'velocity',
+                                      args.context,
+                                      copy_checkpoint=False)
 
         hyperopt(space,
                  s.SKCHECKPOINT,
@@ -155,31 +163,38 @@ def main():
     if args.train:
         from mpc2c import training
         if args.pedaling:
-            training.train_pedaling(nmf_params,
-                                    s.PED_HYPERPARAMS,
-                                    s.WD,
-                                    context=args.context,
-                                    state_dict=checkpoint)
+            training.train(nmf_params,
+                           s.PED_HYPERPARAMS,
+                           s.WD,
+                           'pedaling',
+                           context=args.context,
+                           state_dict=checkpoint)
 
-        elif args.train_velocity:
-            training.train_velocity(nmf_params,
-                                    s.VEL_HYPERPARAMS,
-                                    s.WD,
-                                    context=args.context,
-                                    state_dict=checkpoint)
+        elif args.velocity:
+            training.train(nmf_params,
+                           s.VEL_HYPERPARAMS,
+                           s.WD,
+                           'velocity',
+                           context=args.context,
+                           state_dict=checkpoint)
 
     if args.redump:
         from mpc2c import data_management
         if args.pedaling:
-            for split in ['train', 'validation', 'test']:
-                data_management.get_loader(
-                    [split, args.context] if args.context is not None else
-                    [split], nmf_params, 'pedaling', True)
+            data_management.multiple_splits_one_context(
+                ['train', 'validation', 'test'], args.context, nmf_params,
+                'pedaling', True)
         elif args.velocity:
-            for split in ['train', 'validation', 'test']:
-                data_management.get_loader(
-                    [split, args.context] if args.context is not None else
-                    [split], nmf_params, 'velocity', True)
+            data_management.multiple_splits_one_context(
+                ['train', 'validation', 'test'], args.context, nmf_params,
+                'velocity', True)
+
+    if args.evaluate:
+        from mpc2c import evaluate
+        if args.pedaling:
+            evaluate.evaluate(args.evaluate, 'pedaling', args.compare)
+        if args.velocity:
+            evaluate.evaluate(args.evaluate, 'velocity', args.compare)
 
 
 if __name__ == "__main__":

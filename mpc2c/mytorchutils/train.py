@@ -1,3 +1,4 @@
+import shutil
 from time import time
 from typing import Callable, Optional
 
@@ -137,7 +138,8 @@ def train_epochs(model,
                  device: str = 'cuda',
                  dtype=torch.float32,
                  dummy_loss: Optional[Callable] = None,
-                 trainloss_on_valid: bool = False):
+                 trainloss_on_valid: bool = False,
+                 copy_checkpoint: bool = True):
     """
     A typical training algorithm with early stopping and loss plotting
 
@@ -202,6 +204,9 @@ def train_epochs(model,
 
     `trainloss_on_valid` : bool
         if True, this computes the train loss on the validation set too
+
+    `copy_checkpoint` : bool
+        if True, the best checkpoint is saved to the working directory
 
     Note
     ----
@@ -302,8 +307,8 @@ one output in all the validation batches!")
             best_loss = validloss
             best_epoch = epoch
             state_dict = model.state_dict()
-            name = f"checkpoints/checkpoint{best_loss:.4f}.pt"
-            torch.save({'dtype': dtype, 'state_dict': state_dict}, name)
+            fname = f"checkpoints/checkpoint{best_loss:.4f}.pt"
+            torch.save({'dtype': dtype, 'state_dict': state_dict}, fname)
         elif epoch - best_epoch > early_stop:
             print("-- Early stop! --")
             break
@@ -317,6 +322,9 @@ one output in all the validation batches!")
                              epoch=epoch)
 
         print("Time for this epoch: ", time() - epoch_ttt)
+
+    if copy_checkpoint:
+        shutil.copy(fname, './')
     return best_loss
 
 
