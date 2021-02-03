@@ -51,7 +51,7 @@ def process_velocities(i, dataset, nmf_params):
     return minispecs, velocities
 
 
-def get_loader(groups, nmf_params, mode):
+def get_loader(groups, nmf_params, mode, redump):
     dataset = asmd.Dataset(
         paths=[s.RESYNTH_DATA_PATH],
         metadataset_path=s.METADATASET_PATH).filter(groups=groups)
@@ -64,7 +64,7 @@ def get_loader(groups, nmf_params, mode):
         velocity_dataset = DatasetDump(dataset,
                                        pathlib.Path(s.VELOCITY_DATA_PATH) /
                                        "_".join(groups),
-                                       not s.REDUMP,
+                                       not redump,
                                        num_samples=num_samples)
         # max_nbytes=None disable shared memory for large arrays
         velocity_dataset.dump(process_velocities,
@@ -80,7 +80,7 @@ def get_loader(groups, nmf_params, mode):
         pedaling_dataset = DatasetDump(dataset,
                                        pathlib.Path(s.PEDALING_DATA_PATH) /
                                        "_".join(groups),
-                                       not s.REDUMP,
+                                       not redump,
                                        num_samples=None)
         # max_nbytes=None disable shared memory for large arrays
         pedaling_dataset.dump(process_pedaling,

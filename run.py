@@ -31,49 +31,45 @@ def parse_args():
         help="Prepare the datasets by splitting the various contexts and resynthesizing them"
     )
     parser.add_argument(
-        "-tv",
-        "--train-velocity",
+        "-v",
+        "--velocity",
         action="store_true",
-        help="Train the neural network for velocity estimation.")
+        help="Perform actions for velocity estimation (note-wise prediction).")
     parser.add_argument(
-        "-tp",
-        "--train-pedaling",
+        "-p",
+        "--pedaling",
         action="store_true",
-        help="Train the neural network for pedaling estimation.")
+        help="Perform actions for pedaling estimation (frame-wise prediction)."
+    )
+    parser.add_argument("-t",
+                        "--train",
+                        action="store_true",
+                        help="Train a model.")
     parser.add_argument(
         "-sk",
         "--skopt",
         action="store_true",
-        help="If activated, instead of a full training, performs various little training cycles to look  for hyper-parameters using skopt."
+        help="Perform various little training cycles to look  for hyper-parameters using skopt."
     )
-    parser.add_argument(
-        "-r",
-        "--redump",
-        action="store_true",
-        help="If used, it pre-processes the full dataset and dumps it, then exits")
+    parser.add_argument("-r",
+                        "--redump",
+                        action="store_true",
+                        help="Pre-process the full dataset and dumps it")
     parser.add_argument(
         "-c",
         "--context",
         action="store",
         type=str,
         default=None,
-        help="If used, limits the processing to only the specified context (e.g. `-c pianoteq0`, `-c salamander1`, `-c orig`)"
+        help="Limit the action to only the specified context (e.g. `-c pianoteq0`, `-c salamander1`, `-c orig`)"
     )
     parser.add_argument(
-        "-gm",
-        "--generic-model",
+        "-pt",
+        "--checkpoint",
         action="store",
         type=str,
         default=None,
-        help="If used, load parameters from the generic model and fix the initial weights if training."
-    )
-    parser.add_argument(
-        "-cm",
-        "--context-model",
-        action="store",
-        type=str,
-        default=None,
-        help="If used, load parameters from the specific model into th final weights. If `-gm` is used, this applies afterwards and overwrites the final part of the generic model weights."
+        help="Load parameters from this checkpoint and freeze the initial weights if training."
     )
     parser.add_argument(
         "-i",
@@ -98,25 +94,11 @@ def load_nmf_params():
 def main():
 
     args = parse_args()
-    if args.skopt:
-        # if we are hyper-optimizing, change some settings
-        from mpc2c.mytorchutils import hyperopt
-        if args.train_velocity:
-            s.DATASET_LEN = 0.015
-        elif args.train_pedaling:
-            s.DATASET_LEN = 0.1
-        s.PLOT_LOSSES = False
     s.REDUMP = args.redump
 
-    if args.generic_model:
-        generic_model = torch.load(args.generic_model)['state_dict']
-    else:
-        generic_model = None
-
-    if args.context_model:
-        context_model = torch.load(args.context_model)['state_dict']
-    else:
-        context_model = None
+    if args.input:
+        raise NotImplementedError(
+            "Not yet implemented transcription from files")
 
     if args.template:
         from mpc2c import make_template
@@ -132,45 +114,73 @@ def main():
                       Path(s.CARLA_PROJ), Path(s.RESYNTH_DATA_PATH),
                       Path(s.METADATASET_PATH), s.CONTEXT_SPLITS,
                       s.RESYNTH_FINAL_DECAY)
-    if args.train_pedaling:
+
+    if args.checkpoint:
+        checkpoint = torch.load(args.checkpoint)['state_dict']
+    else:
+        checkpoint = None
+
+    nmf_params = load_nmf_params()
+    if args.skopt:
         from mpc2c import training
-        nmf_params = load_nmf_params()
-        if args.skopt:
-            hyperopt(s.PED_SKSPACE,
-                     s.SKCHECKPOINT,
-                     s.SKITERATIONS,
-                     lambda x: training.train_pedaling(nmf_params, x, s.WD,
-                                                       args.context),
-                     space_constraint=training.model_test(
-                         training.build_pedaling_model,
-                         torch.rand(1, s.BINS - 1, 100)),
-                     plot_graphs=s.PLOT_GRAPHS)
-        else:
+        from mpc2c.mytorchutils import hyperopt
+
+        if args.pedaling:
+            s.DATASET_LEN = 0.1
+            space = s.PED_SKSPACE
+
+            def objective(x):
+                return training.train_pedaling(nmf_params, x, s.WD,
+                                               args.context)
+
+            space_constraint = training.model_test(
+                training.build_pedaling_model, torch.rand(1, s.BINS - 1, 100))
+        elif args.velocity:
+            s.DATASET_LEN = 0.015
+            space = s.VEL_SKSPACE
+            space_constraint = training.model_test(
+                training.build_velocity_model,
+                torch.rand(1, s.BINS - 1, s.MINI_SPEC_SIZE))
+
+            def objective(x):
+                return training.train_velocity(nmf_params, x, s.WD,
+                                               args.context)
+
+        hyperopt(space,
+                 s.SKCHECKPOINT,
+                 s.SKITERATIONS,
+                 objective,
+                 space_constraint=space_constraint,
+                 plot_graphs=False)
+
+    if args.train:
+        from mpc2c import training
+        if args.pedaling:
             training.train_pedaling(nmf_params,
                                     s.PED_HYPERPARAMS,
                                     s.WD,
                                     context=args.context,
-                                    state_dict=generic_model)
+                                    state_dict=checkpoint)
 
-    if args.train_velocity:
-        from mpc2c import training
-        nmf_params = load_nmf_params()
-        if args.skopt:
-            hyperopt(s.VEL_SKSPACE,
-                     s.SKCHECKPOINT,
-                     s.SKITERATIONS,
-                     lambda x: training.train_velocity(nmf_params, x, s.WD,
-                                                       args.context),
-                     space_constraint=training.model_test(
-                         training.build_velocity_model,
-                         torch.rand(1, s.BINS - 1, s.MINI_SPEC_SIZE)),
-                     plot_graphs=s.PLOT_GRAPHS)
-        else:
+        elif args.train_velocity:
             training.train_velocity(nmf_params,
                                     s.VEL_HYPERPARAMS,
                                     s.WD,
                                     context=args.context,
-                                    state_dict=generic_model)
+                                    state_dict=checkpoint)
+
+    if args.redump:
+        from mpc2c import data_management
+        if args.pedaling:
+            for split in ['train', 'validation', 'test']:
+                data_management.get_loader(
+                    [split, args.context] if args.context is not None else
+                    [split], nmf_params, 'pedaling', True)
+        elif args.velocity:
+            for split in ['train', 'validation', 'test']:
+                data_management.get_loader(
+                    [split, args.context] if args.context is not None else
+                    [split], nmf_params, 'velocity', True)
 
 
 if __name__ == "__main__":

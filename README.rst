@@ -48,16 +48,16 @@ Datasets
 2. Training the generic model
 -----------------------------
 
-#. Apply NMF and extract notes for velocity estimation: ``python run.py -tv -r -c orig``
-#. Apply NMF and extract frames for pedaling estimation: ``python run.py -tp -r -c orig``
+#. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c orig``
+#. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c orig``
 #. Look for hyper-parameters for velocity using the original context: ``python
-   run.py -tv -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
+   run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
    and loss function of TODO. Note the preference for `AbsLayer` on `ReLU`.
    Learning rate: 6.41e-04
 #. Look for hyper-parameters for pedaling using the original context: ``python
-   run.py -tp -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
+   run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
    and loss function of TODO. Learning rate: 1.19e-02
-#. Fully train velocity model on the original context: ``python run.py -tv -c orig``
+#. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
    * Model: 30 parameters::
 
@@ -89,7 +89,7 @@ Datasets
    * 1.004.974 batches in training
    * 73.066 batches in validation
 
-#. Fully train pedaling model on the original context: ``python run.py -tp -c orig``
+#. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
     TODO
 
@@ -98,37 +98,42 @@ Datasets
 * option ``-r`` preprocess the dataset using NMF; it should be used only once
   per each type of model; each subsequent runs will use the already dumped
   dataset
-* option ``-r`` must be associated to some action that loads datasets (this
-  could be improved...)
-* option ``-sk`` reduces the dataset to 10% of its total; thus, ``-sk -r``
-  would result in preprocessing only that 10%
+* option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
+  1.5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
+  10% and 1.5%
 
 
 3. Training the context-specific models
 ---------------------------------------
 
-#. Apply NMF and extract notes for velocity estimation: ``python run.py -tv -r -c <context>``
-#. Apply NMF and extract frames for pedaling estimation: ``python run.py -tp -r -c <context>``
+#. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c <context>``
+#. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c <context>``
 
 -- TODO --
-#. Fully train velocity model on the original context: ``python run.py -tv -c
-   <context> -gm <path to generic model>``
-#. Fully train pedaling model on the original context: ``python run.py -tp -c
-   <context> -gm <path to generic model>``
+#. Fully train velocity model on the original context: ``python run.py -v -t -c
+   <context> -pt <path to generic model chekcpoint>``
+#. Fully train pedaling model on the original context: ``python run.py -p -t -c
+   <context> -pt <path to generic model chekcpoint>``
 
 Here ``<context>`` is any Carla preset name that you have used before.
 
-4. Testing on a specific file
------------------------------
-
--- TODO --
-
-#. Fully train velocity model on the original context: ``python run.py -tv -gm <path to generic model> -cm <path to context model> -i <input midi> <input audio>``
-
-5. Evaluating error distributions
+4. Evaluating error distributions
 ---------------------------------
 
 -- TODO --
+#. Evaluate error distributions of velocity models whose checkpoints are in a given directory: ``python run.py -v -e <list of checkpoints>``; you can use shell expansion like ``vel_*.py``
+#. Evaluate error distributions of pedaling models whose checkpoints are in a given directory: ``python run.py -p -e <list of checkpoints>``; you can use shell expansion like ``ped_*.py``
+
+These commands will create a plotly plot with violin plots of generic and
+specific contexts and Wilcoxon p-values.
+
+5. Testing on a specific file
+-----------------------------
+
+N.B. Not yet implemented!
+
+#. Fully test a velocity model on a specific audio/midi file: ``python run.py -v -pt <path to model checkpoint.pt> -i <input midi path> <input audio path>``
+#. Fully test a pedaling model on a specific audio/midi file: ``python run.py -p -pt <path to model checkpoint.pt> -i <input midi path> <input audio path>``
 
 Credits
 =======

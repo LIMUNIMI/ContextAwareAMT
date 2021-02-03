@@ -70,12 +70,11 @@ def build_pedaling_model(hpar):
 def train_pedaling(nmf_params, hpar, wd, context=None, state_dict=None):
     trainloader = data_management.get_loader(
         ['train', context] if context is not None else ['train'], nmf_params,
-        'pedaling')
+        'pedaling', False)
     validloader = data_management.get_loader(
         ['validation', context] if context is not None else ['validation'],
-        nmf_params, 'pedaling')
-    if s.REDUMP:
-        return
+        nmf_params, 'pedaling', False)
+
     model = build_pedaling_model(hpar)
     if state_dict is not None:
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
@@ -93,12 +92,10 @@ def train_pedaling(nmf_params, hpar, wd, context=None, state_dict=None):
 def train_velocity(nmf_params, hpar, wd, context=None, state_dict=None):
     trainloader = data_management.get_loader(
         ['train', context] if context is not None else ['train'], nmf_params,
-        'velocity')
+        'velocity', False)
     validloader = data_management.get_loader(
         ['validation', context] if context is not None else ['validation'],
-        nmf_params, 'velocity')
-    if s.REDUMP:
-        return
+        nmf_params, 'velocity', False)
 
     model = build_velocity_model(hpar)
 
