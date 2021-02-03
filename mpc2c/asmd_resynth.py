@@ -3,7 +3,7 @@ import os
 import pathlib
 import random
 import shutil
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import mido
 import numpy as np
@@ -13,12 +13,13 @@ from asmd import asmd
 
 
 def group_split(datasets: List[str],
-                contexts: List[str],
+                contexts: Dict[str, str],
                 context_splits: List[int],
                 groups: List[str] = ['train', 'validation', 'test']) -> dict:
     """
     Given a list of ASMD datasets which support groups, split each group in
-    sub groups, each corresponding to a context.
+    sub groups, each corresponding to a context. 'orig' can be used to
+    reference to the original context.
 
     Returns a new dict object representing an ASMD definition with the new
     groups.
@@ -36,9 +37,9 @@ def group_split(datasets: List[str],
 
         end: Optional[int]
         start: int = 0
-        for context in contexts:
-            if context == contexts[-1]:
-                # the last context
+        for context, _ in contexts:
+            if context == 'orig':
+                # the original context
                 end = None
                 ext = '.wav'
             else:
@@ -84,9 +85,9 @@ def synthesize_song(midi_path: str, audio_path: str, final_decay: float = 3):
     del player, recorder
 
 
-def trial(contexts, glob, dataset, output_path, old_install_dir, final_decay):
+def trial(contexts, dataset, output_path, old_install_dir, final_decay):
     try:
-        for i, group in enumerate(contexts):
+        for group, proj in contexts:
             print("\n------------------------------------")
             print("Working on context ", group)
             print("------------------------------------\n")
@@ -95,7 +96,6 @@ def trial(contexts, glob, dataset, output_path, old_install_dir, final_decay):
             if group != "orig":
                 server = pycarla.JackServer(['-R', '-d', 'alsa'])
                 # if this is a new context, start Carla
-                proj = glob[i]
                 carla = pycarla.Carla(proj, server, min_wait=8)
                 carla.start()
 
@@ -144,6 +144,17 @@ def trial(contexts, glob, dataset, output_path, old_install_dir, final_decay):
         return True
 
 
+def get_contexts(carla_proj: pathlib.Path):
+    glob = list(carla_proj.glob("**/*.carxp"))
+
+    # take the name of the contexts
+    contexts = {}
+    for p in glob:
+        contexts[p.stem] = p
+    contexts['orig'] = None
+    return contexts
+
+
 def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
                   output_path: pathlib.Path, metadataset_path: pathlib.Path,
                   context_splits: List[int], final_decay: float):
@@ -162,10 +173,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
 
     >>> asmd.Dataset(paths=[output_path], metadataset_path='metadataset.json')
     """
-    glob = list(carla_proj.glob("**/*.carxp"))
-
-    # take the name of the contexts
-    contexts = [p.stem for p in glob] + ['orig']
+    contexts = get_contexts(carla_proj)
 
     # split the Pathdataset Pathin contexts and save the new definition
     new_def = group_split(datasets, contexts, context_splits=context_splits)
@@ -183,7 +191,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
     dataset.metadataset['install_dir'] = str(output_path)
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
     for i in range(100):
-        if trial(contexts, glob, dataset, output_path, old_install_dir,
+        if trial(contexts, dataset, output_path, old_install_dir,
                  final_decay):
             break
 

@@ -72,6 +72,21 @@ def parse_args():
         help="Load parameters from this checkpoint and freeze the initial weights if training."
     )
     parser.add_argument(
+        "-e",
+        "--evaluate",
+        action="store",
+        type=str,
+        default=None,
+        nargs='+',
+        help="Evaluate the error distribution of model checkpoints given as argument. All contexts available in `settings.CARLA_PROJ` will be used, plus the 'orig' context. All models are evaluated on all contexts."
+    )
+    parser.add_argument(
+        "-cp",
+        "--compare",
+        action="store_true",
+        help="Only valid if `--evaluate` is used. Using this option, you can name your models starting with the context on which they were trained (e.g. `pianoteq0_vel.pt`); in this way, one more plot is created, representing the `orig` model compared to the other models on their specific context."
+    )
+    parser.add_argument(
         "-i",
         "--input",
         action="store",
@@ -129,8 +144,7 @@ def main():
             space = s.PED_SKSPACE
 
             def objective(x):
-                return training.train(nmf_params,
-                                      x,
+                return training.train(x,
                                       s.WD,
                                       'pedaling',
                                       args.context,
@@ -146,8 +160,7 @@ def main():
                 torch.rand(1, s.BINS - 1, s.MINI_SPEC_SIZE))
 
             def objective(x):
-                return training.train(nmf_params,
-                                      x,
+                return training.train(x,
                                       s.WD,
                                       'velocity',
                                       args.context,
@@ -163,16 +176,14 @@ def main():
     if args.train:
         from mpc2c import training
         if args.pedaling:
-            training.train(nmf_params,
-                           s.PED_HYPERPARAMS,
+            training.train(s.PED_HYPERPARAMS,
                            s.WD,
                            'pedaling',
                            context=args.context,
                            state_dict=checkpoint)
 
         elif args.velocity:
-            training.train(nmf_params,
-                           s.VEL_HYPERPARAMS,
+            training.train(s.VEL_HYPERPARAMS,
                            s.WD,
                            'velocity',
                            context=args.context,
@@ -182,19 +193,23 @@ def main():
         from mpc2c import data_management
         if args.pedaling:
             data_management.multiple_splits_one_context(
-                ['train', 'validation', 'test'], args.context, nmf_params,
-                'pedaling', True)
+                ['train', 'validation', 'test'], args.context,
+                'pedaling', True, nmf_params=nmf_params)
         elif args.velocity:
             data_management.multiple_splits_one_context(
-                ['train', 'validation', 'test'], args.context, nmf_params,
-                'velocity', True)
+                ['train', 'validation', 'test'], args.context,
+                'velocity', True, nmf_params=nmf_params)
 
     if args.evaluate:
         from mpc2c import evaluate
         if args.pedaling:
-            evaluate.evaluate(args.evaluate, 'pedaling', args.compare)
+            df = evaluate.evaluate(args.evaluate, 'pedaling',
+                                   'pedaling_eval.csv')
         if args.velocity:
-            evaluate.evaluate(args.evaluate, 'velocity', args.compare)
+            df = evaluate.evaluate(args.evaluate, 'velocity',
+                                   'velocity_eval.csv')
+
+        evaluate.plot_dash(evaluate.plot(df, args.compare), 8356)
 
 
 if __name__ == "__main__":

@@ -51,7 +51,10 @@ def process_velocities(i, dataset, nmf_params):
     return minispecs, velocities
 
 
-def get_loader(groups, nmf_params, mode, redump):
+def get_loader(groups, mode, redump, nmf_params=None):
+    """
+    nmf_params is needed only if `redump` is True
+    """
     dataset = asmd.Dataset(
         paths=[s.RESYNTH_DATA_PATH],
         metadataset_path=s.METADATASET_PATH).filter(groups=groups)
@@ -67,10 +70,11 @@ def get_loader(groups, nmf_params, mode, redump):
                                        not redump,
                                        num_samples=num_samples)
         # max_nbytes=None disable shared memory for large arrays
-        velocity_dataset.dump(process_velocities,
-                              nmf_params,
-                              n_jobs=s.NJOBS,
-                              max_nbytes=None)
+        if redump:
+            velocity_dataset.dump(process_velocities,
+                                  nmf_params,
+                                  n_jobs=s.NJOBS,
+                                  max_nbytes=None)
         return DataLoader(velocity_dataset,
                           batch_size=s.VEL_BATCH_SIZE,
                           num_workers=s.NJOBS,
@@ -83,10 +87,11 @@ def get_loader(groups, nmf_params, mode, redump):
                                        not redump,
                                        num_samples=None)
         # max_nbytes=None disable shared memory for large arrays
-        pedaling_dataset.dump(process_pedaling,
-                              nmf_params,
-                              n_jobs=s.NJOBS,
-                              max_nbytes=None)
+        if redump:
+            pedaling_dataset.dump(process_pedaling,
+                                  nmf_params,
+                                  n_jobs=s.NJOBS,
+                                  max_nbytes=None)
         return DataLoader(pedaling_dataset,
                           batch_size=s.PED_BATCH_SIZE,
                           num_workers=s.NJOBS,
@@ -94,10 +99,10 @@ def get_loader(groups, nmf_params, mode, redump):
                           collate_fn=pad_collate)
 
 
-def multiple_splits_one_context(splits, context, *args):
+def multiple_splits_one_context(splits, context, *args, **kwargs):
     ret = []
     for split in splits:
         ret.append(
             get_loader([split, context] if context is not None else [split],
-                       *args))
+                       *args, **kwargs))
     return *ret

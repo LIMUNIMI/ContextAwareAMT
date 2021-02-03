@@ -4,119 +4,9 @@ from typing import Callable, Optional
 
 import numpy as np
 import torch
-from joblib import Parallel, delayed
 from tqdm import tqdm
 
 from . import context
-from .data import DatasetDump
-
-
-def compute_average(dataloader, *axes: int, **joblib_kwargs):
-    """
-    A functional interface to AveragePredictor using dataloaders
-    """
-    predictor = AveragePredictor(*axes)
-    predictor.add_dataloader(dataloader, **joblib_kwargs)
-    return predictor.predict()
-
-
-class AveragePredictor(object):
-    """
-    A simple predictor which computes an average and use that one for any
-    sample
-     Doesn't support multiple targets for now.
-
-    Example:
-
-    .. code:
-        predictor = AveragePredictor()
-        for sample in samples:
-            predictor.add_to_average(sample)
-        predictor.predict()
-
-        # if you add other samples, you also need to manually update the
-        # tracking average:
-        for sample in new_samples:
-            predictor.add_to_average(sample)
-        predictor.update_tracking_avg()
-        predictor.predict()
-    """
-
-    def __init__(self, *axes: int):
-        """
-        `axes` : int
-            the axes along which the data will be summed
-        """
-        self.axes = axes
-        self.__sum_values__: torch.Tensor = None
-        self.__counter__: int = 0
-
-    def update_tracking_avg(self):
-        self.__avg__ = self.__sum_values__ / self.__counter__
-        for ax in self.axes:
-            self.__avg__ = self.__avg__.unsqueeze(ax)
-
-    def add_to_average(self, sample: torch.Tensor, update_tracking_avg=False):
-        if self.__sum_values__ is None:
-            self.__sum_values__ = sample.sum(dim=self.axes)
-        else:
-            self.__sum_values__ += sample.sum(dim=self.axes)
-        # computing the number of elements that were summed
-        if self.axes:
-            size = 1
-            for ax in self.axes:
-                size *= sample.shape[ax]
-        else:
-            size = sample.numel()
-
-        self.__counter__ += size
-        if update_tracking_avg:
-            self.update_tracking_avg()
-
-    def add_dataloader(self, dataset: DatasetDump,
-                       **joblib_kwargs):
-        """
-        Add the targets retrieved by the DatasetDump object.
-
-        `joblib_kwargs` are keyword arguments for joblib.Parallel
-
-        N.B. DatasetDump allows to iterate over targets only, making the
-        loading of data much lighter.
-        """
-
-        def proc(self, targets):
-            self.add_to_average(targets[None])
-            # for i, target in enumerate(targets):
-            #     if lens[i] == torch.tensor(False):
-            #         # None here so that the batch dimension is kept and the
-            #         # predicted value still has it
-            #         self.add_to_average(target[None])
-            #     else:
-            #         for batch, L in enumerate(lens[i]):
-            #             # None here so that the batch dimension is kept and the
-            #             # predicted value still has it
-            #             self.add_to_average(target[None, batch, :L])
-            return self.__sum_values__, self.__counter__
-
-        out = Parallel(**joblib_kwargs)(
-            delayed(proc)(type(self)(*self.axes), targets)
-            for targets in dataset.itertargets())
-
-        # `out` is:
-        #   List[Tuple[float, float]]
-        # `*out` is:
-        #   Tuple[float, float], Tuple[float, float], Tuple[float, float], ...
-        # `zip(*out)` is:
-        #   Tuple[float, float, float, ...], Tuple[float, float, float, ...]
-        out = list(zip(*out))
-        self.__sum_values__ = sum(out[0])
-        self.__counter__ = sum(out[1])
-        self.update_tracking_avg()
-
-    def predict(self, *x):
-        if not hasattr(self, '__avg__'):
-            self.update_tracking_avg()
-        return self.__avg__
 
 
 def count_params(model):
@@ -124,6 +14,23 @@ def count_params(model):
     Compute the number of parameters
     """
     return sum([p.numel() for p in model.parameters() if p.requires_grad])
+
+
+def make_loss_func(loss_func):
+    def _loss_fn(x, y, lens):
+        x, y, lens = x[0], y[0], lens[0]
+
+        if lens == torch.tensor(False):
+            # if `lens` is False, then it's like note_level
+            x = x[..., 0, 0]
+            return loss_func(x, y)
+
+        loss = torch.zeros(len(lens))
+        for batch, L in enumerate(lens):
+            loss[batch] = loss_func(x[batch, :L], y[batch, :L])
+        return loss
+
+    return _loss_fn
 
 
 def train_epochs(model,

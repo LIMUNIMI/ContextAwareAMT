@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from . import data_management, feature_extraction
 from . import settings as s
-from .mytorchutils import compute_average, count_params, train_epochs
+from .mytorchutils import compute_average, count_params, train_epochs, make_loss_func
 
 
 def model_test(model_build_func, test_sample):
@@ -67,8 +67,7 @@ def build_pedaling_model(hpar):
     return m
 
 
-def train(nmf_params,
-          hpar,
+def train(hpar,
           wd,
           mode,
           context=None,
@@ -76,7 +75,7 @@ def train(nmf_params,
           copy_checkpoint=True):
     # loaders
     trainloader, validloader = data_management.multiple_splits_one_context(
-        ['train', 'validation'], context, nmf_params, mode, False)
+        ['train', 'validation'], context, mode, False)
 
     # building model
     if mode == 'velocity':
@@ -101,22 +100,6 @@ def train(nmf_params,
     optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 
     # loss functions
-    def make_loss_func(loss_func):
-        def _loss_fn(x, y, lens):
-            x, y, lens = x[0], y[0], lens[0]
-
-            if lens == torch.tensor(False):
-                # if `lens` is False, then it's like note_level
-                x = x[..., 0, 0]
-                return loss_func(x, y)
-
-            loss = torch.zeros(len(lens))
-            for batch, L in enumerate(lens):
-                loss[batch] = loss_func(x[batch, :L], y[batch, :L])
-            return loss
-
-        return _loss_fn
-
     trainloss_fn = make_loss_func(F.l1_loss)
     validloss_fn = make_loss_func(F.l1_loss)
 
@@ -134,3 +117,5 @@ def train(nmf_params,
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
 
     return train_loss + complexity_loss
+
+

@@ -93,6 +93,9 @@ Datasets
 
     TODO
 
+#. After each training, you will find a file named `checkpoint0.????.pt`
+   containing the checkpoint with the trained parameters. Save it somewhere.
+
 ---
 
 * option ``-r`` preprocess the dataset using NMF; it should be used only once
@@ -114,6 +117,8 @@ Datasets
    <context> -pt <path to generic model chekcpoint>``
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c
    <context> -pt <path to generic model chekcpoint>``
+#. After each training, you will find a file named `checkpoint0.????.pt`
+   containing the checkpoint with the trained parameters. Save theme somewhere.
 
 Here ``<context>`` is any Carla preset name that you have used before.
 
@@ -121,11 +126,15 @@ Here ``<context>`` is any Carla preset name that you have used before.
 ---------------------------------
 
 -- TODO --
-#. Evaluate error distributions of velocity models whose checkpoints are in a given directory: ``python run.py -v -e <list of checkpoints>``; you can use shell expansion like ``vel_*.py``
-#. Evaluate error distributions of pedaling models whose checkpoints are in a given directory: ``python run.py -p -e <list of checkpoints>``; you can use shell expansion like ``ped_*.py``
+#. Evaluate error distributions of velocity models whose checkpoints are in a given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can use shell expansion like ``models/*_vel.pt``
+#. Evaluate error distributions of pedaling models whose checkpoints are in a given directory: ``python run.py -p -e <list of checkpoints> -cp``; you can use shell expansion like ``models/*_ped.pt``
 
-These commands will create a plotly plot with violin plots of generic and
+These commands will create a plotly plots with violin plots of generic and
 specific contexts and Wilcoxon p-values.
+
+Note that the usage of ``-cp`` is only possible if you name your checkpoints
+with the relative context in the initial part of the filename (e.g.
+``models/pianoteq0_vel.pt``).
 
 5. Testing on a specific file
 -----------------------------
