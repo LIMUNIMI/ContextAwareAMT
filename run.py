@@ -94,7 +94,6 @@ def load_nmf_params():
 def main():
 
     args = parse_args()
-    s.REDUMP = args.redump
 
     if args.input:
         raise NotImplementedError(

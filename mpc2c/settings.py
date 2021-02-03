@@ -47,8 +47,6 @@ NMF_COST_FUNC = 'EucDist'
 EPS_RANGE = 0
 #: value used for range around activations
 EPS_ACTIVATIONS = 0
-#: if True, recreate data (also set by --redump)
-REDUMP = False
 
 # MAKE_TEMPLATE
 #: how many basis use in total (except the last one)
