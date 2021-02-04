@@ -1,7 +1,6 @@
 import pathlib
 
 import essentia as es
-from asmd import asmd
 from torch.utils.data import DataLoader
 
 from . import nmf
@@ -55,6 +54,7 @@ def get_loader(groups, mode, redump, nmf_params=None):
     """
     nmf_params is needed only if `redump` is True
     """
+    from asmd import asmd
     dataset = asmd.Dataset(
         paths=[s.RESYNTH_DATA_PATH],
         metadataset_path=s.METADATASET_PATH).filter(groups=groups)
@@ -105,4 +105,6 @@ def multiple_splits_one_context(splits, context, *args, **kwargs):
         ret.append(
             get_loader([split, context] if context is not None else [split],
                        *args, **kwargs))
-    return *ret
+    if len(ret) == 1:
+        ret = ret[0]
+    return ret
