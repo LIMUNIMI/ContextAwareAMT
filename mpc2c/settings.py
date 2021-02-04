@@ -68,8 +68,8 @@ VEL_HYPERPARAMS = {
     'lstm_layers': 0,
     'lstm_hidden_size': 0,
     'middle_features': 0,
-    "kernel_0": 3,
-    "kernel_1": 4,
+    "kernel_0": 4,
+    "kernel_1": 3,
     "middle_activation": AbsLayer,
     "k": 1
 }

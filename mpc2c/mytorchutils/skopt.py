@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Tuple
 from pprint import pprint
 
-import matplotlib.pyplot as plt
-
 import skopt
 from skopt import load, plots
 from skopt.callbacks import CheckpointSaver, VerboseCallback
@@ -111,6 +109,7 @@ class SKOptimizer(object):
             return None
 
     def plot(self):
+        import matplotlib.pyplot as plt
         if not self.plot_graphs:
             return
         print("Plotting a res object, open visdom on localhost!")

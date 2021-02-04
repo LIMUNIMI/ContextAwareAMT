@@ -1,5 +1,4 @@
 import json
-import os
 import pathlib
 import random
 import shutil
@@ -9,7 +8,6 @@ import mido
 import numpy as np
 
 import pycarla
-from asmd import asmd
 
 
 def group_split(datasets: List[str],
@@ -25,6 +23,7 @@ def group_split(datasets: List[str],
     groups.
     """
 
+    from asmd import asmd
     dataset = asmd.Dataset().filter(datasets=datasets)
     new_definition = {"songs": [], "name": "new_def"}
     for i, group in enumerate(groups):
@@ -173,6 +172,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
 
     >>> asmd.Dataset(paths=[output_path], metadataset_path='metadataset.json')
     """
+    from asmd import asmd
     contexts = get_contexts(carla_proj)
 
     # split the Pathdataset Pathin contexts and save the new definition

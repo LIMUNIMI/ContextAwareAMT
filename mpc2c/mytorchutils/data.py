@@ -5,7 +5,6 @@ import torch
 import torch.nn.functional as F
 
 from torch.utils.data import Dataset as TorchDataset
-from asmd import asmd
 
 
 class DatasetDump(TorchDataset):
@@ -32,7 +31,7 @@ class DatasetDump(TorchDataset):
     """
 
     def __init__(self,
-                 dataset: asmd.Dataset,
+                 dataset,
                  root: str,
                  dumped: bool = False,
                  num_samples=None,

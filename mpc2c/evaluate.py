@@ -1,16 +1,17 @@
 import typing as T
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn.functional as F
+from scipy.stats import wilcoxon
 
 from . import settings as s
 from .asmd_resynth import get_contexts
 from .data_management import multiple_splits_one_context
 from .mytorchutils import make_loss_func, test
-from .train import build_pedaling_model, build_velocity_model
+from .training import build_pedaling_model, build_velocity_model
 
 
 def evaluate(checkpoints: T.Dict[str, T.Any], mode: str, fname: str):
@@ -70,53 +71,89 @@ def plot(df: pd.DataFrame, compare: bool):
     """
     `df` is a dataframe with columns the contexts + one column where the
     checkpoint of each result is stored.
-
-    TODO: add p-values
     """
     import plotly.express as px
     figs = []
-    # plotting all contexts for each checkpoint
+    contexts = [context for context in df.columns if context != 'checkpoint']
     checkpoints = df['checkpoint'].unique()
+
+    # plotting all contexts for each checkpoint
     for checkpoint in checkpoints:
+        # this is needed because colors are given by a column with labels,
+        # otherwise all violins have the same color
+        cdf = df[df['checkpoint'] ==
+                 checkpoint][contexts].stack().reset_index()
+        cdf = cdf.rename({0: 'value', 'level_1': 'context'}, axis='columns')
         figs.append(
-            px.violin(df[df['checkpoint'] == checkpoint],
-                      x=[
-                          context for context in df.columns
-                          if context != 'checkpoint'
-            ],
+            px.violin(
+                cdf,
+                y='value',
+                color='context',
+                box=True,
+                # points='all',
+                range_y=[0, 1],
                 title=f"{checkpoint}"))
 
     # plotting all checkpoints for each context
-    for context in df.columns:
-        if context == 'checkpoint':
-            continue
+    for context in contexts:
         figs.append(
-            px.violin(df[context, 'checkpoint'],
-                      x='checkpoint',
-                      title=f"{context}"))
+            px.violin(
+                df[[context, 'checkpoint']],
+                y=context,
+                # x='checkpoint',
+                color='checkpoint',
+                box=True,
+                # points='all',
+                range_y=[0, 1],
+                title=f"{context}"))
 
-    if not compare:
-        return figs
-    # plotting generic vs specific model
-    # creating a new dataframe where rows are only kept if the checkpoint
-    # string representation starts with the context string representation or
-    # with 'orig'.  Deleted values are set to nan. The 'orig' column is also
-    # deleted.
-    del df['orig']
-    for checkpoint in checkpoints:
-        cols_to_delete = [
-            col for col in df.columns()
-            if col != 'checkpoint' and checkpoint.startswith(col)
+    if compare:
+        # plotting generic vs specific model
+        # creating a new dataframe where rows are only kept if the checkpoint
+        # string representation starts with the context string representation
+        # or with 'orig'.  Deleted values are set to nan. The 'orig' column is
+        # also deleted.
+        del df['orig']
+        contexts = [
+            context for context in df.columns if context != 'checkpoint'
         ]
-        # TODO check that the following effectively modifies df
-        df[df['checkpoint'] == checkpoint][cols_to_delete] = None
+        for checkpoint in checkpoints:
+            cols_to_delete = [
+                col for col in df.columns if col != 'checkpoint'
+                and not checkpoint.startswith((col, 'orig'))
+            ]
+            df.loc[df['checkpoint'] == checkpoint, cols_to_delete] = None
+            # changing name to this checkpoint as it will only be used for its
+            # own context
+            if len(cols_to_delete) > 0:
+                df.loc[df['checkpoint'] == checkpoint,
+                       'checkpoint'] = 'transfer-learning'
 
-    figs.append(
-        px.violin(
+        fig = px.violin(
             df,
-            x=[context for context in df.columns if context != 'checkpoint'],
-            groups='checkpoint',
-            title="transfer-learning effect"))
+            # x=contexts,
+            color='checkpoint',
+            box=True,
+            # points='all',
+            range_y=[0, 1],
+            title="transfer-learning effect")
+
+        # adding pvals
+        for n, context in enumerate(contexts):
+            cdf = df[[context, 'checkpoint']].dropna()
+            x = cdf[context]
+            y = cdf[cdf['checkpoint'].str.startswith('orig')][context]
+            L = min(len(x), len(y))
+            _stat, pval = wilcoxon(x[:L], y[:L])
+            fig.add_annotation(x=n,
+                               y=1,
+                               align='center',
+                               text=f"p={pval:.4f}",
+                               showarrow=False)
+
+        figs.append(fig)
+
+    # TODO: save figs to svgs...
 
     return figs
 
