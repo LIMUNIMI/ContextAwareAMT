@@ -51,9 +51,10 @@ Datasets
 #. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c orig``
 #. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c orig``
 #. Look for hyper-parameters for velocity using the original context: ``python
-   run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
-   and loss function of TODO. Note the preference for `AbsLayer` on `ReLU`.
-   Learning rate: 6.41e-04
+   run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py``
+   and loss function of 0.10486 (about like the dummy predictor but there is
+   the complexity cost!). Note the preference for `AbsLayer` on both `ReLU` and
+   `Identity`.  Learning rate: 6.41e-04.
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
    and loss function of TODO. Learning rate: 1.19e-02
