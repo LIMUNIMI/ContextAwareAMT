@@ -7,7 +7,7 @@ import numpy as np
 import plotly.graph_objects as go
 import pretty_midi as pm
 
-from .spectrogram import Spectrometer, peaks_enhance
+from .essentiaspec import Spectrometer, peaks_enhance
 
 
 def make_template(scale_path: Tuple[str, str],

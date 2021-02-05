@@ -2,7 +2,7 @@ import torch
 from skopt import space
 from torch import nn
 
-from . import spectrogram
+from . import essentiaspec
 from .feature_extraction import AbsLayer
 
 # PATHS
@@ -27,12 +27,15 @@ HOP_SIZE = 512
 NJOBS = 5
 # number of mfcc
 BINS = 13
-SPEC = spectrogram.Spectrometer(FRAME_SIZE,
-                                SR,
-                                hop=HOP_SIZE,
-                                transform=spectrogram.Transform.PowerSpectrum,
-                                proctransform=spectrogram.ProcTransform.NONE)
-MFCC = spectrogram.ProcTransform.MFCC(SR, FRAME_SIZE // 2 + 1, logType='dbpow')
+SPEC = essentiaspec.Spectrometer(
+    FRAME_SIZE,
+    SR,
+    hop=HOP_SIZE,
+    transform=essentiaspec.Transform.PowerSpectrum,
+    proctransform=essentiaspec.ProcTransform.NONE)
+MFCC = essentiaspec.ProcTransform.MFCC(SR,
+                                       FRAME_SIZE // 2 + 1,
+                                       logType='dbpow')
 RETUNING = False
 
 # NMF
