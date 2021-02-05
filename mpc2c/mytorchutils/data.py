@@ -1,9 +1,10 @@
 import pathlib
+from typing import Callable, Optional
+
 import numpy as np
 
 import torch
 import torch.nn.functional as F
-
 from torch.utils.data import Dataset as TorchDataset
 
 
@@ -24,10 +25,14 @@ class DatasetDump(TorchDataset):
 
     Arguments
     ----------
-        `num_samples` : list[int] or None
-            a list containing the number of samples in each song (e.g. number
-            of notes, frames or whatelse depending on what is your concept of
-            sample); if `None` (default), one sample per song is considered
+    `num_samples` : list[int] or None
+        a list containing the number of samples in each song (e.g. number
+        of notes, frames or whatelse depending on what is your concept of
+        sample); if `None` (default), one sample per song is considered
+
+    `process_fn` : Callable or None
+        a function that will be used to process songs if the dataset has not
+        been dumped. It should only accept an int and an `asmd.Dataset` object.
     """
 
     def __init__(self,
@@ -35,11 +40,19 @@ class DatasetDump(TorchDataset):
                  root: str,
                  dumped: bool = False,
                  num_samples=None,
-                 folder_size=1500):
+                 folder_size=1500,
+                 process_fn: Optional[Callable] = None):
         super().__init__()
         self.dataset = dataset
         self.dumped = dumped
         self.root = pathlib.Path(root)
+        self.process_fn = process_fn
+        if self.process_fn is not None:
+            # setup stuffs for iterate samples over songs
+            self.__song_iter__ = iter(range(len(dataset.paths)))
+            self.__counter__ = 0
+            self.__xx__: list = []
+            self.__yy__: list = []
         if not num_samples:
             self.num_samples = [1] * len(self.dataset)
         else:
@@ -109,9 +122,22 @@ class DatasetDump(TorchDataset):
         return x
 
     def __getitem__(self, i):
-        assert self.dumped, "Dataset not dumped!"
-        x = self.get_input(i)
-        y = self.get_target(i)
+        if self.dumped:
+            x = self.get_input(i)
+            y = self.get_target(i)
+        elif self.process_fn is not None:
+            if self.__counter__ == len(self.__xx__):
+                # reset counter and load new song
+                self.__xx__, self.__yy__ = self.process_fn(
+                    next(self.__song_counter__), self.dataset)
+                self.__counter__ = 0
+            # increase counter and return new sample from the already loaded
+            # song
+            x = self.__xx__[self.__counter__]
+            y = self.__yy__[self.__counter__]
+            self.__counter__ += 1
+        else:
+            raise RuntimeError("Dataset not dumped and no `process_fn` known")
         return x, y
 
     def __len__(self):
@@ -141,9 +167,21 @@ def pad_collate(batch):
     x_pad = torch.stack(xx)
     y_pad = torch.stack(yy)
 
-    return [x_pad, ], [y_pad, ], [lens, ]
+    return [
+        x_pad,
+    ], [
+        y_pad,
+    ], [
+        lens,
+    ]
 
 
 def dummy_collate(batch):
     xx, yy = zip(*batch)
-    return [torch.stack(xx), ], [torch.stack(yy), ], [torch.tensor(False), ]
+    return [
+        torch.stack(xx),
+    ], [
+        torch.stack(yy),
+    ], [
+        torch.tensor(False),
+    ]
