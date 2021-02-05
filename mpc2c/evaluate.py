@@ -15,6 +15,7 @@ from .training import build_pedaling_model, build_velocity_model
 
 
 def evaluate(checkpoints: T.Dict[str, T.Any], mode: str, fname: str):
+    # TODO: Not yet tested!
 
     evaluation = []
     contexts: T.List[str] = get_contexts(s.CARLA_PROJ)
@@ -42,6 +43,8 @@ def evaluate(checkpoints: T.Dict[str, T.Any], mode: str, fname: str):
 
 
 def eval_model_context(model: torch.nn.Module, context: str, mode: str):
+    # TODO: Not yet tested!
+
     testloader = multiple_splits_one_context(['test'], context, mode, False)
     loss, predictions = test(model,
                              testloader,
