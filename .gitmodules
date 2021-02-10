@@ -4,3 +4,6 @@
 [submodule "mpc2c/essentiaspec"]
 	path = mpc2c/essentiaspec
 	url = https://gitlab.di.unimi.it/federicosimonetta/essentiaspec
+[submodule "mpc2c/asmd"]
+	path = mpc2c/asmd
+	url = https://github.com/LIMUNIMI/ASMD/
