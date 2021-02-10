@@ -56,43 +56,45 @@ Datasets
    the complexity cost!). Note the preference for `AbsLayer` on both `ReLU` and
    `Identity`.  Learning rate: 6.41e-04.
 #. Look for hyper-parameters for pedaling using the original context: ``python
-   run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py`` (TODO)
-   and loss function of TODO. Learning rate: 1.19e-02
+   run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
+   and loss function of 0.18612. Learning rate: 1.19e-02. Note the preference
+   for `Identity` on `ReLU`.
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
-
-   * Model: 30 parameters::
-
-      MIDIParameterEstimation(
-        (stack): Sequential(
-          (0): Conv2d(1, 1, kernel_size=(3, 4), stride=(1, 1), bias=False)
-          (1): Identity()
-          (2): AbsLayer()
-          (3): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-          (4): Identity()
-          (5): AbsLayer()
-          (6): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-          (7): Identity()
-          (8): AbsLayer()
-          (9): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-          (10): Identity()
-          (11): AbsLayer()
-          (12): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-          (13): Identity()
-          (14): AbsLayer()
-          (15): Conv2d(1, 1, kernel_size=(2, 2), stride=(1, 1), bias=False)
-          (16): Sigmoid()
-          (17): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
-        )
-      )
 
    * Dummy loss: 0.12082
    * Validation loss: TODO (TODO epochs, early-stop)
    * 1.004.974 batches in training
    * 73.066 batches in validation
+   * Learning rate: TODO
+   * TODO parameters::
+
+    TODO
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-    TODO
+   * Dummy loss:
+   * Validation loss: TODO (TODO epochs, early-stop)
+   * 847 batches in training
+   * 77 batches in validation
+   * Learning rate: 1.18e-2
+   * 2358 parameters::
+
+    MIDIParameterEstimation(
+      (stack): Sequential(
+        (0): Conv2d(1, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
+        (1): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (2): Identity()
+        (3): Conv2d(16, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
+        (4): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (5): Identity()
+        (6): Conv2d(16, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
+        (7): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (8): Identity()
+        (9): Conv2d(16, 3, kernel_size=(3, 1), stride=(1, 1), bias=False)
+        (10): Sigmoid()
+        (11): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
+      )
+    )
 
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save it somewhere.

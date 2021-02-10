@@ -80,14 +80,16 @@ def train(hpar,
     # building model
     if mode == 'velocity':
         model = build_velocity_model(hpar)
+        axes = []
     elif mode == 'pedaling':
         model = build_pedaling_model(hpar)
+        axes = [-1]
     if state_dict is not None:
         model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
         model.freeze(s.FREEZE_PORTION)
 
     # dummy model (baseline)
-    dummy_avg = compute_average(trainloader.dataset, n_jobs=s.NJOBS)
+    dummy_avg = compute_average(trainloader.dataset, *axes, n_jobs=1)
 
     print(model)
     print("Total number of parameters: ", count_params(model))

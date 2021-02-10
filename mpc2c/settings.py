@@ -77,10 +77,12 @@ VEL_HYPERPARAMS = {
     "k": 1
 }
 PED_HYPERPARAMS = {
-    'lstm_hidden_size': 0,
     'lstm_layers': 0,
-    'middle_features': 1,
-    "kernel_0": 3,
+    'lstm_hidden_size': 0,
+    'middle_features': 4,
+    "kernel_0": 4,
+    "middle_activation": nn.Identity,
+    "k": 1
 }
 VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1
