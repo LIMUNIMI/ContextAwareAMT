@@ -54,7 +54,7 @@ def get_loader(groups, mode, redump, nmf_params=None):
     """
     nmf_params is needed only if `redump` is True
     """
-    from .mpc2c.asmd.asmd import asmd
+    from .asmd.asmd import asmd
     dataset = asmd.Dataset(
         paths=[s.RESYNTH_DATA_PATH],
         metadataset_path=s.METADATASET_PATH).filter(groups=groups)
