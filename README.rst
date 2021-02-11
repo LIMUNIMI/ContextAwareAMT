@@ -119,15 +119,41 @@ Datasets
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c
    <context> -pt <path to generic model chekcpoint>``
-   
-   * Learning rate: 0.05
+
+   * Learning rate: 0.25
    * Training 20 batches, validation 10 batches
+   * Retrained parameters: 150 (last 2 conv layers)
 
    #. pianoteq0:
 
       * Dummy loss: 0.2521
       * Validation loss: 0.1775 (202 epochs with early-stop)
-   
+
+   #. pianoteq1:
+
+      * Dummy loss: 0.2761
+      * Validation loss: 0.2152 (77 epochs with early-stop)
+
+   #. pianoteq2:
+
+      * Dummy loss: 0.2566
+      * Validation loss: 0.2088 (178 epochs with early-stop)
+
+   #. pianoteq3:
+
+      * Dummy loss: 0.2771
+      * Validation loss: 0.2423 (72 epochs with early-stop)
+
+   #. salamander0:
+
+      * Dummy loss: 0.2621
+      * Validation loss: 0.2349 (78 epochs with early-stop)
+
+   #. salamander1:
+
+      * Dummy loss: 0.2628
+      * Validation loss: 0.2295 (87 epochs with early-stop)
+
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save theme somewhere.
 
