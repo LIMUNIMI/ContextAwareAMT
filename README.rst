@@ -72,8 +72,8 @@ Datasets
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss:
-   * Validation loss: TODO (TODO epochs, early-stop)
+   * Dummy loss: 0.26400
+   * Validation loss: 0.20987 (362 epochs with early-stop)
    * 847 batches in training
    * 77 batches in validation
    * Learning rate: 1.18e-2
