@@ -21,9 +21,9 @@ scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch=
 pycarla = "0.1.2"
 pandas = "^1.2.1"
 matplotlib = "^3.3.4"
-# TODO: add asmd
-
 dash = "^1.19.0"
+kaleido = "0.1.0.post1"
+
 [tool.poetry.dev-dependencies]
 jedi = "<0.18.0"
 ipdb = "^0.13.4"

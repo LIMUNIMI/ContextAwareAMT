@@ -44,12 +44,16 @@ Datasets
 #. Create the MIDI file for the initial template: ``python run.py -sc``
 #. Synthesize the midi scale and name it ``pianoteq_scales.mp3`` (TODO: resynthesize using pycarla)
 #. Compute the initial template and save it to file: ``python run.py --template``
+#. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c orig``
+#. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c orig``
+
+   * Train set: 20 songs for specific contexts, 847 for the orig
+   * Validation set: 10 songs for specific contexts, 77 for the orig
+   * Test set: 25 songs for specific contexts, 28 for the orig
 
 2. Training the generic model
 -----------------------------
 
-#. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c orig``
-#. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c orig``
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py``
    and loss function of 0.10486 (about like the dummy predictor but there is
@@ -112,8 +116,6 @@ Datasets
 3. Training the context-specific models
 ---------------------------------------
 
-#. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c <context>``
-#. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c <context>``
 #. Fully train velocity model on the original context: ``python run.py -v -t -c
    <context> -pt <path to generic model chekcpoint>``
 

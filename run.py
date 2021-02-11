@@ -193,23 +193,33 @@ def main():
         from mpc2c import data_management
         if args.pedaling:
             data_management.multiple_splits_one_context(
-                ['train', 'validation', 'test'], args.context,
-                'pedaling', True, nmf_params=nmf_params)
+                ['train', 'validation', 'test'],
+                args.context,
+                'pedaling',
+                True,
+                nmf_params=nmf_params)
         elif args.velocity:
             data_management.multiple_splits_one_context(
-                ['train', 'validation', 'test'], args.context,
-                'velocity', True, nmf_params=nmf_params)
+                ['train', 'validation', 'test'],
+                args.context,
+                'velocity',
+                True,
+                nmf_params=nmf_params)
 
     if args.evaluate:
         from mpc2c import evaluate
         if args.pedaling:
-            df = evaluate.evaluate(args.evaluate, 'pedaling',
-                                   'pedaling_eval.csv')
-        if args.velocity:
-            df = evaluate.evaluate(args.evaluate, 'velocity',
-                                   'velocity_eval.csv')
+            mode = 'pedaling'
+        elif args.velocity:
+            mode = 'velocity'
+        dfs = evaluate.evaluate(args.evaluate, mode, Path(s.RESULT_PATH))
 
-        evaluate.plot_dash(evaluate.plot(df, args.compare), 8356)
+        for i, df in enumerate(dfs):
+            evaluate.plot_dash(
+                evaluate.plot(df,
+                              args.compare,
+                              save=Path(s.IMAGES_PATH) / f"{mode}_eval.{i}"),
+                8356 + i)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,8 @@ METADATASET_PATH = './metadataset.json'
 SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
 CARLA_PROJ = './carla_proj'
 TEMPLATE_PATH = 'nmf_template.pkl'
+IMAGES_PATH = './images/'
+RESULT_PATH = './result/'
 
 # resynthesis of the datasets
 DATASETS = ["Maestro"]
