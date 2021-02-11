@@ -68,33 +68,33 @@ Datasets
    * Learning rate: TODO
    * TODO parameters::
 
-    TODO
+      TODO
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss: 0.26400
-   * Validation loss: 0.20987 (362 epochs with early-stop)
+   * Dummy loss: 0.2640
+   * Validation loss: 0.2098 (362 epochs with early-stop)
    * 847 batches in training
    * 77 batches in validation
    * Learning rate: 1.18e-2
    * 2358 parameters::
 
-    MIDIParameterEstimation(
-      (stack): Sequential(
-        (0): Conv2d(1, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
-        (1): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (2): Identity()
-        (3): Conv2d(16, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
-        (4): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (5): Identity()
-        (6): Conv2d(16, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
-        (7): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (8): Identity()
-        (9): Conv2d(16, 3, kernel_size=(3, 1), stride=(1, 1), bias=False)
-        (10): Sigmoid()
-        (11): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
+      MIDIParameterEstimation(
+        (stack): Sequential(
+          (0): Conv2d(1, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
+          (1): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (2): Identity()
+          (3): Conv2d(16, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
+          (4): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (5): Identity()
+          (6): Conv2d(16, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
+          (7): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (8): Identity()
+          (9): Conv2d(16, 3, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (10): Sigmoid()
+          (11): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
+        )
       )
-    )
 
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save it somewhere.
@@ -114,12 +114,20 @@ Datasets
 
 #. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c <context>``
 #. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c <context>``
-
--- TODO --
 #. Fully train velocity model on the original context: ``python run.py -v -t -c
    <context> -pt <path to generic model chekcpoint>``
+
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c
    <context> -pt <path to generic model chekcpoint>``
+   
+   * Learning rate: 0.05
+   * Training 20 batches, validation 10 batches
+
+   #. pianoteq0:
+
+      * Dummy loss: 0.2521
+      * Validation loss: 0.1775 (202 epochs with early-stop)
+   
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save theme somewhere.
 
