@@ -92,9 +92,14 @@ DTYPE = torch.float32
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
+LR_K = 10
 
-TRANSFER_PORTION = 1
-FREEZE_PORTION = 0
+# Transfer-learning
+PED_TRANSFER_LAYERS = 9
+PED_FREEZE_LAYERS = 9
+VEL_TRANSFER_LAYERS = 11
+VEL_FREEZE_LAYERS = 11
+TRANSFER_LR_K = 5
 
 # SKOPT
 VEL_SKSPACE = [

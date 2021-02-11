@@ -81,12 +81,19 @@ def train(hpar,
     if mode == 'velocity':
         model = build_velocity_model(hpar)
         axes = []
+        transfer_layers = s.VEL_TRANSFER_LAYERS
+        freeze_layers = s.VEL_FREEZE_LAYERS
     elif mode == 'pedaling':
         model = build_pedaling_model(hpar)
         axes = [-1]
+        transfer_layers = s.PED_TRANSFER_LAYERS
+        freeze_layers = s.PED_FREEZE_LAYERS
     if state_dict is not None:
-        model.load_state_dict(state_dict, end=s.TRANSFER_PORTION)
-        model.freeze(s.FREEZE_PORTION)
+        model.load_state_dict(state_dict, end=transfer_layers)
+        model.freeze(freeze_layers)
+        lr_k = s.TRANSFER_LR_K
+    else:
+        lr_k = s.LR_K
 
     # dummy model (baseline)
     dummy_avg = compute_average(trainloader.dataset, *axes, n_jobs=1)
@@ -95,7 +102,7 @@ def train(hpar,
     print("Total number of parameters: ", count_params(model))
 
     # learning rate
-    lr = 10 / len(trainloader)
+    lr = lr_k / len(trainloader)
     print(f"Using learning rate {lr:.2e}")
 
     # optimizer
