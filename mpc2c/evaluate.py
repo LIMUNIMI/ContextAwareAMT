@@ -224,8 +224,7 @@ def plot(df: pd.DataFrame,
                          'values'].sample(frac=1)
             y = data.loc[data['checkpoint'] == 'orig_ped',
                          'values'].sample(frac=1)
-            L = min(len(x), len(y))
-            _stat, pval = wilcoxon(x[:L], y[:L])
+            _stat, pval = wilcoxon(x, y)
             fig.add_annotation(x=n,
                                y=-0.1,
                                align='center',
@@ -234,23 +233,24 @@ def plot(df: pd.DataFrame,
 
         figs.append(fig)
 
-    # change box-plot colors
+    # change box-plot styles
     for fig in figs:
         for data in fig.data:
-            data.box.line.color = 'white'
+            data.box.line.color = 'rgba(255, 255, 255, 0.5)'
+            data.box.line.width = 1
 
     # saving figures to svg files
     if save:
-        write_figs(figs, save)
+        write_figs(figs, save, ext)
 
     return figs
 
 
-def write_figs(figs, save):
+def write_figs(figs, save, ext):
     print(" 4. Saving figures")
     save.mkdir(parents=True, exist_ok=True)
     for fig in figs:
-        fname = str(save / fig.layout.title.text.replace(' ', '_')) + '.svg'
+        fname = str(save / fig.layout.title.text.replace(' ', '_')) + ext
         try:
             fig.write_image(fname)
         except Exception as e:
