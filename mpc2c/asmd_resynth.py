@@ -1,53 +1,93 @@
 import json
 import pathlib
-import random
 import shutil
-from typing import List, Optional, Dict
+import typing as t
 
 import mido
 import numpy as np
-
 import pycarla
+from scipy.cluster.vq import kmeans2, whiten
+from scipy.stats import gamma
+
+from .asmd.asmd import asmd
 
 
-def group_split(datasets: List[str],
-                contexts: Dict[str, str],
-                context_splits: List[int],
-                groups: List[str] = ['train', 'validation', 'test']) -> dict:
+def cluster_choice(dataset: asmd.Dataset,
+                   nclusters: int) -> t.List[t.List[int]]:
+    # prepare the dataset by reading velocities and pedaling of each song and
+    # fitting a gamma distribution
+    def proc(i, dataset):
+        # TODO: data may contains nan
+        pedaling = dataset.get_pedaling(i, frame_based=True)
+        velocities = dataset.get_score(
+            i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
+        vel_data = gamma.fit(velocities)
+        ped_data0 = gamma.fit(pedaling[0][:, 1])
+        ped_data1 = gamma.fit(pedaling[0][:, 2])
+        ped_data2 = gamma.fit(pedaling[0][:, 3])
+        return np.concatenate([vel_data, ped_data0, ped_data1, ped_data2])
+
+    data = dataset.parallel(proc, n_jobs=-1)
+    # clustering
+    data = np.array(data)
+    data = whiten(data)
+    centroids, labels = kmeans2(data, nclusters, minit='++')
+
+    # creating the output structure
+    out = [[] for i in range(nclusters)]
+    for i, label in enumerate(labels):
+        out[label].append(i)
+    return out
+
+
+def group_split(datasets: t.List[str],
+                contexts: t.Dict[str, str],
+                context_splits: t.List[int],
+                cluster_func: t.Callable,
+                groups: t.List[str] = ['train', 'validation', 'test']) -> dict:
     """
     Given a list of ASMD datasets which support groups, split each group in
     sub groups, each corresponding to a context. 'orig' can be used to
     reference to the original context.
 
+    `cluster_func` is a function which takes a dataset and the number of
+    clusters and returns a list of clusters; each cluster is a List[int].
+    For each group, the group of the whole dataset is clustered; then, for each
+    context/group combination, one song is taken from each cluster of that
+    group to form the context-specific group. This means that each group is
+    clustered with `context_splits` clusters.
+
+    N.B. the `orig` context, if used,must come after everything!
+
     Returns a new dict object representing an ASMD definition with the new
     groups.
     """
 
-    from .asmd.asmd import asmd
     dataset = asmd.Dataset().filter(datasets=datasets)
     new_definition = {"songs": [], "name": "new_def"}
     for i, group in enumerate(groups):
         d = dataset.filter(groups=[group], copy=True)
         songs = d.get_songs()
 
-        # shuffle songs to randomize the splits
-        random.seed(i)
-        random.shuffle(songs)
+        clusters = cluster_func(d, context_splits[i])
+        if any(len(c) < len(contexts) for c in clusters):
+            raise Exception(
+                f"Error trying to split {group}. Try to reduce the number of songs per this split!"
+            )
 
-        end: Optional[int]
-        start: int = 0
-        for context, _ in contexts:
+        for j, (context, _) in enumerate(contexts):
             if context == 'orig':
                 # the original context
-                end = None
+                # use all the remaining songs
+                cluster = sum(cluster[j:] for cluster in clusters)
                 ext = '.wav'
             else:
                 # a new context
                 # chose a section of size s.CONTEXT_SPLITS[i]
-                end = start + context_splits[i]
+                cluster = [cluster[j] for cluster in clusters]
                 ext = '.flac'
 
-            selected_songs = songs[start:end]
+            selected_songs = songs[clusters[cluster]]
 
             # change attribute 'groups' of each selected song
             for song in selected_songs:
@@ -58,7 +98,6 @@ def group_split(datasets: List[str],
             # save the dataset in the returned definition
             new_definition['songs'] += selected_songs
 
-            start = end  # type: ignore
     return new_definition
 
 
@@ -154,9 +193,9 @@ def get_contexts(carla_proj: pathlib.Path):
     return contexts
 
 
-def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
+def split_resynth(datasets: t.List[str], carla_proj: pathlib.Path,
                   output_path: pathlib.Path, metadataset_path: pathlib.Path,
-                  context_splits: List[int], final_decay: float):
+                  context_splits: t.List[int], final_decay: float):
     """
     Go trhough the datasets, and using the projects in `carla_proj`, create a
     new resynthesized dataset in `output_path`.
@@ -176,7 +215,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
     contexts = get_contexts(carla_proj)
 
     # split the Pathdataset Pathin contexts and save the new definition
-    new_def = group_split(datasets, contexts, context_splits=context_splits)
+    new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
     # create output_path if it doesn't exist and save the new_def
     output_path.mkdir(parents=True, exist_ok=True)
@@ -191,8 +230,7 @@ def split_resynth(datasets: List[str], carla_proj: pathlib.Path,
     dataset.metadataset['install_dir'] = str(output_path)
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
     for i in range(100):
-        if trial(contexts, dataset, output_path, old_install_dir,
-                 final_decay):
+        if trial(contexts, dataset, output_path, old_install_dir, final_decay):
             break
 
     print("Copying ground-truth files...")
