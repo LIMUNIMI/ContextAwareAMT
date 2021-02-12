@@ -183,6 +183,23 @@ N.B. Not yet implemented!
 #. Fully test a velocity model on a specific audio/midi file: ``python run.py -v -pt <path to model checkpoint.pt> -i <input midi path> <input audio path>``
 #. Fully test a pedaling model on a specific audio/midi file: ``python run.py -p -pt <path to model checkpoint.pt> -i <input midi path> <input audio path>``
 
+Notes
+-----
+
+We used 6 differente contexts:
+
+#. `pianoteq0` is based on `Pianoteq Stage Steinway Model B`; linear mapping of
+   velocities (0-127) -> (ppp-fff) and small/no reverb ("Jazz Studio")
+#. `pianoteq1` is based on `Pianoteq Stage  Grotrian Recording 3`; linear mapping of
+   velocities (0-127) -> (p-f) and medium reverb ("Medium Hall")
+#. `pianoteq2` is based on `Pianoteq Stage  Grotrian Player`; linear mapping of
+   velocities (23-94) -> (ppp-fff) and  small/no reverb ("Jazz Studio")
+#. `pianoteq3` is based on `Pianoteq Stage  Grotrian Player`; almost exponential mapping of
+   velocities (0-127) -> (ppp-fff) and large reverb ("Large Hall")
+#. `salamander0` is based on `SalamnderGrandPianoV3Retuned` with no reverb
+#. `salamander1` is based on `SalamnderGrandPianoV3Retuned` with `Calf` reverb ("Large", 2.15 sec decay)
+
+
 Credits
 =======
 

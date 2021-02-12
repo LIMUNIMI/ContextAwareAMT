@@ -22,7 +22,7 @@ pycarla = "0.1.2"
 pandas = "^1.2.1"
 matplotlib = "^3.3.4"
 dash = "^1.19.0"
-kaleido = "0.1.0.post1"
+kaleido = "0.1.0"
 
 [tool.poetry.dev-dependencies]
 jedi = "<0.18.0"

@@ -16,7 +16,7 @@ from .training import build_pedaling_model, build_velocity_model
 
 def evaluate(checkpoints: T.Dict[str, T.Any], mode: str,
              out_dir: Path) -> T.List[pd.DataFrame]:
-    # TODO: Not yet tested!
+    # TODO: Test with velocities
 
     contexts: T.List[str] = get_contexts(Path(s.CARLA_PROJ))
     evaluation: T.List[T.List[pd.DataFrame]]
@@ -41,6 +41,7 @@ def evaluate(checkpoints: T.Dict[str, T.Any], mode: str,
 def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
                       contexts: T.List[str]) -> T.List[T.List[pd.DataFrame]]:
     evaluation: T.List[T.List[pd.DataFrame]] = []
+    # TODO: Test with velocities
 
     for checkpoint in checkpoints:
         errors = [
@@ -123,7 +124,10 @@ def plot_dash(figs, port):
     app.run_server(port=port, debug=False, use_reloader=False)
 
 
-def plot(df: pd.DataFrame, compare: bool, save: T.Optional[Path]):
+def plot(df: pd.DataFrame,
+         compare: bool,
+         save: T.Optional[Path] = None,
+         ext: str = '.svg'):
     """
     `df` is a dataframe with columns the 'values', 'context' and 'checkpoint'.
 
@@ -134,8 +138,8 @@ def plot(df: pd.DataFrame, compare: bool, save: T.Optional[Path]):
     """
     import plotly.express as px
     figs = []
-    contexts = df['context'].unique()
-    checkpoints = df['checkpoint'].unique()
+    contexts = sorted(df['context'].unique().tolist())
+    checkpoints = sorted(df['checkpoint'].unique().tolist())
 
     # plotting all contexts for each checkpoint
     print(" 1. Plotting checkpoints")
@@ -147,9 +151,13 @@ def plot(df: pd.DataFrame, compare: bool, save: T.Optional[Path]):
                 df[df['checkpoint'] == checkpoint],
                 y='values',
                 color='context',
+                category_orders={
+                    'context': contexts,
+                    'checkpoint': checkpoints
+                },
                 box=True,
                 # range_y=[0, 1],
-                title=f"{checkpoint}"))
+                title=f"checkpoint {checkpoint}"))
 
     # plotting all checkpoints for each context
     print(" 2. Plotting contexts")
@@ -159,9 +167,13 @@ def plot(df: pd.DataFrame, compare: bool, save: T.Optional[Path]):
                 df[df['context'] == context],
                 y='values',
                 color='checkpoint',
+                category_orders={
+                    'context': contexts,
+                    'checkpoint': checkpoints
+                },
                 box=True,
                 # range_y=[0, 1],
-                title=f"{context}"))
+                title=f"context {context}"))
 
     if compare:
         print(" 3.1 Preparing orig vs all")
@@ -172,18 +184,19 @@ def plot(df: pd.DataFrame, compare: bool, save: T.Optional[Path]):
 
         # removing rows with 'orig' context
         df = df[df['context'] != 'orig']
-        contexts = df['context'].unique()
+        contexts = sorted(df['context'].unique().tolist())
 
         # selcting rows for which the checkpoint starts with the context or
         # with 'orig'
         cdf = pd.DataFrame()
-        cdf = cdf.append(df[df['checkpoint'].str.startswith('orig')])
+        idx = df['checkpoint'] == 'orig_ped'
+        cdf = cdf.append(df[idx])
         for context in contexts:
-            cdf = cdf.append(df[df['checkpoint'].str.startswith(context)])
+            cdf = cdf.append(df[(df['context'] == context)
+                                & (df['checkpoint'].str.startswith(context))])
 
         # renaming checkpoints
         new_checkpoint = 'transfer-learnt'
-        idx = cdf['checkpoint'].str.startswith('orig')
         # ~ is for logical not
         cdf.loc[~idx, 'checkpoint'] = new_checkpoint
 
@@ -194,44 +207,67 @@ def plot(df: pd.DataFrame, compare: bool, save: T.Optional[Path]):
             y='values',
             x='context',
             color='checkpoint',
+            category_orders={
+                'context': contexts,
+                'checkpoint': checkpoints
+            },
             box=True,
             # range_y=[0, 1],
             title="transfer-learning effect")
-        __import__('ipdb').set_trace()
-        fig.write_image('test.svg')
 
         # adding pvals
         print(" 3.3 Computing pvals")
         for n, context in enumerate(contexts):
             data = cdf[cdf['context'] == context]
-            x = data.loc[data['checkpoint'] == new_checkpoint, 'values']
-            y = data.loc[data['checkpoint'] == 'orig', 'values']
+            # sample(frac=1) is used to shuffle data
+            x = data.loc[data['checkpoint'] == new_checkpoint,
+                         'values'].sample(frac=1)
+            y = data.loc[data['checkpoint'] == 'orig_ped',
+                         'values'].sample(frac=1)
             L = min(len(x), len(y))
             _stat, pval = wilcoxon(x[:L], y[:L])
             fig.add_annotation(x=n,
-                               y=1,
+                               y=-0.1,
                                align='center',
                                text=f"p={pval:.4f}",
                                showarrow=False)
 
         figs.append(fig)
 
+    # change box-plot colors
+    for fig in figs:
+        for data in fig.data:
+            data.box.line.color = 'white'
+
     # saving figures to svg files
     if save:
-        print(" 4. Saving figures")
-        save.mkdir(parents=True, exist_ok=True)
-        for fig in figs:
-            fig.write_image(save / fig.layout.title.text.replace(' ', '_') +
-                            '.svg')
+        write_figs(figs, save)
 
     return figs
 
 
-def plot_from_file(fname, compare, port):
+def write_figs(figs, save):
+    print(" 4. Saving figures")
+    save.mkdir(parents=True, exist_ok=True)
+    for fig in figs:
+        fname = str(save / fig.layout.title.text.replace(' ', '_')) + '.svg'
+        try:
+            fig.write_image(fname)
+        except Exception as e:
+            print("Cannot save figure " + fname)
+            print(e)
+
+
+def plot_from_file(fname, compare, port, ext='.svg'):
+    """
+    if `port` is None, dash won't be started
+    """
+
     fname = Path(fname)
     print("Reading from file...")
     df = pd.read_csv(fname)
     print("Creating figures...")
-    figs = plot(df, compare, save=Path(s.IMAGES_PATH) / fname.stem)
-    print("Starting dash...")
-    plot_dash(figs, port)
+    figs = plot(df, compare, save=Path(s.IMAGES_PATH) / fname.stem, ext=ext)
+    if port:
+        print("Starting dash...")
+        plot_dash(figs, port)
