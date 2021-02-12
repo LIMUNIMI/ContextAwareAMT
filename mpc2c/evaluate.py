@@ -156,7 +156,8 @@ def plot(df: pd.DataFrame,
                     'checkpoint': checkpoints
                 },
                 box=True,
-                # range_y=[0, 1],
+                points=False,
+                range_y=[0, 2],
                 title=f"checkpoint {checkpoint}"))
 
     # plotting all checkpoints for each context
@@ -172,7 +173,8 @@ def plot(df: pd.DataFrame,
                     'checkpoint': checkpoints
                 },
                 box=True,
-                # range_y=[0, 1],
+                points=False,
+                range_y=[0, 2],
                 title=f"context {context}"))
 
     if compare:
@@ -212,7 +214,8 @@ def plot(df: pd.DataFrame,
                 'checkpoint': checkpoints
             },
             box=True,
-            # range_y=[0, 1],
+            points=False,
+            range_y=[0, 2],
             title="transfer-learning effect")
 
         # adding pvals
