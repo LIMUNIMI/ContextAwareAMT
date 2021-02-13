@@ -7,9 +7,22 @@ import mido
 import numpy as np
 import pycarla
 from scipy.cluster.vq import kmeans2, whiten
-from scipy.stats import gamma
+from scipy.stats import entropy, gennorm
 
 from .asmd.asmd import asmd
+
+
+def extract_velocity_features(vel: np.array):
+    return *gennorm.fit(vel), entropy(vel)
+
+
+def extract_pedaling_features(ped: np.array):
+    idx_0 = ped == ped.min()
+    idx_127 = ped == ped.max()
+    ratio_0 = np.count_nonzero(idx_0) / ped.shape[0]
+    ratio_127 = np.count_nonzero(idx_127) / ped.shape[0]
+    ped = ped[np.where(~idx_0 * ~idx_127)]
+    return ratio_0, ratio_127, *gennorm.fit(ped), entropy(ped)
 
 
 def cluster_choice(dataset: asmd.Dataset,
@@ -17,20 +30,24 @@ def cluster_choice(dataset: asmd.Dataset,
     # prepare the dataset by reading velocities and pedaling of each song and
     # fitting a gamma distribution
     def proc(i, dataset):
-        # TODO: data may contains nan
-        pedaling = dataset.get_pedaling(i, frame_based=True)
+        pedaling = dataset.get_pedaling(i, frame_based=True)[0]
         velocities = dataset.get_score(
             i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
-        vel_data = gamma.fit(velocities)
-        ped_data0 = gamma.fit(pedaling[0][:, 1])
-        ped_data1 = gamma.fit(pedaling[0][:, 2])
-        ped_data2 = gamma.fit(pedaling[0][:, 3])
+        vel_data = extract_velocity_features(velocities)
+        ped_data0 = extract_pedaling_features(pedaling[:, 1])
+        ped_data1 = extract_pedaling_features(pedaling[:, 1])
+        ped_data2 = extract_pedaling_features(pedaling[:, 1])
+        # 3. gennorm or beta for pedaling in (0, 127)
         return np.concatenate([vel_data, ped_data0, ped_data1, ped_data2])
 
     data = dataset.parallel(proc, n_jobs=-1)
+    __import__('ipdb').set_trace()
     # clustering
+    # TODO: check if pedaling 1 is always zero and decide what to do with other
+    # nans
+    # TODO: apply PCA? explained variance...
+    # TODO: standardize!
     data = np.array(data)
-    data = whiten(data)
     centroids, labels = kmeans2(data, nclusters, minit='++')
 
     # creating the output structure
@@ -65,6 +82,7 @@ def group_split(datasets: t.List[str],
 
     dataset = asmd.Dataset().filter(datasets=datasets)
     new_definition = {"songs": [], "name": "new_def"}
+    clusters_groups = []
     for i, group in enumerate(groups):
         d = dataset.filter(groups=[group], copy=True)
         songs = d.get_songs()
@@ -74,7 +92,9 @@ def group_split(datasets: t.List[str],
             raise Exception(
                 f"Error trying to split {group}. Try to reduce the number of songs per this split!"
             )
+        clusters_groups.append(clusters)
 
+    for clusters in clusters_groups:
         for j, (context, _) in enumerate(contexts):
             if context == 'orig':
                 # the original context
@@ -83,7 +103,6 @@ def group_split(datasets: t.List[str],
                 ext = '.wav'
             else:
                 # a new context
-                # chose a section of size s.CONTEXT_SPLITS[i]
                 cluster = [cluster[j] for cluster in clusters]
                 ext = '.flac'
 
