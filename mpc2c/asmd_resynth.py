@@ -7,7 +7,7 @@ import mido
 import numpy as np
 import pycarla
 from scipy.stats import entropy, gennorm
-from sklearn import cluster
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
@@ -71,22 +71,51 @@ def cluster_choice(dataset: asmd.Dataset,
 
     # clustering
     _data_no_outlier = StandardScaler().fit_transform(_data_no_outlier)
-    cluster_computer = cluster.KMeans(n_clusters=n_clusters, random_state=1992)
+    cluster_computer = KMeans(n_clusters=n_clusters, random_state=1992)
     cluster_computer.fit(_data_no_outlier)
     distances = cluster_computer.transform(data)
     # labels = cluster_computer.predict(data)
 
-    # sort points by each cluster in queue
     # creating the output structure
-    out = [[] for i in range(n_clusters)]
-    # while there are points to assign
-        # take nearest point for each cluster
-        # recursive routine:
-            # assign unique points
-            # for each non-unique point:
-            # chose one random cluster and assign the point to it
-            # chose the next point for the other clusters
-            # restart recursive routine
+    return distribute_clusters(distances)
+
+
+def distribute_clusters(transformed_data: np.ndarray) -> t.List[t.List[int]]:
+    """
+    >>> n_samples, n_clusters = transformed_data.shape
+    """
+    n_samples, n_clusters = transformed_data.shape
+    sorted = np.stack(
+        [np.argsort(transformed_data[:, i]) for i in range(n_clusters)])
+    not_used_samples = np.ones(n_samples, dtype=np.bool)
+    clusters = list(range(n_clusters))
+    counters = [0] * n_clusters
+
+    seed = 1992
+    assigned = 0
+    while assigned < n_samples:
+        np.random.seed(seed + assigned)
+        np.random.shuffle(clusters)
+        for cluster in clusters:
+            for sample_idx in range(counters[cluster], n_samples):
+                sample = sorted[cluster, sample_idx]
+                if not_used_samples[sample]:
+                    # use that
+                    not_used_samples[sample] = False
+                    assigned += 1
+                    counters[cluster] += 1
+                    break
+                else:
+                    # skip it
+                    sorted[cluster, sample_idx] = -1
+                    counters[cluster] += 1
+
+    # put remaining indices to -1
+    for cluster in clusters:
+        sorted[cluster, counters[cluster]:] = -1
+
+    out = [sorted[i, sorted[i] > -1] for i in range(n_clusters)]
+    print(sum(len(c) for c in out))
     return out
 
 
@@ -124,8 +153,8 @@ def group_split(datasets: t.List[str],
         clusters = cluster_func(d, context_splits[i])
         minlen = min(len(c) for c in clusters)
         print(f"The most little cluster has cardinality {minlen}")
+        print([len(c) for c in clusters])
         if minlen < len(contexts):
-            print([len(c) for c in clusters])
             raise Exception(
                 f"Error trying to split {group}. Try to reduce the number of songs per this split!"
             )
