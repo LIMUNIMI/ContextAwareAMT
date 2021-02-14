@@ -6,8 +6,11 @@ import typing as t
 import mido
 import numpy as np
 import pycarla
-from scipy.cluster.vq import kmeans2, whiten
 from scipy.stats import entropy, gennorm
+from sklearn import cluster
+from sklearn.decomposition import PCA
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler
 
 from .asmd.asmd import asmd
 
@@ -22,38 +25,68 @@ def extract_pedaling_features(ped: np.array):
     ratio_0 = np.count_nonzero(idx_0) / ped.shape[0]
     ratio_127 = np.count_nonzero(idx_127) / ped.shape[0]
     ped = ped[np.where(~idx_0 * ~idx_127)]
-    return ratio_0, ratio_127, *gennorm.fit(ped), entropy(ped)
+    if len(ped) > 0:
+        distr = gennorm.fit(ped)
+    else:
+        distr = (0, 0, 0)
+    return ratio_0, ratio_127, *distr, entropy(ped)
 
 
 def cluster_choice(dataset: asmd.Dataset,
-                   nclusters: int) -> t.List[t.List[int]]:
+                   n_clusters: int) -> t.List[t.List[int]]:
     # prepare the dataset by reading velocities and pedaling of each song and
     # fitting a gamma distribution
     def proc(i, dataset):
-        pedaling = dataset.get_pedaling(i, frame_based=True)[0]
         velocities = dataset.get_score(
             i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
         vel_data = extract_velocity_features(velocities)
-        ped_data0 = extract_pedaling_features(pedaling[:, 1])
+
+        pedaling = dataset.get_pedaling(i, frame_based=True)[0]
         ped_data1 = extract_pedaling_features(pedaling[:, 1])
-        ped_data2 = extract_pedaling_features(pedaling[:, 1])
-        # 3. gennorm or beta for pedaling in (0, 127)
-        return np.concatenate([vel_data, ped_data0, ped_data1, ped_data2])
+        # ped_data2 = extract_pedaling_features(pedaling[:, 2])
+        ped_data3 = extract_pedaling_features(pedaling[:, 3])
+
+        # return np.concatenate([vel_data, ped_data1, ped_data2, ped_data3])
+        return np.concatenate([vel_data, ped_data1, ped_data3])
 
     data = dataset.parallel(proc, n_jobs=-1)
-    __import__('ipdb').set_trace()
-    # clustering
-    # TODO: check if pedaling 1 is always zero and decide what to do with other
-    # nans
-    # TODO: apply PCA? explained variance...
-    # TODO: standardize!
     data = np.array(data)
-    centroids, labels = kmeans2(data, nclusters, minit='++')
 
+    # PCA
+    _old_vars = data.shape[1]
+    data = StandardScaler().fit_transform(data)
+    pca_computer = PCA(n_components=_old_vars // 2)
+    data = pca_computer.fit_transform(data)
+    explained_variance = sum(pca_computer.explained_variance_ratio_)
+    print(f"Retained {data.shape[1]} variables out of {_old_vars}")
+    print(f"Explained variance: {explained_variance:.2f}")
+
+    # outliers
+    outlier_detector = IsolationForest(n_estimators=200,
+                                       random_state=1992,
+                                       bootstrap=True).fit(data)
+    outliers = outlier_detector.predict(data)
+    _data_no_outlier = data[outliers == 1]
+    print(f"Found {data.shape[0] - _data_no_outlier.shape[0]} outliers")
+
+    # clustering
+    _data_no_outlier = StandardScaler().fit_transform(_data_no_outlier)
+    cluster_computer = cluster.KMeans(n_clusters=n_clusters, random_state=1992)
+    cluster_computer.fit(_data_no_outlier)
+    distances = cluster_computer.transform(data)
+    # labels = cluster_computer.predict(data)
+
+    # sort points by each cluster in queue
     # creating the output structure
-    out = [[] for i in range(nclusters)]
-    for i, label in enumerate(labels):
-        out[label].append(i)
+    out = [[] for i in range(n_clusters)]
+    # while there are points to assign
+        # take nearest point for each cluster
+        # recursive routine:
+            # assign unique points
+            # for each non-unique point:
+            # chose one random cluster and assign the point to it
+            # chose the next point for the other clusters
+            # restart recursive routine
     return out
 
 
@@ -84,11 +117,15 @@ def group_split(datasets: t.List[str],
     new_definition = {"songs": [], "name": "new_def"}
     clusters_groups = []
     for i, group in enumerate(groups):
+        print(f"Splitting group {group}")
         d = dataset.filter(groups=[group], copy=True)
         songs = d.get_songs()
 
         clusters = cluster_func(d, context_splits[i])
-        if any(len(c) < len(contexts) for c in clusters):
+        minlen = min(len(c) for c in clusters)
+        print(f"The most little cluster has cardinality {minlen}")
+        if minlen < len(contexts):
+            print([len(c) for c in clusters])
             raise Exception(
                 f"Error trying to split {group}. Try to reduce the number of songs per this split!"
             )
