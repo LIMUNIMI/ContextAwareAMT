@@ -5,9 +5,10 @@ import typing as t
 
 import mido
 import numpy as np
+import plotly.express as px
 import pycarla
 from scipy.stats import entropy, gennorm
-from sklearn.cluster import KMeans
+from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
@@ -15,11 +16,11 @@ from sklearn.preprocessing import StandardScaler
 from .asmd.asmd import asmd
 
 
-def extract_velocity_features(vel: np.array):
+def extract_velocity_features(vel: np.ndarray):
     return *gennorm.fit(vel), entropy(vel)
 
 
-def extract_pedaling_features(ped: np.array):
+def extract_pedaling_features(ped: np.ndarray):
     idx_0 = ped == ped.min()
     idx_127 = ped == ped.max()
     ratio_0 = np.count_nonzero(idx_0) / ped.shape[0]
@@ -33,7 +34,8 @@ def extract_pedaling_features(ped: np.array):
 
 
 def cluster_choice(dataset: asmd.Dataset,
-                   n_clusters: int) -> t.List[t.List[int]]:
+                   n_clusters: int,
+                   plot: bool = True) -> t.List[t.List[int]]:
     # prepare the dataset by reading velocities and pedaling of each song and
     # fitting a gamma distribution
     def proc(i, dataset):
@@ -43,11 +45,11 @@ def cluster_choice(dataset: asmd.Dataset,
 
         pedaling = dataset.get_pedaling(i, frame_based=True)[0]
         ped_data1 = extract_pedaling_features(pedaling[:, 1])
-        # ped_data2 = extract_pedaling_features(pedaling[:, 2])
+        ped_data2 = extract_pedaling_features(pedaling[:, 2])
         ped_data3 = extract_pedaling_features(pedaling[:, 3])
 
-        # return np.concatenate([vel_data, ped_data1, ped_data2, ped_data3])
-        return np.concatenate([vel_data, ped_data1, ped_data3])
+        return np.concatenate([vel_data, ped_data1, ped_data2, ped_data3])
+        # return np.concatenate([vel_data, ped_data1, ped_data3])
 
     data = dataset.parallel(proc, n_jobs=-1)
     data = np.array(data)
@@ -70,56 +72,107 @@ def cluster_choice(dataset: asmd.Dataset,
     print(f"Found {data.shape[0] - _data_no_outlier.shape[0]} outliers")
 
     # clustering
-    _data_no_outlier = StandardScaler().fit_transform(_data_no_outlier)
+    # _data_no_outlier = StandardScaler().fit_transform(_data_no_outlier)
     cluster_computer = KMeans(n_clusters=n_clusters, random_state=1992)
     cluster_computer.fit(_data_no_outlier)
-    distances = cluster_computer.transform(data)
-    # labels = cluster_computer.predict(data)
 
     # creating the output structure
-    return distribute_clusters(distances)
+    distances = cluster_computer.transform(data)
+    labels = cluster_computer.predict(data)
+    distributed_clusters = distribute_clusters(distances, labels)
+
+    # plotting
+    if plot:
+        _plot_clusters(data[:, :2], _data_no_outlier[:, :2], n_clusters)
+    return distributed_clusters
 
 
-def distribute_clusters(transformed_data: np.ndarray) -> t.List[t.List[int]]:
+def _plot_clusters(points: np.ndarray, data_to_cluster: np.ndarray,
+                   n_clusters: int):
+    from .mytorchutils.context import vis
+    cluster_computer = KMeans(n_clusters=n_clusters, random_state=1992)
+    cluster_computer.fit(data_to_cluster)
+    cluster1 = cluster_computer.predict(points)
+    distances = cluster_computer.transform(points)
+    _, cluster2 = distribute_clusters(distances, cluster1)
+
+    fig = px.scatter(
+        x=points[:, 0],
+        y=points[:, 1],
+        color=[
+            str(cl) for cl in AgglomerativeClustering(
+                n_clusters=n_clusters, linkage='ward').fit_predict(points)
+        ],
+        title="agglomerative clustering")
+    vis.plotlyplot(fig)
+
+    fig = px.scatter(x=points[:, 0],
+                     y=points[:, 1],
+                     color=[str(cl) for cl in cluster1],
+                     category_orders=dict(color=[str(cl) for cl in cluster1]),
+                     title="color: standard")
+    vis.plotlyplot(fig)
+
+    fig = px.scatter(x=points[:, 0],
+                     y=points[:, 1],
+                     color=[str(cl) for cl in cluster2],
+                     category_orders=dict(color=[str(cl) for cl in cluster1]),
+                     title="color: distributed")
+    vis.plotlyplot(fig)
+
+
+def distribute_clusters(transformed_data: np.ndarray,
+                        labels: np.ndarray) -> t.List[t.List[int]]:
     """
     >>> n_samples, n_clusters = transformed_data.shape
     """
     n_samples, n_clusters = transformed_data.shape
-    sorted = np.stack(
-        [np.argsort(transformed_data[:, i]) for i in range(n_clusters)])
-    not_used_samples = np.ones(n_samples, dtype=np.bool)
-    clusters = list(range(n_clusters))
+    target_cardinality = n_samples // n_clusters
+    cardinalities = np.array(
+        [np.count_nonzero(labels == cl) for cl in range(n_clusters)])
+    sorted = np.stack([
+        np.argsort(transformed_data[:, i])
+        for i in range(transformed_data.shape[1])
+    ])
+    clusters = [
+        i for i in range(n_clusters) if cardinalities[i] > target_cardinality
+    ]
     counters = [0] * n_clusters
 
     seed = 1992
     assigned = 0
-    while assigned < n_samples:
+    while np.any(cardinalities < target_cardinality):
+        print(np.min(cardinalities))
         np.random.seed(seed + assigned)
         np.random.shuffle(clusters)
         for cluster in clusters:
+            if cardinalities[cluster] > target_cardinality:
+                # don't add points to rich clusters
+                continue
             for sample_idx in range(counters[cluster], n_samples):
                 sample = sorted[cluster, sample_idx]
-                if not_used_samples[sample]:
+                sample_cluster = labels[cluster]
+                if cardinalities[sample_cluster] >= target_cardinality:
+                    # the point belong to a rich cluster, steal it
                     # use that
-                    not_used_samples[sample] = False
-                    assigned += 1
+                    labels[sample] = cluster
+                    cardinalities[sample_cluster] -= 1
+                    cardinalities[cluster] += 1
                     counters[cluster] += 1
                     break
                 else:
                     # skip it
-                    sorted[cluster, sample_idx] = -1
                     counters[cluster] += 1
 
-    # put remaining indices to -1
-    for cluster in clusters:
-        sorted[cluster, counters[cluster]:] = -1
-
-    out = [sorted[i, sorted[i] > -1].tolist() for i in range(n_clusters)]
+    # creating list of clusters
+    out: t.List[t.List[int]] = [[] for i in range(n_samples)]
+    for i, label in enumerate(labels):
+        out[label].append(i)
     return out
 
 
 def group_split(datasets: t.List[str],
-                contexts: t.Dict[str, str],
+                contexts: t.Dict[str, t.Any],
                 context_splits: t.List[int],
                 cluster_func: t.Callable,
                 groups: t.List[str] = ['train', 'validation', 'test']) -> dict:
@@ -162,6 +215,7 @@ def group_split(datasets: t.List[str],
 
     for i, clusters in enumerate(clusters_groups):
         for j, context in enumerate(contexts):
+            cluster: t.List[int]
             if context == 'orig':
                 # the original context
                 # use all the remaining songs
@@ -172,7 +226,9 @@ def group_split(datasets: t.List[str],
                 cluster = [cluster[j] for cluster in clusters]
                 ext = '.flac'
 
-            selected_songs = [songs_groups[i][idx] for idx in cluster]
+            selected_songs: t.List[dict] = [
+                songs_groups[i][idx] for idx in cluster
+            ]
 
             # change attribute 'groups' of each selected song
             for song in selected_songs:
@@ -181,7 +237,7 @@ def group_split(datasets: t.List[str],
                     i[:-4] + ext for i in song['recording']['path']
                 ]
             # save the dataset in the returned definition
-            new_definition['songs'] += selected_songs
+            new_definition['songs'] += selected_songs  # type: ignore
 
     return new_definition
 
@@ -267,11 +323,12 @@ def trial(contexts, dataset, output_path, old_install_dir, final_decay):
         return True
 
 
-def get_contexts(carla_proj: pathlib.Path):
+def get_contexts(
+        carla_proj: pathlib.Path) -> t.Dict[str, t.Optional[pathlib.Path]]:
     glob = list(carla_proj.glob("**/*.carxp"))
 
     # take the name of the contexts
-    contexts = {}
+    contexts: t.Dict[str, t.Optional[pathlib.Path]] = {}
     for p in glob:
         contexts[p.stem] = p
     contexts['orig'] = None
@@ -302,6 +359,7 @@ def split_resynth(datasets: t.List[str], carla_proj: pathlib.Path,
     # split the Pathdataset Pathin contexts and save the new definition
     new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
+    __import__('ipdb').set_trace()
     # create output_path if it doesn't exist and save the new_def
     output_path.mkdir(parents=True, exist_ok=True)
     json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
