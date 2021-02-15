@@ -114,8 +114,7 @@ def distribute_clusters(transformed_data: np.ndarray) -> t.List[t.List[int]]:
     for cluster in clusters:
         sorted[cluster, counters[cluster]:] = -1
 
-    out = [sorted[i, sorted[i] > -1] for i in range(n_clusters)]
-    print(sum(len(c) for c in out))
+    out = [sorted[i, sorted[i] > -1].tolist() for i in range(n_clusters)]
     return out
 
 
@@ -145,34 +144,35 @@ def group_split(datasets: t.List[str],
     dataset = asmd.Dataset().filter(datasets=datasets)
     new_definition = {"songs": [], "name": "new_def"}
     clusters_groups = []
+    songs_groups = []
     for i, group in enumerate(groups):
         print(f"Splitting group {group}")
         d = dataset.filter(groups=[group], copy=True)
         songs = d.get_songs()
+        songs_groups.append(songs)
 
         clusters = cluster_func(d, context_splits[i])
         minlen = min(len(c) for c in clusters)
-        print(f"The most little cluster has cardinality {minlen}")
-        print([len(c) for c in clusters])
+        print("Cardinality of clusters:", [len(c) for c in clusters])
         if minlen < len(contexts):
             raise Exception(
                 f"Error trying to split {group}. Try to reduce the number of songs per this split!"
             )
         clusters_groups.append(clusters)
 
-    for clusters in clusters_groups:
-        for j, (context, _) in enumerate(contexts):
+    for i, clusters in enumerate(clusters_groups):
+        for j, context in enumerate(contexts):
             if context == 'orig':
                 # the original context
                 # use all the remaining songs
-                cluster = sum(cluster[j:] for cluster in clusters)
+                cluster = sum([cluster[j:] for cluster in clusters], [])
                 ext = '.wav'
             else:
                 # a new context
                 cluster = [cluster[j] for cluster in clusters]
                 ext = '.flac'
 
-            selected_songs = songs[clusters[cluster]]
+            selected_songs = [songs_groups[i][idx] for idx in cluster]
 
             # change attribute 'groups' of each selected song
             for song in selected_songs:
@@ -210,7 +210,7 @@ def synthesize_song(midi_path: str, audio_path: str, final_decay: float = 3):
 
 def trial(contexts, dataset, output_path, old_install_dir, final_decay):
     try:
-        for group, proj in contexts:
+        for group, proj in contexts.items():
             print("\n------------------------------------")
             print("Working on context ", group)
             print("------------------------------------\n")
