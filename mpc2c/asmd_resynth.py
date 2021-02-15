@@ -79,23 +79,24 @@ def cluster_choice(dataset: asmd.Dataset,
     # creating the output structure
     distances = cluster_computer.transform(data)
     labels = cluster_computer.predict(data)
-    distributed_clusters = distribute_clusters(distances, labels)
+    mode = 'robinhood'
+    distributed_clusters = redistribute(distances, labels, mode=mode)
 
     # plotting
     if plot:
-        _plot_clusters(data[:, :2], _data_no_outlier[:, :2], n_clusters)
+        _plot_clusters(data[:, :2], _data_no_outlier[:, :2], n_clusters, mode)
     return distributed_clusters
 
 
 def _plot_clusters(points: np.ndarray, data_to_cluster: np.ndarray,
-                   n_clusters: int):
+                   n_clusters: int, title: str):
     from .mytorchutils.context import vis
     cluster_computer = KMeans(n_clusters=n_clusters, random_state=1992)
     cluster_computer.fit(data_to_cluster)
     cluster1 = cluster_computer.predict(points)
     distances = cluster_computer.transform(points)
     cluster2 = np.copy(cluster1)
-    _ = distribute_clusters(distances, cluster2)
+    _ = redistribute(distances, cluster2)
 
     fig = px.scatter(
         x=points[:, 0],
@@ -104,26 +105,78 @@ def _plot_clusters(points: np.ndarray, data_to_cluster: np.ndarray,
             str(cl) for cl in AgglomerativeClustering(
                 n_clusters=n_clusters, linkage='ward').fit_predict(points)
         ],
-        title="agglomerative clustering")
+        title=f"{title} agglomerative clustering")
     vis.plotlyplot(fig)
 
     fig = px.scatter(x=points[:, 0],
                      y=points[:, 1],
                      color=[str(cl) for cl in cluster1],
                      category_orders=dict(color=[str(cl) for cl in cluster1]),
-                     title="color: standard")
+                     title=f"{title} color: standard")
     vis.plotlyplot(fig)
 
     fig = px.scatter(x=points[:, 0],
                      y=points[:, 1],
                      color=[str(cl) for cl in cluster2],
                      category_orders=dict(color=[str(cl) for cl in cluster1]),
-                     title="color: distributed")
+                     title=f"{title} color: distributed")
     vis.plotlyplot(fig)
 
 
-def distribute_clusters(transformed_data: np.ndarray,
-                        labels: np.ndarray) -> t.List[t.List[int]]:
+def redistribute(*args, mode='robinhood') -> t.List[t.List[int]]:
+
+    if mode == 'robinhood':
+        return robinhood(*args)
+    elif mode == 'notpope':
+        return notpope(*args)
+    else:
+        raise RuntimeError("mode not known for redistributing clustering")
+
+
+def notpope(transformed_data: np.ndarray,
+            labels: np.ndarray) -> t.List[t.List[int]]:
+    """
+    >>> n_samples, n_clusters = transformed_data.shape
+    """
+    n_samples, n_clusters = transformed_data.shape
+    sorted = np.stack(
+        [np.argsort(transformed_data[:, i]) for i in range(n_clusters)])
+    not_used_samples = np.full(n_samples, -1, dtype=np.int32)
+    clusters = list(range(n_clusters))
+    counters = [0] * n_clusters
+
+    seed = 1992
+    assigned = 0
+    while assigned < n_samples:
+        np.random.seed(seed + assigned)
+        np.random.shuffle(clusters)
+        for cluster in clusters:
+            for sample_idx in range(counters[cluster], n_samples):
+                sample = sorted[cluster, sample_idx]
+                if not_used_samples[sample] < 0:
+                    # use that
+                    not_used_samples[sample] = cluster
+                    assigned += 1
+                    counters[cluster] += 1
+                    break
+                else:
+                    # skip it
+                    sorted[cluster, sample_idx] = -1
+                    counters[cluster] += 1
+
+    # put remaining indices to -1
+    for cluster in clusters:
+        sorted[cluster, counters[cluster]:] = -1
+
+    # overwrite labels
+    labels[:] = not_used_samples[:]
+
+    out = [sorted[i, sorted[i] > -1].tolist() for i in range(n_clusters)]
+    return out
+
+
+def robinhood(transformed_data: np.ndarray, labels: np.ndarray,
+              *args) -> t.List[t.List[int]]:
     """
     >>> n_samples, n_clusters = transformed_data.shape
     """
@@ -134,10 +187,8 @@ def distribute_clusters(transformed_data: np.ndarray,
     poors = np.where(cardinalities < target_cardinality)[0]
     poors_points = np.where(np.isin(labels, poors))[0]
     # transformed_data = transformed_data[rich_points, :]
-    sorted = np.stack([
-        np.argsort(transformed_data[:, i])
-        for i in range(n_clusters)
-    ])
+    sorted = np.stack(
+        [np.argsort(transformed_data[:, i]) for i in range(n_clusters)])
     clusters = [
         i for i in range(n_clusters) if cardinalities[i] < target_cardinality
     ]
