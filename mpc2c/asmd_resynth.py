@@ -35,6 +35,7 @@ def extract_pedaling_features(ped: np.ndarray):
 
 def cluster_choice(dataset: asmd.Dataset,
                    n_clusters: int,
+                   target_cardinality: int,
                    plot: bool = True) -> t.List[t.List[int]]:
     # prepare the dataset by reading velocities and pedaling of each song and
     # fitting a gamma distribution
@@ -80,23 +81,29 @@ def cluster_choice(dataset: asmd.Dataset,
     distances = cluster_computer.transform(data)
     labels = cluster_computer.predict(data)
     mode = 'robinhood'
-    distributed_clusters = redistribute(distances, labels, mode=mode)
+    distributed_clusters = redistribute(distances,
+                                        labels,
+                                        mode=mode,
+                                        target_cardinality=target_cardinality)
 
     # plotting
     if plot:
-        _plot_clusters(data[:, :2], _data_no_outlier[:, :2], n_clusters, mode)
+        _plot_clusters(data[:, :2], _data_no_outlier[:, :2], n_clusters,
+                       target_cardinality, mode)
     return distributed_clusters
 
 
 def _plot_clusters(points: np.ndarray, data_to_cluster: np.ndarray,
-                   n_clusters: int, title: str):
+                   n_clusters: int, target_cardinality: int, title: str):
     from .mytorchutils.context import vis
     cluster_computer = KMeans(n_clusters=n_clusters, random_state=1992)
     cluster_computer.fit(data_to_cluster)
     cluster1 = cluster_computer.predict(points)
     distances = cluster_computer.transform(points)
     cluster2 = np.copy(cluster1)
-    _ = redistribute(distances, cluster2)
+    _ = redistribute(distances,
+                     cluster2,
+                     target_cardinality=target_cardinality)
 
     fig = px.scatter(
         x=points[:, 0],
@@ -123,18 +130,18 @@ def _plot_clusters(points: np.ndarray, data_to_cluster: np.ndarray,
     vis.plotlyplot(fig)
 
 
-def redistribute(*args, mode='robinhood') -> t.List[t.List[int]]:
+def redistribute(*args, mode='robinhood', **kwargs) -> t.List[t.List[int]]:
 
     if mode == 'robinhood':
-        return robinhood(*args)
+        return robinhood(*args, **kwargs)
     elif mode == 'notpope':
-        return notpope(*args)
+        return notpope(*args, **kwargs)
     else:
         raise RuntimeError("mode not known for redistributing clustering")
 
 
-def notpope(transformed_data: np.ndarray,
-            labels: np.ndarray) -> t.List[t.List[int]]:
+def notpope(transformed_data: np.ndarray, labels: np.ndarray,
+            **kwargs) -> t.List[t.List[int]]:
     """
     >>> n_samples, n_clusters = transformed_data.shape
     """
@@ -175,13 +182,17 @@ def notpope(transformed_data: np.ndarray,
     return out
 
 
-def robinhood(transformed_data: np.ndarray, labels: np.ndarray,
-              *args) -> t.List[t.List[int]]:
+def robinhood(
+        transformed_data: np.ndarray,
+        labels: np.ndarray,
+        *args,
+        target_cardinality: t.Optional[int] = None) -> t.List[t.List[int]]:
     """
     >>> n_samples, n_clusters = transformed_data.shape
     """
     n_samples, n_clusters = transformed_data.shape
-    target_cardinality = n_samples // n_clusters
+    if not target_cardinality:
+        target_cardinality = n_samples // n_clusters
     cardinalities = np.array(
         [np.count_nonzero(labels == cl) for cl in range(n_clusters)])
     poors = np.where(cardinalities < target_cardinality)[0]
@@ -261,7 +272,7 @@ def group_split(datasets: t.List[str],
         songs = d.get_songs()
         songs_groups.append(songs)
 
-        clusters = cluster_func(d, context_splits[i])
+        clusters = cluster_func(d, context_splits[i], len(contexts), plot=True)
         minlen = min(len(c) for c in clusters)
         print("Cardinality of clusters:", [len(c) for c in clusters])
         if minlen < len(contexts):
@@ -416,7 +427,6 @@ def split_resynth(datasets: t.List[str], carla_proj: pathlib.Path,
     # split the Pathdataset Pathin contexts and save the new definition
     new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
-    __import__('ipdb').set_trace()
     # create output_path if it doesn't exist and save the new_def
     output_path.mkdir(parents=True, exist_ok=True)
     json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
