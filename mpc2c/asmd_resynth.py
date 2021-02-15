@@ -94,7 +94,8 @@ def _plot_clusters(points: np.ndarray, data_to_cluster: np.ndarray,
     cluster_computer.fit(data_to_cluster)
     cluster1 = cluster_computer.predict(points)
     distances = cluster_computer.transform(points)
-    _, cluster2 = distribute_clusters(distances, cluster1)
+    cluster2 = np.copy(cluster1)
+    _ = distribute_clusters(distances, cluster2)
 
     fig = px.scatter(
         x=points[:, 0],
@@ -130,42 +131,47 @@ def distribute_clusters(transformed_data: np.ndarray,
     target_cardinality = n_samples // n_clusters
     cardinalities = np.array(
         [np.count_nonzero(labels == cl) for cl in range(n_clusters)])
+    poors = np.where(cardinalities < target_cardinality)[0]
+    poors_points = np.where(np.isin(labels, poors))[0]
+    # transformed_data = transformed_data[rich_points, :]
     sorted = np.stack([
         np.argsort(transformed_data[:, i])
-        for i in range(transformed_data.shape[1])
+        for i in range(n_clusters)
     ])
     clusters = [
-        i for i in range(n_clusters) if cardinalities[i] > target_cardinality
+        i for i in range(n_clusters) if cardinalities[i] < target_cardinality
     ]
     counters = [0] * n_clusters
+    not_used = np.ones(n_samples, dtype=np.bool8)
+    not_used[poors_points] = False
 
     seed = 1992
-    assigned = 0
     while np.any(cardinalities < target_cardinality):
-        print(np.min(cardinalities))
-        np.random.seed(seed + assigned)
+        np.random.seed(seed + np.sum(counters))
         np.random.shuffle(clusters)
         for cluster in clusters:
-            if cardinalities[cluster] > target_cardinality:
+            if cardinalities[cluster] >= target_cardinality:
                 # don't add points to rich clusters
                 continue
             for sample_idx in range(counters[cluster], n_samples):
                 sample = sorted[cluster, sample_idx]
-                sample_cluster = labels[cluster]
-                if cardinalities[sample_cluster] >= target_cardinality:
+                sample_cluster = labels[sample]
+                if cardinalities[
+                        sample_cluster] > target_cardinality and not_used[
+                            sample_idx]:
                     # the point belong to a rich cluster, steal it
-                    # use that
                     labels[sample] = cluster
                     cardinalities[sample_cluster] -= 1
                     cardinalities[cluster] += 1
                     counters[cluster] += 1
+                    not_used[sample_idx] = False
                     break
                 else:
                     # skip it
                     counters[cluster] += 1
 
     # creating list of clusters
-    out: t.List[t.List[int]] = [[] for i in range(n_samples)]
+    out: t.List[t.List[int]] = [[] for i in range(n_clusters)]
     for i, label in enumerate(labels):
         out[label].append(i)
     return out
