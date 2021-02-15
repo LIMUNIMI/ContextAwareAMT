@@ -66,13 +66,28 @@ Datasets
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
    * Dummy loss: 0.12082
-   * Validation loss: TODO (TODO epochs, early-stop)
+   * Validation loss: 0.11753 (>201 epochs, forced-stop)
    * 1.004.974 batches in training
    * 73.066 batches in validation
-   * Learning rate: TODO
-   * TODO parameters::
+   * Learning rate: 9.77e-6
+   * 33 parameters::
 
-      TODO
+      MIDIParameterEstimation(                                            
+        (stack): Sequential(                                              
+          (0): Conv2d(1, 1, kernel_size=(4, 3), stride=(1, 1), bias=False)
+          (1): Identity()                                                 
+          (2): AbsLayer()                                                 
+          (3): Conv2d(1, 1, kernel_size=(4, 3), stride=(1, 1), bias=False)
+          (4): Identity()                                                 
+          (5): AbsLayer()                                                 
+          (6): Conv2d(1, 1, kernel_size=(4, 1), stride=(1, 1), bias=False)
+          (7): Identity()                                                 
+          (8): AbsLayer()                                                 
+          (9): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (10): Sigmoid()                                                 
+          (11): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))           
+        )                                                                 
+      )                                                                   
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 

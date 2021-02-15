@@ -95,9 +95,6 @@ def train(hpar,
     else:
         lr_k = s.LR_K
 
-    # dummy model (baseline)
-    dummy_avg = compute_average(trainloader.dataset, *axes, n_jobs=1)
-
     print(model)
     print("Total number of parameters: ", count_params(model))
 
@@ -105,6 +102,8 @@ def train(hpar,
     lr = lr_k / len(trainloader)
     print(f"Using learning rate {lr:.2e}")
 
+    # dummy model (baseline)
+    dummy_avg = compute_average(trainloader.dataset, *axes, n_jobs=1)
     # optimizer
     optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 
