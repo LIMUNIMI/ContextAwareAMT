@@ -81,6 +81,7 @@ class MIDIParameterEstimation(nn.Module):
         super().__init__()
 
         self.note_level = note_level
+        self.output_features = output_features
 
         # setup the `note_level` stuffs
         kernel_size, stride, dilation, lstm_hidden_size,\
@@ -139,6 +140,7 @@ class MIDIParameterEstimation(nn.Module):
                               stride=s,
                               padding=0,
                               dilation=d,
+                              groups=output_features,
                               bias=False),
                     nn.InstanceNorm2d(conv_out_features,
                                       affine=True,
@@ -158,7 +160,7 @@ class MIDIParameterEstimation(nn.Module):
 
         # start adding blocks until we can
         self.stack = []
-        input_features = 1
+        input_features = output_features
         added = True
         for i in range(max_layers):
             added, conv_in_size = add_module(input_features, conv_in_size)
@@ -185,7 +187,7 @@ class MIDIParameterEstimation(nn.Module):
                           stride=1,
                           dilation=1,
                           padding=0,
-                          groups=1,
+                          groups=output_features,
                           bias=False),
                 nn.Sigmoid(),
                 nn.Conv2d(output_features,
@@ -242,7 +244,8 @@ class MIDIParameterEstimation(nn.Module):
             x = torch.transpose(x, 1, 2)
 
         # unsqueeze the channels dimension
-        x = x.unsqueeze(1)
+        x = x.unsqueeze(1).expand(x.shape[0], self.output_features, x.shape[1],
+                                  x.shape[2])
         # apply the stack
         x = self.stack(x)
         # remove the height
