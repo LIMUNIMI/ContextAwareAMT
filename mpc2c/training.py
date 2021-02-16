@@ -6,7 +6,8 @@ import torch.nn.functional as F
 
 from . import data_management, feature_extraction
 from . import settings as s
-from .mytorchutils import compute_average, count_params, train_epochs, make_loss_func
+from .mytorchutils import (compute_average, count_params, make_loss_func,
+                           train_epochs)
 
 
 def model_test(model_build_func, test_sample):
@@ -67,12 +68,7 @@ def build_pedaling_model(hpar):
     return m
 
 
-def train(hpar,
-          wd,
-          mode,
-          context=None,
-          state_dict=None,
-          copy_checkpoint=True):
+def train(hpar, wd, mode, context=None, state_dict=None, copy_checkpoint=True):
     # loaders
     trainloader, validloader = data_management.multiple_splits_one_context(
         ['train', 'validation'], context, mode, False)
@@ -120,10 +116,10 @@ def train(hpar,
                               validloader,
                               dummy_loss=lambda x: dummy_avg,
                               trainloss_on_valid=True,
+                              early_stop=s.EARLY_STOP,
+                              early_range=s.EARLY_RANGE,
                               plot_losses=s.PLOT_LOSSES,
                               copy_checkpoint=copy_checkpoint)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
 
     return train_loss + complexity_loss
-
-
