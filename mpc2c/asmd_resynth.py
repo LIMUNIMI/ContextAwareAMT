@@ -6,12 +6,13 @@ import typing as t
 import mido
 import numpy as np
 import plotly.express as px
-import pycarla
 from scipy.stats import entropy, gennorm
 from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
+
+import pycarla
 
 from .asmd.asmd import asmd
 
@@ -33,26 +34,28 @@ def extract_pedaling_features(ped: np.ndarray):
     return ratio_0, ratio_127, *distr, entropy(ped)
 
 
+def proc(i, dataset):
+    velocities = dataset.get_score(
+        i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
+    vel_data = extract_velocity_features(velocities)
+
+    pedaling = dataset.get_pedaling(i, frame_based=True)[0]
+    ped_data1 = extract_pedaling_features(pedaling[:, 1])
+    ped_data2 = extract_pedaling_features(pedaling[:, 2])
+    ped_data3 = extract_pedaling_features(pedaling[:, 3])
+
+    return np.concatenate([vel_data, ped_data1, ped_data2, ped_data3])
+    # return np.concatenate([vel_data, ped_data1, ped_data3])
+
+
 def cluster_choice(dataset: asmd.Dataset,
                    n_clusters: int,
                    target_cardinality: int,
                    plot: bool = True) -> t.List[t.List[int]]:
     # prepare the dataset by reading velocities and pedaling of each song and
     # fitting a gamma distribution
-    def proc(i, dataset):
-        velocities = dataset.get_score(
-            i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
-        vel_data = extract_velocity_features(velocities)
 
-        pedaling = dataset.get_pedaling(i, frame_based=True)[0]
-        ped_data1 = extract_pedaling_features(pedaling[:, 1])
-        ped_data2 = extract_pedaling_features(pedaling[:, 2])
-        ped_data3 = extract_pedaling_features(pedaling[:, 3])
-
-        return np.concatenate([vel_data, ped_data1, ped_data2, ped_data3])
-        # return np.concatenate([vel_data, ped_data1, ped_data3])
-
-    data = dataset.parallel(proc, n_jobs=-1)
+    data = dataset.parallel(proc, n_jobs=-1, backend='multiprocessing')
     data = np.array(data)
 
     # PCA
@@ -272,7 +275,8 @@ def group_split(datasets: t.List[str],
         songs = d.get_songs()
         songs_groups.append(songs)
 
-        clusters = cluster_func(d, context_splits[i], len(contexts), plot=True)
+        clusters = cluster_func(
+            d, context_splits[i], len(contexts), plot=False)
         minlen = min(len(c) for c in clusters)
         print("Cardinality of clusters:", [len(c) for c in clusters])
         if minlen < len(contexts):
@@ -346,7 +350,7 @@ def trial(contexts, dataset, output_path, old_install_dir, final_decay):
                 carla = pycarla.Carla(proj, server, min_wait=8)
                 carla.start()
 
-            # get the song with this context
+            # get the songs with this context
             d = dataset.filter(groups=[group], copy=True)
             for j in range(len(d)):
 
@@ -384,7 +388,7 @@ def trial(contexts, dataset, output_path, old_install_dir, final_decay):
             print(
                 "There was an error while synthesizing, restarting the procedure"
             )
-            carla.restart()
+            carla.kill_carla()
         return False
     else:
         server.kill()
@@ -439,7 +443,7 @@ def split_resynth(datasets: t.List[str], carla_proj: pathlib.Path,
     dataset.install_dir = str(output_path)
     dataset.metadataset['install_dir'] = str(output_path)
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
-    for i in range(100):
+    for i in range(10):
         if trial(contexts, dataset, output_path, old_install_dir, final_decay):
             break
 
