@@ -76,7 +76,7 @@ VEL_HYPERPARAMS = {
     "kernel_0": 4,
     "kernel_1": 3,
     "middle_activation": AbsLayer,
-    "k": 1
+    "sigmoid_last": False
 }
 PED_HYPERPARAMS = {
     'lstm_layers': 0,
@@ -84,7 +84,7 @@ PED_HYPERPARAMS = {
     'middle_features': 4,
     "kernel_0": 4,
     "middle_activation": nn.Identity,
-    "k": 1
+    "sigmoid_last": False
 }
 VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1
@@ -113,7 +113,7 @@ VEL_SKSPACE = [
     space.Integer(3, 5, name='kernel_1'),
     space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
                       name='middle_activation'),
-    space.Categorical([1, 3], name='k'),
+    space.Categorical([True, False], name='sigmoid_last'),
 ]
 PED_SKSPACE = [
     space.Integer(0, 4, name='lstm_layers'),
@@ -122,7 +122,7 @@ PED_SKSPACE = [
     space.Integer(3, 6, name='kernel_0'),
     space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
                       name='middle_activation'),
-    space.Categorical([1, 3], name='k'),
+    space.Categorical([True, False], name='sigmoid_last'),
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
 SKITERATIONS = (0, 80)

@@ -49,7 +49,7 @@ def build_velocity_model(hpar):
         hyperparams=((hpar['kernel_0'], hpar['kernel_1']), (1, 1), (1, 1),
                      hpar['lstm_hidden_size'], hpar['lstm_layers'],
                      hpar['middle_features'], hpar['middle_activation'],
-                     hpar['k'])).to(s.DEVICE).to(s.DTYPE)
+                     1, hpar['sigmoid_last'])).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
@@ -63,7 +63,7 @@ def build_pedaling_model(hpar):
         hyperparams=((hpar['kernel_0'], 1), (1, 1), (1, 1),
                      hpar['lstm_hidden_size'], hpar['lstm_layers'],
                      hpar['middle_features'], hpar['middle_activation'],
-                     hpar['k'])).to(s.DEVICE).to(s.DTYPE)
+                     3, hpar['sigmoid_last'])).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 

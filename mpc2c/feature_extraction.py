@@ -35,7 +35,7 @@ class MIDIParameterEstimation(nn.Module):
     def __init__(self, input_size, output_features, note_level, max_layers,
                  hyperparams):
         """
-        * `hyperparams` must contains 3 values:
+        * `hyperparams` must contains the following values:
 
             * kernel_size : tuple[int]
             * stride : tuple[int]
@@ -45,6 +45,7 @@ class MIDIParameterEstimation(nn.Module):
             * middle_features: int [x in k*(2^x)]
             * middle_activation: int
             * k: int
+            * sigmoid_last: tuple
 
         * `input_size` is a tuple[int] containing the number of rows (features)
         and columns (frames) of each input. It can contain 1 if the size of a
@@ -85,7 +86,9 @@ class MIDIParameterEstimation(nn.Module):
 
         # setup the `note_level` stuffs
         kernel_size, stride, dilation, lstm_hidden_size,\
-            lstm_layers, middle_features, middle_activation, k = hyperparams
+            lstm_layers, middle_features, middle_activation,\
+            k, sigmoid_last = hyperparams
+
         middle_features = k * (2**middle_features)
 
         if lstm_layers > 0:
@@ -146,12 +149,6 @@ class MIDIParameterEstimation(nn.Module):
                                       affine=True,
                                       track_running_stats=True)
                     if conv_out_features > 1 else nn.Identity(),
-                    # nn.LayerNorm([*next_conv_in_size]),
-                    # nn.BatchNorm2d(conv_out_features),
-                    # nn.SELU()
-                    # nn.Hardtanh()
-                    # nn.ReLU()
-                    # AbsLayer()
                     middle_activation()
                 ]
                 return True, next_conv_in_size
@@ -180,7 +177,7 @@ class MIDIParameterEstimation(nn.Module):
             k = conv_in_size
 
         if k[0] > 1 or k[1] > 1:
-            self.stack += [
+            self.stac.append(
                 nn.Conv2d(input_features,
                           output_features,
                           kernel_size=k,
@@ -188,26 +185,34 @@ class MIDIParameterEstimation(nn.Module):
                           dilation=1,
                           padding=0,
                           groups=output_features,
-                          bias=False),
-                nn.Sigmoid(),
-                nn.Conv2d(output_features,
-                          output_features,
-                          groups=output_features,
-                          kernel_size=1),
-                # nn.Hardsigmoid()
-            ]
-        else:
-            # change the last activation so that the outputs are in (0, 1)
-            self.stack[-1] = nn.Sigmoid()
+                          bias=False))
+            if sigmoid_last:
+                self.stack.append(
+                    nn.InstanceNorm2d(
+                        output_features, affine=True, track_running_stats=True
+                    ) if output_features > 1 else nn.Identity())
+            else:
+                self.stack.append(nn.Sigmoid())
+
             self.stack.append(
                 nn.Conv2d(output_features,
                           output_features,
                           groups=output_features,
                           kernel_size=1))
 
-        # initialize like a line
-        # nn.init.ones_(self.stack[-1].weight)
-        # nn.init.zeros_(self.stack[-1].bias)
+            if sigmoid_last:
+                self.stack.append(nn.Sigmoid())
+        else:
+            # change the last activation so that the outputs are in (0, 1)
+            if not sigmoid_last:
+                self.stack[-1] = nn.Sigmoid()
+            self.stack.append(
+                nn.Conv2d(output_features,
+                          output_features,
+                          groups=output_features,
+                          kernel_size=1))
+            if sigmoid_last:
+                self.stack.append(nn.Sigmoid())
 
         self.stack = nn.Sequential(*self.stack)
 
