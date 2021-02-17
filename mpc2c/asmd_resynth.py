@@ -1,8 +1,9 @@
 import json
-import pathlib
 import shutil
 import typing as t
+from pathlib import Path
 
+import essentia.standard as esst
 import mido
 import numpy as np
 import plotly.express as px
@@ -15,6 +16,7 @@ from sklearn.preprocessing import StandardScaler
 import pycarla
 
 from .asmd.asmd import asmd
+from .mytorchutils.context import vis
 
 
 def extract_velocity_features(vel: np.ndarray):
@@ -34,7 +36,7 @@ def extract_pedaling_features(ped: np.ndarray):
     return ratio_0, ratio_127, *distr, entropy(ped)
 
 
-def proc(i, dataset):
+def parallel_feature_extraction(i, dataset):
     velocities = dataset.get_score(
         i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
     vel_data = extract_velocity_features(velocities)
@@ -55,7 +57,8 @@ def cluster_choice(dataset: asmd.Dataset,
     # prepare the dataset by reading velocities and pedaling of each song and
     # fitting a gamma distribution
 
-    data = dataset.parallel(proc, n_jobs=-1, backend='multiprocessing')
+    data = dataset.parallel(parallel_feature_extraction,
+                            n_jobs=-1, backend='multiprocessing')
     data = np.array(data)
 
     # PCA
@@ -98,7 +101,6 @@ def cluster_choice(dataset: asmd.Dataset,
 
 def _plot_clusters(points: np.ndarray, data_to_cluster: np.ndarray,
                    n_clusters: int, target_cardinality: int, title: str):
-    from .mytorchutils.context import vis
     cluster_computer = KMeans(n_clusters=n_clusters, random_state=1992)
     cluster_computer.fit(data_to_cluster)
     cluster1 = cluster_computer.predict(points)
@@ -336,7 +338,15 @@ def synthesize_song(midi_path: str, audio_path: str, final_decay: float = 3):
     del player, recorder
 
 
-def trial(contexts, dataset, output_path, old_install_dir, final_decay):
+def trial(contexts: t.Mapping[str, t.Optional[Path]],
+          dataset: asmd.Dataset,
+          output_path: Path,
+          old_install_dir: Path,
+          final_decay: float) -> bool:
+    """
+    Try to synthesize the provided contexts from dataset. If success returns
+    True, otherwise False.
+    """
     try:
         for group, proj in contexts.items():
             print("\n------------------------------------")
@@ -357,22 +367,24 @@ def trial(contexts, dataset, output_path, old_install_dir, final_decay):
                 # for each song in this context, get the new audio_path
                 audio_path = output_path / d.paths[j][0][0]
                 if audio_path.exists() and audio_path.stat().st_size > 0:
-                    print(f"{audio_path} already exists")
-                    continue
+                    if correctly_synthesized(j, d):
+                        print(f"{audio_path} already exists")
+                        continue
                 audio_path.parent.mkdir(parents=True, exist_ok=True)
-                audio_path = str(audio_path)
                 if group != "orig":
-                    old_audio_path = str(
-                        old_install_dir / d.paths[j][0][0])[:-5] + '.wav'
                     # if this is a new context, resynthesize...
-                    midi_path = old_audio_path[:-4] + '.midi'
-                    # check that Carla is still alive..
-                    if not carla.exists():
-                        print("Carla doesn't exists... restarting everything")
-                        carla.restart()
-                    synthesize_song(midi_path,
-                                    audio_path,
-                                    final_decay=final_decay)
+                    midi_path = (old_install_dir /
+                                 d.paths[j][0][0]).with_suffix('.midi')
+                    while not correctly_synthesized(j, d):
+                        # delete file if it exists (only python >= 3.8)
+                        audio_path.unlink(missing_ok=True)
+                        # check that Carla is still alive..
+                        if not carla.exists():
+                            print("Carla doesn't exists... restarting everything")
+                            carla.restart()
+                        synthesize_song(str(midi_path),
+                                        str(audio_path),
+                                        final_decay=final_decay)
                 else:
                     old_audio_path = str(old_install_dir / d.paths[j][0][0])
                     print(f"Orig context, {old_audio_path} > {audio_path}")
@@ -389,26 +401,74 @@ def trial(contexts, dataset, output_path, old_install_dir, final_decay):
                 "There was an error while synthesizing, restarting the procedure"
             )
             carla.kill_carla()
+            server.kill()
         return False
     else:
+        carla.kill_carla()
         server.kill()
         return True
 
 
 def get_contexts(
-        carla_proj: pathlib.Path) -> t.Dict[str, t.Optional[pathlib.Path]]:
+        carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:
+    """
+    Loads contexts and Carla project files from the provided directory
+
+    Returns a dictionary which maps context names to the corresponding carla
+    project file. The additional context 'orig' with project `None` is added.
+    """
     glob = list(carla_proj.glob("**/*.carxp"))
 
     # take the name of the contexts
-    contexts: t.Dict[str, t.Optional[pathlib.Path]] = {}
+    contexts: t.Dict[str, t.Optional[Path]] = {}
     for p in glob:
         contexts[p.stem] = p
     contexts['orig'] = None
     return contexts
 
 
-def split_resynth(datasets: t.List[str], carla_proj: pathlib.Path,
-                  output_path: pathlib.Path, metadataset_path: pathlib.Path,
+def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
+    """
+    Check if audio file in a song in a dataset is correctly loadable and
+    synthesized.
+    """
+    try:
+        audio, sr = dataset.get_mix(i)
+    except Exception:
+        return False
+    midi = dataset.get_score(
+        i, score_type=['precise_alignment', 'broad_alignment'])
+
+    # check duration
+    if len(audio) / sr >= midi[:, 2].max():
+        return False
+
+    # check silence
+    processer = esst.InstantPower()
+    fs, hs = sr, sr // 2
+    pr = dataset.get_pianoroll(i,
+                               score_type=[
+                                   'precise_alignment', 'broad_alignment'],
+                               resolution=1.0,
+                               onsets=False,
+                               velocity=False)
+
+    for j, frame in enumerate(esst.FrameGenerator(audio,
+                                                  frameSize=fs,
+                                                  hopSize=hs,
+                                                  startFromZero=True)):
+        power = processer(frame)
+
+        if j < pr.shape[1]:
+            if power == 0:
+                if pr[:, (j, j-1)].sum() > 0:
+                    print(f"Song {i} was uncorrectly synthesized!!")
+                    return False
+    return True
+
+
+def split_resynth(datasets: t.List[str], carla_proj: Path,
+                  output_path: Path, metadataset_path: Path,
                   context_splits: t.List[int], final_decay: float):
     """
     Go trhough the datasets, and using the projects in `carla_proj`, create a
@@ -425,10 +485,9 @@ def split_resynth(datasets: t.List[str], carla_proj: pathlib.Path,
 
     >>> asmd.Dataset(paths=[output_path], metadataset_path='metadataset.json')
     """
-    from .asmd.asmd import asmd
     contexts = get_contexts(carla_proj)
 
-    # split the Pathdataset Pathin contexts and save the new definition
+    # split the dataset in contexts and save the new definition
     new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
     # create output_path if it doesn't exist and save the new_def
@@ -437,11 +496,12 @@ def split_resynth(datasets: t.List[str], carla_proj: pathlib.Path,
 
     # load the new dataset
     dataset = asmd.Dataset(paths=[output_path])
-    old_install_dir = pathlib.Path(dataset.install_dir)
+    old_install_dir = Path(dataset.install_dir)
 
     # prepare and save the new metadataset
     dataset.install_dir = str(output_path)
     dataset.metadataset['install_dir'] = str(output_path)
+
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
     for i in range(10):
         if trial(contexts, dataset, output_path, old_install_dir, final_decay):
