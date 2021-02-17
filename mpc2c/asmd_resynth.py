@@ -13,10 +13,9 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
-from .pycarla import pycarla
-
 from .asmd.asmd import asmd
 from .mytorchutils.context import vis
+from .pycarla import pycarla
 
 
 def extract_velocity_features(vel: np.ndarray):
@@ -446,8 +445,6 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
         return False
 
     # check silence
-    processer = esst.InstantPower()
-    fs, hs = sr, sr // 2
     pr = dataset.get_pianoroll(i,
                                score_type=[
                                    'precise_alignment', 'broad_alignment'],
@@ -455,25 +452,38 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
                                onsets=False,
                                velocity=False)
 
-    for j, frame in enumerate(esst.FrameGenerator(audio,
-                                                  frameSize=fs,
-                                                  hopSize=hs,
-                                                  startFromZero=True)):
-        power = processer(frame)
+    length = pr.shape[1]
+    # count the number of silent frames
+    pr = np.sum(pr.sum(axis=0) == 0)
 
-        if j < pr.shape[1]:
-            if power == 0:
-                if pr[:, (j, j-1)].sum() > 0:
-                    print(f"Song {i} check: uncorrectly synthesized!!")
-                    return False
-    return True
+    powers: t.Any = []
+    for j, frame in enumerate(esst.FrameGenerator(audio,
+                                                  frameSize=sr,
+                                                  hopSize=sr,
+                                                  startFromZero=True)):
+        if j >= length:
+            break
+
+        powers.append(np.all(frame == 0))
+
+    # count the number of silent frames
+    powers = np.sum(powers)
+
+    # remember: in audio there is reverb etc., so it can sound without notes in
+    # midi
+    if powers > pr:
+        # audio is more silent than midi...
+        print(f"Song {i} check: uncorrect synthesis!")
+        return False
+    else:
+        return True
 
 
 def split_resynth(datasets: t.List[str], carla_proj: Path,
                   output_path: Path, metadataset_path: Path,
                   context_splits: t.List[int], final_decay: float):
     """
-    Go trhough the datasets, and using the projects in `carla_proj`, create a
+    Go through the datasets, and using the projects in `carla_proj`, create a
     new resynthesized dataset in `output_path`.
 
     `context_splits` is a list containing the size for each group of each
