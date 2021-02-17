@@ -1,4 +1,3 @@
-import essentia as es
 import essentia.standard as esst
 import numpy as np
 import pretty_midi as pm

@@ -18,7 +18,12 @@ plotly = "^4.12.0"
 torch = "^1.7.0"
 # TODO: change this when this branch is merged!
 scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
-pycarla = "0.1.2"
+jack-client = "^0.5.2"
+pysoundfile = "^0.9.0"
+PyQt5 = "^5.15.2"
+sounddevice = "^0.4.1"
+mido = "^1.2.9"
+python-rtmidi = "^1.4.6"
 pandas = "^1.2.1"
 matplotlib = "^3.3.4"
 dash = "^1.19.0"

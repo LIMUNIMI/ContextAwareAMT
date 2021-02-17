@@ -13,7 +13,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
-import pycarla
+from .pycarla import pycarla
 
 from .asmd.asmd import asmd
 from .mytorchutils.context import vis

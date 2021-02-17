@@ -9,3 +9,6 @@
 	url = https://gitlab.di.unimi.it/federicosimonetta/asmd/
 [submodule "mpc2c/asmd/"]
 	url = https://gitlab.di.unimi.it/federicosimonetta/asmd/
+[submodule "mpc2c/pycarla"]
+	path = mpc2c/pycarla
+	url = https://gitlab.di.unimi.it/federicosimonetta/pycarla
