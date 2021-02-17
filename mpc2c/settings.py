@@ -32,6 +32,7 @@ BINS = 13
 SPEC = essentiaspec.Spectrometer(
     FRAME_SIZE,
     SR,
+    'hann',
     hop=HOP_SIZE,
     transform=essentiaspec.Transform.PowerSpectrum,
     proctransform=essentiaspec.ProcTransform.NONE)
