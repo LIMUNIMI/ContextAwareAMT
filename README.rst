@@ -35,7 +35,8 @@ Datasets
 --------
 
 #. Install 'Maestro' dataset from ``asmd``: ``python -m mpc2c.asmd.asmd.install``
-#. Installa Carla with ``python -m mpc2c.pycarla.pycarla.carla -d``
+#. Install Carla with ``python -m mpc2c.pycarla.pycarla.carla -d``
+#. Install ``jackd`` in your path
 #. Prepare the new dataset with the resynthesized parts: ``python run.py -d``
 #. If the process stops, relaunch it (it will skip the already synthesized songs)
 
