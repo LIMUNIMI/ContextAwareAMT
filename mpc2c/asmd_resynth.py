@@ -355,8 +355,8 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]],
             # for each context
             # load the preset in Carla
             if group != "orig":
-                server = pycarla.JackServer(['-R', '-d', 'alsa'])
                 # if this is a new context, start Carla
+                server = pycarla.JackServer(['-R', '-d', 'alsa'])
                 carla = pycarla.Carla(proj, server, min_wait=8)
                 carla.start()
 
@@ -435,12 +435,14 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
     try:
         audio, sr = dataset.get_mix(i)
     except Exception:
+        print(f"Song {i} check: couldn't correctly load the recorded song")
         return False
     midi = dataset.get_score(
         i, score_type=['precise_alignment', 'broad_alignment'])
 
     # check duration
-    if len(audio) / sr >= midi[:, 2].max():
+    if len(audio) / sr < midi[:, 2].max():
+        print(f"Song {i} check: audio duration < midi duration!")
         return False
 
     # check silence
@@ -462,7 +464,7 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
         if j < pr.shape[1]:
             if power == 0:
                 if pr[:, (j, j-1)].sum() > 0:
-                    print(f"Song {i} was uncorrectly synthesized!!")
+                    print(f"Song {i} check: uncorrectly synthesized!!")
                     return False
     return True
 
@@ -488,11 +490,12 @@ def split_resynth(datasets: t.List[str], carla_proj: Path,
     contexts = get_contexts(carla_proj)
 
     # split the dataset in contexts and save the new definition
-    new_def = group_split(datasets, contexts, context_splits, cluster_choice)
+    # TODO: uncomment
+    # new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
-    # create output_path if it doesn't exist and save the new_def
-    output_path.mkdir(parents=True, exist_ok=True)
-    json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
+    # # create output_path if it doesn't exist and save the new_def
+    # output_path.mkdir(parents=True, exist_ok=True)
+    # json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
 
     # load the new dataset
     dataset = asmd.Dataset(paths=[output_path])
