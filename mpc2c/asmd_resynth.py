@@ -1,5 +1,6 @@
 import json
 import shutil
+import time
 import typing as t
 from pathlib import Path
 
@@ -469,8 +470,8 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
     # count the number of silent frames
     powers = np.sum(powers)
 
-    # remember: in audio there is reverb etc., so it can sound without notes in
-    # midi
+    # remember: in audio there is reverb etc., so it can have power eve if in
+    # midi there are no notes
     if powers > pr:
         # audio is more silent than midi...
         print(f"Song {i} check: uncorrect synthesis!")
@@ -517,7 +518,9 @@ def split_resynth(datasets: t.List[str], carla_proj: Path,
 
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
     for i in range(10):
-        if trial(contexts, dataset, output_path, old_install_dir, final_decay):
+        if not trial(contexts, dataset, output_path, old_install_dir, final_decay):
+            time.sleep(2)
+        else:
             break
 
     print("Copying ground-truth files...")
