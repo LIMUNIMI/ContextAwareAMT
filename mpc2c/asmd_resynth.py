@@ -502,11 +502,11 @@ def split_resynth(datasets: t.List[str], carla_proj: Path,
 
     # split the dataset in contexts and save the new definition
     # TODO: uncomment
-    # new_def = group_split(datasets, contexts, context_splits, cluster_choice)
+    new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
     # # create output_path if it doesn't exist and save the new_def
-    # output_path.mkdir(parents=True, exist_ok=True)
-    # json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
+    output_path.mkdir(parents=True, exist_ok=True)
+    json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
 
     # load the new dataset
     dataset = asmd.Dataset(paths=[output_path])
@@ -518,7 +518,8 @@ def split_resynth(datasets: t.List[str], carla_proj: Path,
 
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
     for i in range(10):
-        if not trial(contexts, dataset, output_path, old_install_dir, final_decay):
+        if not trial(
+                contexts, dataset, output_path, old_install_dir, final_decay):
             time.sleep(2)
         else:
             break
