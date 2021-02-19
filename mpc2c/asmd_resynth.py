@@ -455,24 +455,33 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
 
     length = pr.shape[1]
     # count the number of silent frames
-    pr = np.sum(pr.sum(axis=0) == 0)
+    pr_sum = np.sum(pr.sum(axis=0) == 0)
 
-    powers: t.Any = []
+    # sum pianoroll in windows of 3 frames
+    notes = np.stack([pr[:, 1:-1], pr[:, :-2], pr[:, 2:]]).sum(axis=(0, 1)) > 0
+
+    silence: t.Any = []
     for j, frame in enumerate(esst.FrameGenerator(audio,
                                                   frameSize=sr,
                                                   hopSize=sr,
                                                   startFromZero=True)):
-        if j >= length:
+        if 0 < j < length - 1:
+            is_silent = np.all(frame == 0)
+            silence.append(is_silent)
+        elif j >= length - 1:
             break
 
-        powers.append(np.all(frame == 0))
+    silence = np.array(silence, dtype=np.bool8)
+    if np.any(np.logical_and(silence, notes)):
+        print(f"Song {i} check: uncorrect synthesis!!")
+        return False
 
     # count the number of silent frames
-    powers = np.sum(powers)
+    silence_sum = np.sum(silence)
 
-    # remember: in audio there is reverb etc., so it can have power eve if in
+    # remember: in audio there is reverb etc., so it can have power even if in
     # midi there are no notes
-    if powers > pr:
+    if silence_sum > pr_sum:
         # audio is more silent than midi...
         print(f"Song {i} check: uncorrect synthesis!")
         return False
