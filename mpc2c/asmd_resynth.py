@@ -510,7 +510,6 @@ def split_resynth(datasets: t.List[str], carla_proj: Path,
     contexts = get_contexts(carla_proj)
 
     # split the dataset in contexts and save the new definition
-    # TODO: uncomment
     new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
     # # create output_path if it doesn't exist and save the new_def
@@ -524,18 +523,20 @@ def split_resynth(datasets: t.List[str], carla_proj: Path,
     # prepare and save the new metadataset
     dataset.install_dir = str(output_path)
     dataset.metadataset['install_dir'] = str(output_path)
-
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
+
+    print("Copying ground-truth files...")
+    for dataset_name in datasets:
+        for old_file in old_install_dir.glob(f"{dataset_name}/**/*.json.gz"):
+            new_file = output_path / old_file.relative_to(old_install_dir)
+            new_file.parent.mkdir(parents=True, exist_ok=True)
+            print(f":::\n::: {old_file.name} > {new_file.name}")
+            shutil.copy(old_file, new_file)
+
+    print("Synthesizing contexts")
     for i in range(10):
         if not trial(
                 contexts, dataset, output_path, old_install_dir, final_decay):
             time.sleep(2)
         else:
             break
-
-    print("Copying ground-truth files...")
-    for dataset in datasets:
-        for old_file in old_install_dir.glob(f"{dataset}/**/*.json.gz"):
-            new_file = output_path / old_file.relative_to(old_install_dir)
-            print(f":::\n::: {old_file.name} > {new_file.name}")
-            shutil.copy(old_file, new_file)
