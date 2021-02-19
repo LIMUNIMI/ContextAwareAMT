@@ -39,6 +39,12 @@ Datasets
 #. Install ``jackd`` in your path
 #. Prepare the new dataset with the resynthesized parts: ``python run.py -d``
 #. If the process stops, relaunch it (it will skip the already synthesized songs)
+#. If it fails because cannot correctly synthesize some song, it can be due to
+   your system latency, so try to tune your system or to reduce the
+   computational cost of the synthesis - e.g. reduce the sample rate at which
+   synthesis works
+#. The datasets were split using PCA and retaining 0.89, 0.93, 0.91 of total
+   variance for `train`, `validation` and `test` set respectively.
 
 1. Preprocess
 -------------
