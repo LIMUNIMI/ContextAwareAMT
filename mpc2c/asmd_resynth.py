@@ -13,6 +13,7 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
 
 from .asmd.asmd import asmd
 from .mytorchutils.context import vis
@@ -324,6 +325,7 @@ def synthesize_song(midi_path: str, audio_path: str, final_decay: float = 3):
     (e.g. if there is a long reverb)
     """
     player = pycarla.MIDIPlayer()
+    # player = pycarla.ExternalMIDIPlayer()
     recorder = pycarla.AudioRecorder()
     print("Playing and recording " + midi_path + "...")
     midifile = mido.MidiFile(midi_path)
@@ -472,7 +474,7 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
             break
 
     silence = np.array(silence, dtype=np.bool8)
-    if np.any(np.logical_and(silence, notes)):
+    if np.count_nonzero(np.logical_and(silence, notes)) > 3:
         print(f"Song {i} check: uncorrect synthesis!!")
         return False
 
@@ -527,10 +529,9 @@ def split_resynth(datasets: t.List[str], carla_proj: Path,
 
     print("Copying ground-truth files...")
     for dataset_name in datasets:
-        for old_file in old_install_dir.glob(f"{dataset_name}/**/*.json.gz"):
+        for old_file in tqdm(old_install_dir.glob(f"{dataset_name}/**/*.json.gz")):
             new_file = output_path / old_file.relative_to(old_install_dir)
             new_file.parent.mkdir(parents=True, exist_ok=True)
-            print(f":::\n::: {old_file.name} > {new_file.name}")
             shutil.copy(old_file, new_file)
 
     print("Synthesizing contexts")
