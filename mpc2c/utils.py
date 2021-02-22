@@ -54,9 +54,12 @@ def find_start_stop(audio, sample_rate=44100, seconds=False, threshold=-60):
         the sample where sound ends or the corresponding second
     """
     # reset parameters based on sample_rate
-    ratio = sample_rate / 44100
-    fs = round(1024 * ratio)
-    hs = round(128 * ratio)
+    fs, hs = 1024, 128
+    if 44100 % sample_rate == 0 or sample_rate % 44100 == 0:
+        # 1025, 22050, 44100, 88200, but not 48000, 96000 etc.
+        ratio = sample_rate / 44100
+        fs = round(1024 * ratio)
+        hs = round(128 * ratio)
     processer = esst.StartStopSilence(threshold=threshold)
     for frame in esst.FrameGenerator(audio,
                                      frameSize=fs,
