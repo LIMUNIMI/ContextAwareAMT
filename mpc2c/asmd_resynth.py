@@ -168,6 +168,7 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             if group != "orig":
                 # if this is a new context, close Carla
                 carla.kill_carla()
+                server.kill()
                 del carla
     except Exception as e:
         print("Exception occured while processing group " + group)
@@ -180,8 +181,6 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             server.kill()
         return False
     else:
-        carla.kill_carla()
-        server.kill()
         return True
 
 
