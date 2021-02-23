@@ -4,16 +4,13 @@ import time
 import typing as t
 from pathlib import Path
 
-import essentia.standard as esst
 import mido
 import numpy as np
 from tqdm import tqdm
 
 from .asmd.asmd import asmd
-from .essentiaspec.spectrogram import ProcTransform, Spectrometer, Transform
 from .pycarla import pycarla
-from .clustering import cluster_choice
-from . import utils
+
 
 def group_split(datasets: t.List[str],
                 contexts: t.Dict[str, t.Any],
@@ -89,8 +86,8 @@ def group_split(datasets: t.List[str],
     return new_definition
 
 
-def synthesize_song(midi_path: str, audio_path: str, server: pycarla.JackServer,
-                    final_decay: float):
+def synthesize_song(midi_path: str, audio_path: str,
+                    server: pycarla.JackServer, final_decay: float):
     """
     Given a path to a midi file, synthesize it and returns the numpy array
 
@@ -131,8 +128,8 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             if group != "orig":
                 # if this is a new context, start Carla
                 server = pycarla.JackServer([
-                    '-R', '-d', 'alsa', '-n', '2', '-r', '48000', '-p',
-                    '64', '-X', 'seq'
+                    '-R', '-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256',
+                    '-X', 'seq'
                 ])
                 server.start()
                 carla = pycarla.Carla(proj, server, min_wait=8)
@@ -162,10 +159,8 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                                 "Carla doesn't exists... restarting everything"
                             )
                             carla.restart()
-                        synthesize_song(str(midi_path),
-                                        str(audio_path),
-                                        server,
-                                        final_decay)
+                        synthesize_song(str(midi_path), str(audio_path),
+                                        server, final_decay)
                 else:
                     old_audio_path = str(old_install_dir / d.paths[j][0][0])
                     print(f"Orig context, {old_audio_path} > {audio_path}")
@@ -234,49 +229,24 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
         onsets=False,
         velocity=False)
 
-    length = pr.shape[1]
-    # count the number of silent frames
-    pr_sum = np.sum(pr.sum(axis=0) == 0)
-
-    # sum pianoroll in windows of 3 frames
-    notes = np.stack([pr[:, 1:-1], pr[:, :-2], pr[:, 2:]]).sum(axis=(0, 1)) > 0
-
     # remove trailing silence in audio
-    start, stop = utils.find_start_stop(audio, sample_rate=sr)
-    audio = audio[start:stop]
+    # note: here silence is exactly 0 because there is no background noise
+    start: int = np.argmax(audio != 0)  # type: ignore
+    stop: int = np.argmax(audio[::-1] != 0)  # type: ignore
+    audio = audio[start:-stop]
 
-    # count silence in audio
-    silence: t.Any = []
-    for j, frame in enumerate(
-            esst.FrameGenerator(audio,
-                                frameSize=sr,
-                                hopSize=sr,
-                                startFromZero=True)):
-        if 0 < j < length - 1:
-            is_silent = np.all(frame == 0)
-            silence.append(is_silent)
-        elif j >= length - 1:
-            break
-    silence = np.array(silence, dtype=np.bool8)
-    diff = abs(silence.shape[0] - notes.shape[0])
-    L = min(silence.shape[0], notes.shape[0])
+    L = min(pr.shape[1], audio.shape[0] // sr)
+    silence = audio[:L * sr].reshape((sr, L))
+    silence = silence.sum(axis=0) == 0
+    notes = pr[:, :L].sum(axis=(0)) > 0
 
     # if there is silence in audio but not in pianoroll
-    if np.count_nonzero(np.logical_and(silence[:L], notes[:L])) > diff:
+    # if np.count_nonzero(np.logical_and(silence[:L], notes[:L])) > diff:
+    if np.any(np.logical_and(silence[:L], notes[:L])):
         print(f"Song {i} check: uncorrect synthesis!!")
         return False
 
-    # count the number of silent frames
-    silence_sum = np.sum(silence)
-
-    # remember: in audio there is reverb etc., so it can have power even if in
-    # midi there are no notes
-    if silence_sum > pr_sum:
-        # audio is more silent than midi...
-        print(f"Song {i} check: uncorrect synthesis!")
-        return False
-    else:
-        return True
+    return True
 
 
 def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
@@ -300,11 +270,11 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     contexts = get_contexts(carla_proj)
 
     # split the dataset in contexts and save the new definition
-    new_def = group_split(datasets, contexts, context_splits, cluster_choice)
+    # new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
-    # # create output_path if it doesn't exist and save the new_def
-    output_path.mkdir(parents=True, exist_ok=True)
-    json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
+    # # # create output_path if it doesn't exist and save the new_def
+    # output_path.mkdir(parents=True, exist_ok=True)
+    # json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
 
     # load the new dataset
     dataset = asmd.Dataset(paths=[output_path])
