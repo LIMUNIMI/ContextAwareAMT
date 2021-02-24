@@ -62,64 +62,32 @@ Datasets
 
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.10486 (about like the dummy predictor but there is
-   the complexity cost!). Note the preference for `AbsLayer` on both `ReLU` and
-   `Identity`.  Learning rate: 6.41e-04.
+   and loss function of TODO (about like the dummy predictor but there is
+   the complexity cost!). Learning rate: 4.07e-04.
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.18612. Learning rate: 1.19e-02. Note the preference
-   for `Identity` on `ReLU`.
+   and loss function of TODO. Learning rate: 1.19e-01.
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
-   * Dummy loss: 0.12082
-   * Validation loss: 0.11753 (>201 epochs, forced-stop)
+   * Dummy loss: TODO
+   * Validation loss: TODO (TODO epochs, forced-stop)
    * 1.004.974 batches in training
    * 73.066 batches in validation
-   * Learning rate: 9.77e-6
-   * 33 parameters::
+   * Learning rate: TODO
+   * TODO parameters::
 
-      MIDIParameterEstimation(                                            
-        (stack): Sequential(                                              
-          (0): Conv2d(1, 1, kernel_size=(4, 3), stride=(1, 1), bias=False)
-          (1): Identity()                                                 
-          (2): AbsLayer()                                                 
-          (3): Conv2d(1, 1, kernel_size=(4, 3), stride=(1, 1), bias=False)
-          (4): Identity()                                                 
-          (5): AbsLayer()                                                 
-          (6): Conv2d(1, 1, kernel_size=(4, 1), stride=(1, 1), bias=False)
-          (7): Identity()                                                 
-          (8): AbsLayer()                                                 
-          (9): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-          (10): Sigmoid()                                                 
-          (11): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))           
-        )                                                                 
-      )                                                                   
+        TODO
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss: 0.2640
-   * Validation loss: 0.2098 (362 epochs with early-stop)
+   * Dummy loss: TODO
+   * Validation loss: TODO (TODO epochs with early-stop)
    * 847 batches in training
    * 77 batches in validation
-   * Learning rate: 1.18e-2
-   * 2358 parameters::
+   * Learning rate: TODO
+   * TODO parameters::
 
-      MIDIParameterEstimation(
-        (stack): Sequential(
-          (0): Conv2d(1, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
-          (1): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (2): Identity()
-          (3): Conv2d(16, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
-          (4): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (5): Identity()
-          (6): Conv2d(16, 16, kernel_size=(4, 1), stride=(1, 1), bias=False)
-          (7): InstanceNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (8): Identity()
-          (9): Conv2d(16, 3, kernel_size=(3, 1), stride=(1, 1), bias=False)
-          (10): Sigmoid()
-          (11): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
-        )
-      )
+        TODO
 
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save it somewhere.
@@ -143,39 +111,39 @@ Datasets
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c
    <context> -pt <path to generic model chekcpoint>``
 
-   * Learning rate: 0.25
+   * Learning rate: TODO
    * Training 20 batches, validation 10 batches
-   * Retrained parameters: 150 (last 2 conv layers)
+   * Retrained parameters: TODO (last 2 conv layers)
 
    #. pianoteq0:
 
-      * Dummy loss: 0.2521
-      * Validation loss: 0.1775 (202 epochs with early-stop)
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs with early-stop)
 
    #. pianoteq1:
 
-      * Dummy loss: 0.2761
-      * Validation loss: 0.2152 (77 epochs with early-stop)
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs with early-stop)
 
    #. pianoteq2:
 
-      * Dummy loss: 0.2566
-      * Validation loss: 0.2088 (178 epochs with early-stop)
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs with early-stop)
 
    #. pianoteq3:
 
-      * Dummy loss: 0.2771
-      * Validation loss: 0.2423 (72 epochs with early-stop)
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs with early-stop)
 
    #. salamander0:
 
-      * Dummy loss: 0.2621
-      * Validation loss: 0.2349 (78 epochs with early-stop)
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs with early-stop)
 
    #. salamander1:
 
-      * Dummy loss: 0.2628
-      * Validation loss: 0.2295 (87 epochs with early-stop)
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs with early-stop)
 
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save theme somewhere.
@@ -185,9 +153,12 @@ Here ``<context>`` is any Carla preset name that you have used before.
 4. Evaluating error distributions
 ---------------------------------
 
--- TODO --
-#. Evaluate error distributions of velocity models whose checkpoints are in a given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can use shell expansion like ``models/*_vel.pt``
-#. Evaluate error distributions of pedaling models whose checkpoints are in a given directory: ``python run.py -p -e <list of checkpoints> -cp``; you can use shell expansion like ``models/*_ped.pt``
+#. Evaluate error distributions of velocity models whose checkpoints are in a
+   given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can
+   use shell expansion like ``models/*_vel.pt``
+#. Evaluate error distributions of pedaling models whose checkpoints are in a
+   given directory: ``python run.py -p -e <list of checkpoints> -cp``; you can
+   use shell expansion like ``models/*_ped.pt``
 
 These commands will create a plotly plots with violin plots of generic and
 specific contexts and Wilcoxon p-values.
@@ -207,7 +178,7 @@ N.B. Not yet implemented!
 Notes
 -----
 
-We used 6 differente contexts:
+We used 6 different artificial contexts:
 
 #. `pianoteq0` is based on `Pianoteq Stage Steinway Model B`; linear mapping of
    velocities (0-127) -> (ppp-fff) and small/no reverb ("Jazz Studio")
@@ -218,7 +189,8 @@ We used 6 differente contexts:
 #. `pianoteq3` is based on `Pianoteq Stage  Grotrian Player`; almost exponential mapping of
    velocities (0-127) -> (ppp-fff) and large reverb ("Large Hall")
 #. `salamander0` is based on `SalamnderGrandPianoV3Retuned` with no reverb
-#. `salamander1` is based on `SalamnderGrandPianoV3Retuned` with `Calf` reverb ("Large", 2.15 sec decay)
+#. `salamander1` is based on `SalamnderGrandPianoV3Retuned` with `Calf` reverb
+   ("Large", 2.15 sec decay)
 
 
 Credits
