@@ -171,7 +171,7 @@ def main():
                  s.SKITERATIONS,
                  objective,
                  space_constraint=space_constraint,
-                 plot_graphs=False)
+                 plot_graphs=True)
 
     if args.train:
         from mpc2c import training

@@ -62,7 +62,7 @@ Datasets
 
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of TODO (about like the dummy predictor but there is
+   and loss function of 0.0838 (about like the dummy predictor but there is
    the complexity cost!). Learning rate: 4.07e-04.
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
@@ -73,10 +73,19 @@ Datasets
    * Validation loss: TODO (TODO epochs, forced-stop)
    * 1.004.974 batches in training
    * 73.066 batches in validation
-   * Learning rate: TODO
-   * TODO parameters::
+   * Learning rate: 9.88e-6
+   * 721 parameters::
 
-        TODO
+    MIDIParameterEstimation(
+      (lstm): LSTM(12, 8, batch_first=True)
+      (stack): Sequential(
+        (0): Conv2d(1, 1, kernel_size=(3, 5), stride=(1, 1), bias=False)
+        (1): Identity()
+        (2): Tanh()
+        (3): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
+        (4): Sigmoid()
+      )
+    )
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
