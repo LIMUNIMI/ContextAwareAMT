@@ -269,7 +269,7 @@ class MIDIParameterEstimation(nn.Module):
         ending with `end`, where `start` and `end` are indices of layers of
         the stack of this model, so that the first layer whose parameters are
         loaded is layer with index `start` (included) while the last is `end`
-        (not ncluded)
+        (not ncluded). The LSTM is always loaded fully.
         """
         # back-up untouched parts (as they are now)
         cp1 = deepcopy(self.stack[:start])
@@ -288,7 +288,9 @@ class MIDIParameterEstimation(nn.Module):
     def freeze(self, num_layers=0):
         """
         Set `requires_grad` to `False` for the first `num_layers` of layers
+        and for the lstm
         """
+        self.lstm.requires_grad_(False)
 
         for i in range(num_layers):
             m = self.stack[i]
