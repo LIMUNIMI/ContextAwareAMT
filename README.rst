@@ -135,13 +135,21 @@ Datasets
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c
    <context> -pt <path to generic model chekcpoint>``
 
-   * Learning rate: TODO
+#. After each training, you will find a file named `checkpoint0.????.pt`
+   containing the checkpoint with the trained parameters. Save theme somewhere.
+
+Here ``<context>`` is any Carla preset name that you have used before.
+
+Results for velocity
+~~~~~~~~~~~~~~~~~~~~
+
+   * Learning rate: 0.000221
    * Training 20 batches, validation 10 batches
-   * Retrained parameters: TODO (last 2 conv layers)
+   * Retrained parameters: 17 (last 2 conv layers)
 
    #. pianoteq0:
 
-      * Dummy loss: TODO
+      * Dummy loss: 0.1216
       * Validation loss: TODO (TODO epochs with early-stop)
 
    #. pianoteq1:
@@ -169,10 +177,11 @@ Datasets
       * Dummy loss: TODO
       * Validation loss: TODO (TODO epochs with early-stop)
 
-#. After each training, you will find a file named `checkpoint0.????.pt`
-   containing the checkpoint with the trained parameters. Save theme somewhere.
+Results for pedaling
+~~~~~~~~~~~~~~~~~~~~
 
-Here ``<context>`` is any Carla preset name that you have used before.
+TODO
+
 
 4. Evaluating error distributions
 ---------------------------------
