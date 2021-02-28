@@ -99,7 +99,7 @@ def train(hpar, wd, mode, context=None, state_dict=None, copy_checkpoint=True):
     print(f"Using learning rate {lr:.2e}")
 
     # dummy model (baseline)
-    dummy_avg = compute_average(trainloader.dataset, *axes, n_jobs=1)
+    dummy_avg = compute_average(trainloader.dataset, *axes, n_jobs=-1, backend='threading')
     # optimizer
     optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 

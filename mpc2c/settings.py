@@ -80,12 +80,12 @@ VEL_HYPERPARAMS = {
     "sigmoid_last": True
 }
 PED_HYPERPARAMS = {
-    'lstm_layers': 0,
-    'lstm_hidden_size': 0,
-    'middle_features': 4,
-    "kernel_0": 4,
+    'lstm_layers': 1,
+    'lstm_hidden_size': 5,
+    'middle_features': 0,
+    "kernel_0": 3,
     "middle_activation": nn.Identity,
-    "sigmoid_last": False
+    "sigmoid_last": True
 }
 VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1

@@ -89,14 +89,26 @@ Datasets
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss: TODO
+   * Dummy loss: 0.2604
    * Validation loss: TODO (TODO epochs with early-stop)
    * 847 batches in training
    * 77 batches in validation
-   * Learning rate: TODO
-   * TODO parameters::
+   * Learning rate: 0.0118
+   * 5924 parameters::
 
-        TODO
+    MIDIParameterEstimation(
+      (lstm): LSTM(12, 32, batch_first=True)
+      (stack): Sequential(
+        (0): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
+        (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (2): Identity()
+        (3): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
+        (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (5): Identity()
+        (6): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
+        (7): Sigmoid()
+      )
+    )
 
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save it somewhere.
@@ -113,6 +125,9 @@ Datasets
 
 3. Training the context-specific models
 ---------------------------------------
+
+#. Apply NMF to each context: ``python run.py -p -r -c <context>``, ``python
+   run.py -v -r -c <context>``
 
 #. Fully train velocity model on the original context: ``python run.py -v -t -c
    <context> -pt <path to generic model chekcpoint>``
