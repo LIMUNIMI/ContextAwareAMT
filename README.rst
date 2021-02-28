@@ -66,11 +66,11 @@ Datasets
    the complexity cost!). Learning rate: 4.07e-04.
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of TODO. Learning rate: 1.19e-01.
+   and loss function of 0.2206. Learning rate: 1.19e-01.
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
-   * Dummy loss: TODO
-   * Validation loss: TODO (TODO epochs, forced-stop)
+   * Dummy loss: 0.1220
+   * Validation loss: 0.1213 (20 epochs, early-stop)
    * 1.004.974 batches in training
    * 73.066 batches in validation
    * Learning rate: 9.88e-6
