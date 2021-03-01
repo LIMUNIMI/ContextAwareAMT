@@ -272,33 +272,41 @@ class MIDIParameterEstimation(nn.Module):
         ending with `end`, where `start` and `end` are indices of layers of
         the stack of this model, so that the first layer whose parameters are
         loaded is layer with index `start` (included) while the last is `end`
-        (not ncluded). The LSTM is always loaded fully.
+        (not ncluded). The LSTM is always loaded fully. InstanceNorme2d are
+        always reinitialized.
         """
         # back-up untouched parts (as they are now)
-        cp1 = deepcopy(self.stack[:start])
-        cp2 = deepcopy(self.stack[end:])
+        cp = deepcopy(self.stack)
 
         # load everything
         super().load_state_dict(state_dict)
 
         # restore backed-up parts (as they were before)
         stack = list(self.stack)
-        stack[:start] = cp1
-        stack[end:] = cp2
+        stack[:start] = cp[:start]
+        stack[end:] = cp[end:]
+
+        # restore all InstanceNorm layers
+        for i in range(len(stack)):
+            if type(stack[i]) is nn.InstanceNorm2d:
+                stack[i] = cp[i]
 
         self.stack = nn.Sequential(*stack)
 
     def freeze(self, num_layers=0):
         """
-        Set `requires_grad` to `False` for the first `num_layers` of layers
-        and for the lstm
+        Set `requires_grad` to `False` except for the last `num_layers` if type
+        `nn.Conv2d`. Note that normalization layers are not controlled by
+        `requires_grad` but by `train` and `eval` mode.
         """
         self.lstm.requires_grad_(False)
+        self.stack.requires_grad_(False)
 
-        for i in range(num_layers):
-            m = self.stack[i]
-            for p in m.parameters():
-                p.requires_grad = False
+        for i in range(1, num_layers + 1):
+            m = self.stack[-i]
+            if type(m) is nn.Conv2d:
+                for p in m.parameters():
+                    p.requires_grad = True
 
 
 class AbsLayer(nn.Module):
