@@ -32,7 +32,7 @@ def conv_output_size(size, dilation, kernel, stride):
 
 
 class MIDIParameterEstimation(nn.Module):
-    def __init__(self, input_size, output_features, note_level, max_layers,
+    def __init__(self, input_size, output_features, note_level, max_layers, dropout,
                  hyperparams):
         """
         * `hyperparams` must contains the following values:
@@ -80,6 +80,7 @@ class MIDIParameterEstimation(nn.Module):
         """
 
         super().__init__()
+        self.dropout = nn.Dropout(dropout)
 
         self.note_level = note_level
         self.output_features = output_features
@@ -247,6 +248,8 @@ class MIDIParameterEstimation(nn.Module):
 
             # put the frames after the features (see nn.LSTM)
             x = torch.transpose(x, 1, 2)
+
+        x = self.dropout(x)
 
         # unsqueeze the channels dimension
         x = x.unsqueeze(1).expand(x.shape[0], self.output_features, x.shape[1],

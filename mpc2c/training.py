@@ -40,12 +40,13 @@ def model_test(model_build_func, test_sample):
     return constraint
 
 
-def build_velocity_model(hpar):
+def build_velocity_model(hpar, dropout):
     m = feature_extraction.MIDIParameterEstimation(
         input_size=(s.BINS - 1, s.MINI_SPEC_SIZE),
         output_features=1,
         note_level=True,
         max_layers=s.MAX_LAYERS,
+        dropout=dropout,
         hyperparams=((hpar['kernel_0'], hpar['kernel_1']), (1, 1), (1, 1),
                      hpar['lstm_hidden_size'], hpar['lstm_layers'],
                      hpar['middle_features'], hpar['middle_activation'],
@@ -54,12 +55,13 @@ def build_velocity_model(hpar):
     return m
 
 
-def build_pedaling_model(hpar):
+def build_pedaling_model(hpar, dropout):
     m = feature_extraction.MIDIParameterEstimation(
         input_size=(s.BINS - 1, 1),
         output_features=3,
         note_level=False,
         max_layers=s.MAX_LAYERS,
+        dropout=dropout,
         hyperparams=((hpar['kernel_0'], 1), (1, 1), (1, 1),
                      hpar['lstm_hidden_size'], hpar['lstm_layers'],
                      hpar['middle_features'], hpar['middle_activation'],
@@ -74,22 +76,33 @@ def train(hpar, wd, mode, context=None, state_dict=None, copy_checkpoint=True):
         ['train', 'validation'], context, mode, False)
 
     # building model
+    if state_dict is not None:
+        dropout = s.TRANSFER_DROPOUT
+        lr_k = s.TRANSFER_LR_K
+        early_range = s.TRANSFER_EARLY_RANGE
+        early_stop = s.TRANSFER_EARLY_STOP
+    else:
+        lr_k = s.LR_K
+        dropout = 0
+        transfer_layers = s.PED_TRANSFER_LAYERS
+        freeze_layers = s.PED_FREEZE_LAYERS
+        early_range = s.EARLY_RANGE
+        early_stop = s.EARLY_STOP
+
     if mode == 'velocity':
-        model = build_velocity_model(hpar)
+        model = build_velocity_model(hpar, dropout)
         axes = []
         transfer_layers = s.VEL_TRANSFER_LAYERS
         freeze_layers = s.VEL_FREEZE_LAYERS
     elif mode == 'pedaling':
-        model = build_pedaling_model(hpar)
+        model = build_pedaling_model(hpar, dropout)
         axes = [-1]
         transfer_layers = s.PED_TRANSFER_LAYERS
         freeze_layers = s.PED_FREEZE_LAYERS
+
     if state_dict is not None:
         model.load_state_dict(state_dict, end=transfer_layers)
         model.freeze(freeze_layers)
-        lr_k = s.TRANSFER_LR_K
-    else:
-        lr_k = s.LR_K
 
     print(model)
     print("Total number of parameters: ", count_params(model))
@@ -116,8 +129,8 @@ def train(hpar, wd, mode, context=None, state_dict=None, copy_checkpoint=True):
                               validloader,
                               dummy_loss=lambda x: dummy_avg,
                               trainloss_on_valid=True,
-                              early_stop=s.EARLY_STOP,
-                              early_range=s.EARLY_RANGE,
+                              early_stop=early_stop,
+                              early_range=early_range,
                               plot_losses=s.PLOT_LOSSES,
                               copy_checkpoint=copy_checkpoint)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
