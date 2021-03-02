@@ -157,7 +157,7 @@ def plot(df: pd.DataFrame,
                 },
                 box=True,
                 points=False,
-                range_y=[0, 2],
+                range_y=[0, 1],
                 title=f"checkpoint {checkpoint}"))
 
     # plotting all checkpoints for each context
@@ -174,7 +174,7 @@ def plot(df: pd.DataFrame,
                 },
                 box=True,
                 points=False,
-                range_y=[0, 2],
+                range_y=[0, 1],
                 title=f"context {context}"))
 
     if compare:
@@ -200,6 +200,7 @@ def plot(df: pd.DataFrame,
         # renaming checkpoints
         new_checkpoint = 'transfer-learnt'
         # ~ is for logical not
+        idx = cdf['checkpoint'] == 'orig_ped'
         cdf.loc[~idx, 'checkpoint'] = new_checkpoint
 
         # plotting
@@ -215,7 +216,7 @@ def plot(df: pd.DataFrame,
             },
             box=True,
             points=False,
-            range_y=[0, 2],
+            range_y=[0, 1],
             title="transfer-learning effect")
 
         # adding pvals
@@ -229,7 +230,7 @@ def plot(df: pd.DataFrame,
                          'values'].sample(frac=1)
             _stat, pval = wilcoxon(x, y)
             fig.add_annotation(x=n,
-                               y=-0.1,
+                               y=1,
                                align='center',
                                text=f"p={pval:.4f}",
                                showarrow=False)
