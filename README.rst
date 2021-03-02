@@ -162,30 +162,30 @@ Results for velocity
    #. pianoteq2:
 
       * Dummy loss: 0.1217
-      * Validation loss: TODO (TODO epochs with early-stop)
+      * Validation loss: 0.1202 (500 epochs NO early-stop)
       * Training 22405 batches, validation 7729 batches
       * Learning rate: 2.23e-4
 
    #. pianoteq3:
 
-      * Dummy loss: TODO
-      * Validation loss: TODO (TODO epochs with early-stop)
-      * Training TODO batches, validation TODO batches
-      * Learning rate: TODO
+      * Dummy loss: 0.1222
+      * Validation loss: 0.1223 (500 epochs with early-stop)
+      * Training 20394 batches, validation 8273 batches
+      * Learning rate: 2.45e-4
 
    #. salamander0:
 
-      * Dummy loss: TODO
-      * Validation loss: TODO (TODO epochs with early-stop)
-      * Training TODO batches, validation TODO batches
-      * Learning rate: TODO
+      * Dummy loss: 0.1134
+      * Validation loss: 0.1132 (23 epochs with early-stop)
+      * Training 20734 batches, validation 8329 batches
+      * Learning rate: 2.41e-4
 
    #. salamander1:
 
-      * Dummy loss: TODO
-      * Validation loss: TODO (TODO epochs with early-stop)
-      * Training TODO batches, validation TODO batches
-      * Learning rate: TODO
+      * Dummy loss: 0.1213
+      * Validation loss: 0.1209 (23 epochs with early-stop)
+      * Training 22218 batches, validation 8626 batches
+      * Learning rate: 2.25e-4
 
 Results for pedaling
 ~~~~~~~~~~~~~~~~~~~~
