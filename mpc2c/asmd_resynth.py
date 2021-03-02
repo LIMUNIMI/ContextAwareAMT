@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from .asmd.asmd import asmd
 from .pycarla import pycarla
+from .clustering import cluster_choice
 
 
 def group_split(datasets: t.List[str],
@@ -269,11 +270,11 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     contexts = get_contexts(carla_proj)
 
     # split the dataset in contexts and save the new definition
-    # new_def = group_split(datasets, contexts, context_splits, cluster_choice)
+    new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
-    # # # create output_path if it doesn't exist and save the new_def
-    # output_path.mkdir(parents=True, exist_ok=True)
-    # json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
+    # create output_path if it doesn't exist and save the new_def
+    output_path.mkdir(parents=True, exist_ok=True)
+    json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
 
     # load the new dataset
     dataset = asmd.Dataset(paths=[output_path])
