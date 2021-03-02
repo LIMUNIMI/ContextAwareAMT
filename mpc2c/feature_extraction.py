@@ -287,9 +287,9 @@ class MIDIParameterEstimation(nn.Module):
         stack[end:] = cp[end:]
 
         # restore all InstanceNorm layers
-        for i in range(len(stack)):
-            if type(stack[i]) is nn.InstanceNorm2d:
-                stack[i] = cp[i]
+        # for i in range(len(stack)):
+        #     if type(stack[i]) is nn.InstanceNorm2d:
+        #         stack[i] = cp[i]
 
         self.stack = nn.Sequential(*stack)
 
