@@ -238,6 +238,9 @@ Results for pedaling
 These commands will create a plotly plots with violin plots of generic and
 specific contexts and Wilcoxon p-values.
 
+You can plot the tests multiple times without retesting: ``python run.py -cf
+results/*.csv``.
+
 Note that the usage of ``-cp`` is only possible if you name your checkpoints
 with the relative context in the initial part of the filename (e.g.
 ``models/pianoteq0_vel.pt``).

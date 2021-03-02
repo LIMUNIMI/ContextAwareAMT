@@ -1,12 +1,18 @@
 import argparse
+import pickle
+from pathlib import Path
 
 import torch
-# from cylang import cylang
-# cylang.compile()
 from Cython.Build import Cythonize
 
+from mpc2c import create_midi_scale, data_management, evaluate, make_template
 from mpc2c import settings as s
-from pathlib import Path
+from mpc2c import training
+from mpc2c.asmd_resynth import split_resynth
+from mpc2c.mytorchutils import hyperopt
+
+# from cylang import cylang
+# cylang.compile()
 
 if s.BUILD:
     Cythonize.main(["mpc2c/[!data_management.py]**.py", "-3", "--inplace"])
@@ -17,19 +23,22 @@ def parse_args():
     parser.add_argument(
         "--template",
         action="store_true",
-        help="Create the initial template from `pianoteq_scales.mp3` and `scales.mid`"
+        help=
+        "Create the initial template from `pianoteq_scales.mp3` and `scales.mid`"
     )
     parser.add_argument(
         "-sc",
         "--scale",
         action="store_true",
-        help="Create the midi file that must be synthesized for creating the template."
+        help=
+        "Create the midi file that must be synthesized for creating the template."
     )
     parser.add_argument(
         "-d",
         "--datasets",
         action="store_true",
-        help="Prepare the datasets by splitting the various contexts and resynthesizing them"
+        help=
+        "Prepare the datasets by splitting the various contexts and resynthesizing them"
     )
     parser.add_argument(
         "-v",
@@ -50,7 +59,8 @@ def parse_args():
         "-sk",
         "--skopt",
         action="store_true",
-        help="Perform various little training cycles to look  for hyper-parameters using skopt."
+        help=
+        "Perform various little training cycles to look  for hyper-parameters using skopt."
     )
     parser.add_argument("-r",
                         "--redump",
@@ -62,7 +72,8 @@ def parse_args():
         action="store",
         type=str,
         default=None,
-        help="Limit the action to only the specified context (e.g. `-c pianoteq0`, `-c salamander1`, `-c orig`)"
+        help=
+        "Limit the action to only the specified context (e.g. `-c pianoteq0`, `-c salamander1`, `-c orig`)"
     )
     parser.add_argument(
         "-pt",
@@ -70,7 +81,8 @@ def parse_args():
         action="store",
         type=str,
         default=None,
-        help="Load parameters from this checkpoint and freeze the initial weights if training."
+        help=
+        "Load parameters from this checkpoint and freeze the initial weights if training."
     )
     parser.add_argument(
         "-e",
@@ -79,13 +91,15 @@ def parse_args():
         type=str,
         default=None,
         nargs='+',
-        help="Evaluate the error distribution of model checkpoints given as argument. All contexts available in `settings.CARLA_PROJ` will be used, plus the 'orig' context. All models are evaluated on all contexts."
+        help=
+        "Evaluate the error distribution of model checkpoints given as argument. All contexts available in `settings.CARLA_PROJ` will be used, plus the 'orig' context. All models are evaluated on all contexts."
     )
     parser.add_argument(
         "-cp",
         "--compare",
         action="store_true",
-        help="Only valid if `--evaluate` is used. Using this option, you can name your models starting with the context on which they were trained (e.g. `pianoteq0_vel.pt`); in this way, one more plot is created, representing the `orig` model compared to the other models on their specific context."
+        help=
+        "Only valid if `--evaluate` is used. Using this option, you can name your models starting with the context on which they were trained (e.g. `pianoteq0_vel.pt`); in this way, one more plot is created, representing the `orig` model compared to the other models on their specific context."
     )
     parser.add_argument(
         "-i",
@@ -94,13 +108,23 @@ def parse_args():
         type=str,
         default=None,
         nargs=2,
-        help="Expects two inputs, namely a path to MIDI file and a path to audio file."
+        help=
+        "Expects two inputs, namely a path to MIDI file and a path to audio file."
+    )
+    parser.add_argument(
+        "-cf",
+        "--csv-file",
+        action="store",
+        type=str,
+        default=None,
+        nargs='+',
+        help=
+        "Expects at least one input, namely paths to csv files containing the saved tests that should be plotted"
     )
     return parser.parse_args()
 
 
 def load_nmf_params():
-    import pickle
     nmf_params = pickle.load(open(s.TEMPLATE_PATH, 'rb'))
     print("using minpitch: ", nmf_params[1])
     print("using maxpitch: ", nmf_params[2])
@@ -116,14 +140,11 @@ def main():
             "Not yet implemented transcription from files")
 
     if args.template:
-        from mpc2c import make_template
         make_template.main()
     if args.scale:
-        from mpc2c import create_midi_scale
         create_midi_scale.main()
     if args.datasets:
 
-        from mpc2c.asmd_resynth import split_resynth
         split_resynth(s.DATASETS,
                       Path(s.CARLA_PROJ), Path(s.RESYNTH_DATA_PATH),
                       Path(s.METADATASET_PATH), s.CONTEXT_SPLITS,
@@ -136,8 +157,6 @@ def main():
 
     nmf_params = load_nmf_params()
     if args.skopt:
-        from mpc2c import training
-        from mpc2c.mytorchutils import hyperopt
 
         if args.pedaling:
             s.DATASET_LEN = 0.1
@@ -174,7 +193,6 @@ def main():
                  plot_graphs=True)
 
     if args.train:
-        from mpc2c import training
         if args.pedaling:
             training.train(s.PED_HYPERPARAMS,
                            s.WD,
@@ -190,7 +208,6 @@ def main():
                            state_dict=checkpoint)
 
     if args.redump:
-        from mpc2c import data_management
         if args.pedaling:
             data_management.multiple_splits_one_context(
                 ['train', 'validation', 'test'],
@@ -207,19 +224,24 @@ def main():
                 nmf_params=nmf_params)
 
     if args.evaluate:
-        from mpc2c import evaluate
         if args.pedaling:
             mode = 'pedaling'
         elif args.velocity:
             mode = 'velocity'
-        dfs = evaluate.evaluate(args.evaluate, mode, Path(s.RESULT_PATH))
+        if args.csv_file:
+            for fname in args.csv_file:
+                evaluate.plot_from_file(fname,
+                                        compare=True,
+                                        port=False,
+                                        ext='.svg')
+        else:
 
-        for i, df in enumerate(dfs):
-            evaluate.plot_dash(
+            dfs = evaluate.evaluate(args.evaluate, mode, Path(s.RESULT_PATH))
+
+            for i, df in enumerate(dfs):
                 evaluate.plot(df,
                               args.compare,
-                              save=Path(s.IMAGES_PATH) / f"{mode}_eval.{i}"),
-                8356 + i)
+                              save=Path(s.IMAGES_PATH) / f"{mode}_eval.{i}")
 
 
 if __name__ == "__main__":
