@@ -223,15 +223,17 @@ def main():
                 True,
                 nmf_params=nmf_params)
 
-    if args.evaluate:
+    if args.evaluate or args.csv_file:
         if args.pedaling:
             mode = 'pedaling'
         elif args.velocity:
             mode = 'velocity'
+        compare = args.compare
         if args.csv_file:
             for fname in args.csv_file:
                 evaluate.plot_from_file(fname,
-                                        compare=True,
+                                        compare=compare,
+                                        mode=mode,
                                         port=False,
                                         ext='.svg')
         else:
@@ -240,7 +242,7 @@ def main():
 
             for i, df in enumerate(dfs):
                 evaluate.plot(df,
-                              args.compare,
+                              compare,
                               save=Path(s.IMAGES_PATH) / f"{mode}_eval.{i}")
 
 
