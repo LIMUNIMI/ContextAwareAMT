@@ -143,44 +143,86 @@ Here ``<context>`` is any Carla preset name that you have used before.
 Results for velocity
 ~~~~~~~~~~~~~~~~~~~~
 
-   * Learning rate: 0.000221
-   * Training 20 batches, validation 10 batches
-   * Retrained parameters: 17 (last 2 conv layers)
+   * Retrained parameters: 2 (last conv module)
 
    #. pianoteq0:
 
       * Dummy loss: 0.1216
-      * Validation loss: TODO (TODO epochs with early-stop)
+      * Validation loss: 0.1214 (23 epochs with early-stop)
+      * Training 22669 batches, validation 6567 batches
+      * Learning rate: 2.21e-5
 
    #. pianoteq1:
 
-      * Dummy loss: TODO
-      * Validation loss: TODO (TODO epochs with early-stop)
+      * Dummy loss: 0.1204
+      * Validation loss: 0.1190 (30 epochs with early-stop)
+      * Training 24457 batches, validation 6672 batches
+      * Learning rate: 2.04e-4
 
    #. pianoteq2:
 
-      * Dummy loss: TODO
+      * Dummy loss: 0.1217
       * Validation loss: TODO (TODO epochs with early-stop)
+      * Training 22405 batches, validation 7729 batches
+      * Learning rate: 2.23e-4
 
    #. pianoteq3:
 
       * Dummy loss: TODO
       * Validation loss: TODO (TODO epochs with early-stop)
+      * Training TODO batches, validation TODO batches
+      * Learning rate: TODO
 
    #. salamander0:
 
       * Dummy loss: TODO
       * Validation loss: TODO (TODO epochs with early-stop)
+      * Training TODO batches, validation TODO batches
+      * Learning rate: TODO
 
    #. salamander1:
 
       * Dummy loss: TODO
       * Validation loss: TODO (TODO epochs with early-stop)
+      * Training TODO batches, validation TODO batches
+      * Learning rate: TODO
 
 Results for pedaling
 ~~~~~~~~~~~~~~~~~~~~
 
-TODO
+   * Retrained parameters: 6 (last conv module)
+   * Training 20 batches, validation 10 batches
+   * Learning rate: 0.025
+
+   #. pianoteq0:
+
+      * Dummy loss: 0.2723
+      * Validation loss: 0.2022 (92 epochs with early-stop)
+
+   #. pianoteq1:
+
+      * Dummy loss: 0.2751
+      * Validation loss: 0.2103 (302 epochs with early-stop)
+
+   #. pianoteq2:
+
+      * Dummy loss: 0.2721
+      * Validation loss: 0.2168 (49 epochs with early-stop)
+
+   #. pianoteq3:
+
+      * Dummy loss: 0.2395
+      * Validation loss: 0.19103 (500 epochs NO early-stop)
+
+   #. salamander0:
+
+      * Dummy loss: 0.2871
+      * Validation loss: 0.2417 (53 epochs with early-stop)
+
+   #. salamander1:
+
+      * Dummy loss: 0.2623
+      * Validation loss: 0.2255 (500 epochs with NO early-stop)
 
 
 4. Evaluating error distributions
