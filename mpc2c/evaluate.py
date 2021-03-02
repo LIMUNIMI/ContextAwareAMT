@@ -18,7 +18,7 @@ def evaluate(checkpoints: T.Dict[str, T.Any], mode: str,
              out_dir: Path) -> T.List[pd.DataFrame]:
     # TODO: Test with velocities
 
-    contexts: T.List[str] = get_contexts(Path(s.CARLA_PROJ))
+    contexts: T.List[str] = list(get_contexts(Path(s.CARLA_PROJ)).keys())
     evaluation: T.List[T.List[pd.DataFrame]]
     if mode == 'velocity':
         evaluation = evaluate_velocity(checkpoints, contexts)
@@ -47,11 +47,11 @@ def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
         errors = [
             pd.DataFrame(),
         ]
-        model = build_velocity_model(s.VEL_HYPERPARAMS)
+        model = build_velocity_model(s.VEL_HYPERPARAMS, 0)
 
         model.load_state_dict(torch.load(checkpoint)['state_dict'])
 
-        for context in contexts.keys():
+        for context in contexts:
             print(f"\nEvaluating {checkpoint} on {context}")
             res = eval_model_context(model, context, 'velocity')
             errors[0] = errors[0].append(
@@ -59,7 +59,7 @@ def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
                     dict(values=res,
                          context=[context] * res.shape[0],
                          checkpoint=[Path(checkpoint).stem] * res.shape[0])))
-        errors[0]['checkpoint'] = [Path(checkpoint).stem] * errors.shape[0]
+        errors[0]['checkpoint'] = [Path(checkpoint).stem] * errors[0].shape[0]
         evaluation.append(errors)
 
     return evaluation
@@ -71,11 +71,11 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
 
     for checkpoint in checkpoints:
         errors = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
-        model = build_pedaling_model(s.PED_HYPERPARAMS)
+        model = build_pedaling_model(s.PED_HYPERPARAMS, 0)
 
         model.load_state_dict(torch.load(checkpoint)['state_dict'])
 
-        for context in contexts.keys():
+        for context in contexts:
             print(f"\nEvaluating {checkpoint} on {context}")
             res = eval_model_context(model, context, 'pedaling')
             for i in range(len(errors)):

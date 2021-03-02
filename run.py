@@ -6,6 +6,7 @@ import torch
 from Cython.Build import Cythonize
 
 from mpc2c import settings as s
+from pathlib import Path
 
 if s.BUILD:
     Cythonize.main(["mpc2c/[!data_management.py]**.py", "-3", "--inplace"])
@@ -121,7 +122,6 @@ def main():
         from mpc2c import create_midi_scale
         create_midi_scale.main()
     if args.datasets:
-        from pathlib import Path
 
         from mpc2c.asmd_resynth import split_resynth
         split_resynth(s.DATASETS,
