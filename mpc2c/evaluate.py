@@ -232,7 +232,7 @@ def plot(df: pd.DataFrame,
             L = min(len(x), len(y))
             stat, pval = wilcoxon(x[:L], y[:L])
             fig.add_annotation(x=n,
-                               y=1.1,
+                               y=1.0,
                                align='center',
                                text=f"p={pval:.2e}",
                                showarrow=False)
