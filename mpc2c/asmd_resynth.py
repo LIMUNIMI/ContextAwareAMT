@@ -129,7 +129,7 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             if group != "orig":
                 # if this is a new context, start Carla
                 server = pycarla.JackServer([
-                    '-R', '-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256',
+                    '-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256',
                     '-X', 'seq'
                 ])
                 server.start()
@@ -168,9 +168,7 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                     shutil.copy(old_audio_path, audio_path)
             if group != "orig":
                 # if this is a new context, close Carla
-                carla.kill_carla()
-                server.kill()
-                del carla
+                carla.kill()
     except Exception as e:
         print("Exception occured while processing group " + group)
         print(e)
@@ -178,8 +176,7 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             print(
                 "There was an error while synthesizing, restarting the procedure"
             )
-            carla.kill_carla()
-            server.kill()
+            carla.kill()
         return False
     else:
         return True
