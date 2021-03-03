@@ -6,17 +6,19 @@ from torch.utils.data import DataLoader
 from . import nmf
 from . import settings as s
 from . import utils
+from .asmd.asmd import asmd
 from .mytorchutils import DatasetDump, dummy_collate, pad_collate
 
 
 def transform_func(arr: es.array):
     """
-    Takes a 2d array in float32 and computes the first 13 MFCC, on each column,
-    and discards the first one, resulting in a new 2darray with 12 columns
+    Takes a 2d array in float32 and computes the first 13 MFCC, on each column
+    resulting in a new 2darray with 13 columns
     """
     out = []
     for col in range(arr.shape[1]):
-        out.append(s.MFCC(arr[:, col])[1:])
+        # TODO check from here!
+        out.append(s.MFCC(arr[:, col]))
 
     return es.array(out).T
 
@@ -28,7 +30,7 @@ def process_pedaling(i, dataset, nmf_params):
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
     diff_spec = transform_func(nmf_tools.initV) - transform_func(
-        nmf_tools.renormalize(nmf_tools.W @ nmf_tools.H))
+        nmf_tools.renormalize(nmf_tools.W @ nmf_tools.H, initV_sum=True))
     winlen = s.FRAME_SIZE / s.SR
     hop = s.HOP_SIZE / s.SR
     pedaling = dataset.get_pedaling(
@@ -54,7 +56,6 @@ def get_loader(groups, mode, redump, nmf_params=None):
     """
     nmf_params is needed only if `redump` is True
     """
-    from .asmd.asmd import asmd
     dataset = asmd.Dataset(
         paths=[s.RESYNTH_DATA_PATH],
         metadataset_path=s.METADATASET_PATH).filter(groups=groups)

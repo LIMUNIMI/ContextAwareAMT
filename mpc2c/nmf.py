@@ -161,7 +161,7 @@ def make_nonnegative(arr: np.ndarray, th: int = 1):
     # the new threshold is 1, not 0 anymore...
     arr /= np.abs(arr).max()
     arr += th
-    arr /= 2*th
+    arr /= 2 * th
 
 
 class NMFTools:
@@ -223,8 +223,11 @@ class NMFTools:
 
         self.initV_sum = self.initV.sum()
 
-    def renormalize(self, arr):
-        return arr / (arr.sum() + s.EPS) * self.initV_sum
+    def renormalize(self, arr, initV_sum=True):
+        if initV_sum:
+            return arr / (arr.sum() + s.EPS) * self.initV_sum
+        else:
+            return arr / (arr.sum() + s.EPS)
 
     def perform_nmf(self, audio, score):
         self.to2d()
@@ -282,7 +285,8 @@ class NMFTools:
 
             # compute the mini_spec
             mini_spec = self.renormalize(
-                self.W[:, pitch, :] @ self.H[pitch, :, start:end])
+                self.W[:, pitch, :] @ self.H[pitch, :, start:end],
+                initV_sum=False)
 
             # normalizing with rms
             if mini_spec.shape[1] < s.MINI_SPEC_SIZE:

@@ -170,13 +170,13 @@ def main():
                                       copy_checkpoint=False)
 
             space_constraint = training.model_test(
-                training.build_pedaling_model, torch.rand(1, s.BINS - 1, 100))
+                training.build_pedaling_model, torch.rand(1, s.BINS, 100))
         elif args.velocity:
             s.DATASET_LEN = 0.015
             space = s.VEL_SKSPACE
             space_constraint = training.model_test(
                 training.build_velocity_model,
-                torch.rand(1, s.BINS - 1, s.MINI_SPEC_SIZE))
+                torch.rand(1, s.BINS, s.MINI_SPEC_SIZE))
 
             def objective(x):
                 return training.train(x,

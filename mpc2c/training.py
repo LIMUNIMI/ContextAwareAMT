@@ -42,7 +42,7 @@ def model_test(model_build_func, test_sample):
 
 def build_velocity_model(hpar, dropout):
     m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS - 1, s.MINI_SPEC_SIZE),
+        input_size=(s.BINS, s.MINI_SPEC_SIZE),
         output_features=1,
         note_level=True,
         max_layers=s.MAX_LAYERS,
@@ -57,7 +57,7 @@ def build_velocity_model(hpar, dropout):
 
 def build_pedaling_model(hpar, dropout):
     m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS - 1, 1),
+        input_size=(s.BINS, 1),
         output_features=3,
         note_level=False,
         max_layers=s.MAX_LAYERS,
