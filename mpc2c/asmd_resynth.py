@@ -6,11 +6,9 @@ from pathlib import Path
 
 import mido
 import numpy as np
-from tqdm import tqdm
 
 from .asmd.asmd import asmd
 from .pycarla import pycarla
-from .clustering import cluster_choice
 
 
 def group_split(datasets: t.List[str],
@@ -88,12 +86,15 @@ def group_split(datasets: t.List[str],
 
 
 def synthesize_song(midi_path: str, audio_path: str,
-                    server: pycarla.JackServer, final_decay: float):
+                    server: pycarla.JackServer, final_decay: float) -> bool:
     """
     Given a path to a midi file, synthesize it and returns the numpy array
 
     `final_decay` is the time that is waited before of stopping the recording
     (e.g. if there is a long reverb)
+
+    Return `True` if timeout was reachd while recording (probably some frame
+    was lost!)
     """
     recorder = pycarla.AudioRecorder(blocksize=server.client.blocksize)
     player = pycarla.MIDIPlayer()
@@ -103,13 +104,14 @@ def synthesize_song(midi_path: str, audio_path: str,
     server.toggle_freewheel()
     recorder.start(midifile.length + final_decay)
     player.synthesize_midi_file(midifile, sync=True, progress=False)
-    recorder.wait()
+    timeout = recorder.wait(midifile.length + final_decay + 1)
     server.toggle_freewheel()
     print()
     if np.all(recorder.recorded == 0):
         raise RuntimeWarning("Recorded file is empty!")
     recorder.save_recorded(audio_path)
     del player, recorder
+    return timeout
 
 
 def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
@@ -129,8 +131,8 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             if group != "orig":
                 # if this is a new context, start Carla
                 server = pycarla.JackServer([
-                    '-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256',
-                    '-X', 'seq'
+                    '-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256', '-X',
+                    'seq'
                 ])
                 server.start()
                 carla = pycarla.Carla(proj, server, min_wait=8)
@@ -151,7 +153,8 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                     # if this is a new context, resynthesize...
                     midi_path = (old_install_dir /
                                  d.paths[j][0][0]).with_suffix('.midi')
-                    while not correctly_synthesized(j, d):
+                    timeout = False
+                    while not correctly_synthesized(j, d) or timeout:
                         # delete file if it exists (only python >= 3.8)
                         audio_path.unlink(missing_ok=True)
                         # check that Carla is still alive..
@@ -160,8 +163,9 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                                 "Carla doesn't exists... restarting everything"
                             )
                             carla.restart()
-                        synthesize_song(str(midi_path), str(audio_path),
-                                        server, final_decay)
+                        timeout = synthesize_song(str(midi_path),
+                                                  str(audio_path), server,
+                                                  final_decay)
                 else:
                     old_audio_path = str(old_install_dir / d.paths[j][0][0])
                     print(f"Orig context, {old_audio_path} > {audio_path}")
