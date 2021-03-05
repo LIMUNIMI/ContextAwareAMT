@@ -6,9 +6,11 @@ from pathlib import Path
 
 import mido
 import numpy as np
+from tqdm import tqdm
 
 from .asmd.asmd import asmd
 from .pycarla import pycarla
+from .clustering import cluster_choice
 
 
 def group_split(datasets: t.List[str],
