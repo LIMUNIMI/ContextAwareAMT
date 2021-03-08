@@ -80,31 +80,32 @@ VEL_HYPERPARAMS = {
     "sigmoid_last": True
 }
 PED_HYPERPARAMS = {
-    'lstm_layers': 1,
-    'lstm_hidden_size': 5,
+    'lstm_layers': 0,
+    'lstm_hidden_size': 3,
     'middle_features': 0,
-    "kernel_0": 3,
-    "middle_activation": nn.Identity,
+    "kernel_0": 6,
+    "middle_activation": AbsLayer,
     "sigmoid_last": True
 }
 VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1
 EARLY_STOP = 10
 EARLY_RANGE = 1e-4
+TRAIN_DROPOUT = 0.1
 PLOT_LOSSES = True
 DTYPE = torch.float32
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
-LR_K = 10
+LR_K = 5
 
 # Transfer-learning
 PED_TRANSFER_LAYERS = -1
 PED_FREEZE_LAYERS = 2
 VEL_TRANSFER_LAYERS = -1
 VEL_FREEZE_LAYERS = 2
-TRANSFER_LR_K = 5
-TRANSFER_DROPOUT = 0.0
+TRANSFER_LR_K = 1
+TRANSFER_DROPOUT = 0.1
 TRANSFER_EARLY_RANGE = 0
 TRANSFER_EARLY_STOP = 20
 
@@ -131,7 +132,7 @@ PED_SKSPACE = [
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
 SKITERATIONS = (0, 80)
 PLOT_GRAPHS = True
-COMPLEXITY_PENALIZER = 1e-6
+COMPLEXITY_PENALIZER = 1e-5
 
 #: If compiling code with cython in pure-python mode
 BUILD = False

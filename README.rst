@@ -66,7 +66,7 @@ Datasets
    the complexity cost!). Learning rate: 4.07e-04.
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.2206. Learning rate: 1.19e-01.
+   and loss function of 0.2186.
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
    * Dummy loss: 0.1220
@@ -77,7 +77,6 @@ Datasets
    * 721 parameters::
 
     MIDIParameterEstimation(
-      (lstm): LSTM(12, 8, batch_first=True)
       (stack): Sequential(
         (0): Conv2d(1, 1, kernel_size=(3, 5), stride=(1, 1), bias=False)
         (1): Identity()
@@ -89,24 +88,26 @@ Datasets
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss: 0.2604
-   * Validation loss: 0.2068 (57 epochs with early-stop)
-   * 847 batches in training
-   * 77 batches in validation
-   * Learning rate: 0.0118
-   * 5924 parameters::
+   * Dummy loss: 0.2578
+   * Validation loss: 0.2013 (161 epochs with early-stop)
+   * 247 batches in training
+   * 47 batches in validation
+   * Learning rate: 0.0202
+   * 69 parameters::
 
     MIDIParameterEstimation(
-      (lstm): LSTM(12, 32, batch_first=True)
+      (dropout): Dropout(p=0.1, inplace=False)
       (stack): Sequential(
-        (0): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
+        (0): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
         (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (2): Identity()
-        (3): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
+        (2): AbsLayer()
+        (3): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
         (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (5): Identity()
-        (6): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
-        (7): Sigmoid()
+        (5): AbsLayer()
+        (6): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
+        (7): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (8): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
+        (9): Sigmoid()
       )
     )
 
