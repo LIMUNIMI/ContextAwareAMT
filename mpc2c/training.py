@@ -23,7 +23,7 @@ def model_test(model_build_func, test_sample):
 
         if allowed:
             try:
-                model = model_build_func(hpar)
+                model = model_build_func(hpar, s.TRAIN_DROPOUT)
                 print("model created")
                 model(test_sample.to(s.DEVICE).to(s.DTYPE))
                 print("model tested")
@@ -83,7 +83,7 @@ def train(hpar, wd, mode, context=None, state_dict=None, copy_checkpoint=True):
         early_stop = s.TRANSFER_EARLY_STOP
     else:
         lr_k = s.LR_K
-        dropout = 0
+        dropout = s.TRAIN_DROPOUT
         transfer_layers = s.PED_TRANSFER_LAYERS
         freeze_layers = s.PED_FREEZE_LAYERS
         early_range = s.EARLY_RANGE

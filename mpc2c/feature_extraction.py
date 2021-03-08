@@ -178,7 +178,7 @@ class MIDIParameterEstimation(nn.Module):
             k = conv_in_size
 
         if k[0] > 1 or k[1] > 1:
-            self.stac.append(
+            self.stack.append(
                 nn.Conv2d(input_features,
                           output_features,
                           kernel_size=k,
