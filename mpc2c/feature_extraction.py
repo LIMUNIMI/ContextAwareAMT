@@ -32,8 +32,8 @@ def conv_output_size(size, dilation, kernel, stride):
 
 
 class MIDIParameterEstimation(nn.Module):
-    def __init__(self, input_size, output_features, note_level, max_layers, dropout,
-                 hyperparams):
+    def __init__(self, input_size, output_features, note_level, max_layers,
+                 dropout, hyperparams):
         """
         * `hyperparams` must contains the following values:
 
@@ -178,7 +178,7 @@ class MIDIParameterEstimation(nn.Module):
             k = conv_in_size
 
         if k[0] > 1 or k[1] > 1:
-            self.stack.append(
+            self.stack += [
                 nn.Conv2d(input_features,
                           output_features,
                           kernel_size=k,
@@ -186,12 +186,12 @@ class MIDIParameterEstimation(nn.Module):
                           dilation=1,
                           padding=0,
                           groups=output_features,
-                          bias=False))
+                          bias=False),
+                nn.InstanceNorm2d(
+                    output_features, affine=True, track_running_stats=True
+                ) if output_features > 1 else nn.Identity()]
             if sigmoid_last:
-                self.stack.append(
-                    nn.InstanceNorm2d(
-                        output_features, affine=True, track_running_stats=True
-                    ) if output_features > 1 else nn.Identity())
+                self.stack.append(middle_activation())
             else:
                 self.stack.append(nn.Sigmoid())
 
