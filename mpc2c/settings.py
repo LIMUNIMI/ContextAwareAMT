@@ -71,9 +71,9 @@ MAX_LAYERS = 30
 DEVICE = 'cuda'
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    'lstm_layers': 1,
-    'lstm_hidden_size': 3,
-    'middle_features': 5,
+    'lstm_layers': 0,
+    'lstm_hidden_size': 5,
+    'middle_features': 0,
     "kernel_0": 3,
     "kernel_1": 5,
     "middle_activation": nn.Tanh,

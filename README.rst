@@ -62,54 +62,56 @@ Datasets
 
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.0838 (about like the dummy predictor but there is
-   the complexity cost!). Learning rate: 4.07e-04.
+   and loss function of 0.1074 (about like the dummy predictor but there is
+   the complexity cost!).
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.2186.
+   and loss function of TODO.
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
-   * Dummy loss: 0.1220
-   * Validation loss: 0.1213 (20 epochs, early-stop)
-   * 1.004.974 batches in training
-   * 73.066 batches in validation
-   * Learning rate: 9.88e-6
-   * 721 parameters::
+   * Dummy loss: 0.1207
+   * Validation loss: TODO (TODO epochs, early-stop)
+   * 354845 in training
+   * 55008 batches in validation
+   * Learning rate: 1.41e-05
+   * 32 parameters::
 
-    MIDIParameterEstimation(
+    MIDIParameterEstimation(                                               
+      (dropout): Dropout(p=0.1, inplace=False)
       (stack): Sequential(
         (0): Conv2d(1, 1, kernel_size=(3, 5), stride=(1, 1), bias=False)
         (1): Identity()
         (2): Tanh()
-        (3): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
-        (4): Sigmoid()
+        (3): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+        (4): Identity()
+        (5): Tanh()
+        (6): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+        (7): Identity()
+        (8): Tanh()
+        (9): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+        (10): Identity()
+        (11): Tanh()
+        (12): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+        (13): Identity()
+        (14): Tanh()
+        (15): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+        (16): Identity()
+        (17): Tanh()
+        (18): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
+        (19): Sigmoid()
       )
     )
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss: 0.2578
-   * Validation loss: 0.2013 (161 epochs with early-stop)
-   * 247 batches in training
-   * 47 batches in validation
-   * Learning rate: 0.0202
-   * 69 parameters::
+   * Dummy loss: TODO
+   * Validation loss: TODO (TODO epochs with early-stop)
+   * TODO batches in training
+   * TODO batches in validation
+   * Learning rate: TODO
+   * TODO parameters::
 
-    MIDIParameterEstimation(
-      (dropout): Dropout(p=0.1, inplace=False)
-      (stack): Sequential(
-        (0): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
-        (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (2): AbsLayer()
-        (3): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
-        (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (5): AbsLayer()
-        (6): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
-        (7): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (8): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
-        (9): Sigmoid()
-      )
-    )
+    TODO
 
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save it somewhere.
@@ -191,14 +193,14 @@ Results for velocity
 Results for pedaling
 ~~~~~~~~~~~~~~~~~~~~
 
-   * Retrained parameters: 6 (last conv module)
-   * Training 20 batches, validation 10 batches
-   * Learning rate: 0.025
+   * Retrained parameters: 21 (last 2 conv modules)
+   * Training 120 batches, validation 15 batches
+   * Learning rate: 0.00833
 
    #. pianoteq0:
 
-      * Dummy loss: 0.2723
-      * Validation loss: 0.2022 (92 epochs with early-stop)
+      * Dummy loss: 0.2646
+      * Validation loss: 0.2280 (92 epochs with early-stop)
 
    #. pianoteq1:
 
