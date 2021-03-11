@@ -70,7 +70,7 @@ def build_pedaling_model(hpar, dropout):
     return m
 
 
-def train(hpar, wd, mode, context=None, state_dict=None, copy_checkpoint=True):
+def train(hpar, mode, context=None, state_dict=None, copy_checkpoint=True):
     # loaders
     trainloader, validloader = data_management.multiple_splits_one_context(
         ['train', 'validation'], context, mode, False)
@@ -81,7 +81,9 @@ def train(hpar, wd, mode, context=None, state_dict=None, copy_checkpoint=True):
         lr_k = s.TRANSFER_LR_K
         early_range = s.TRANSFER_EARLY_RANGE
         early_stop = s.TRANSFER_EARLY_STOP
+        wd = s.TRANSFER_WD
     else:
+        wd = s.WD
         lr_k = s.LR_K
         dropout = s.TRAIN_DROPOUT
         transfer_layers = s.PED_TRANSFER_LAYERS

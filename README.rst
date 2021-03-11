@@ -70,7 +70,7 @@ Datasets
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
    * Dummy loss: 0.1207
-   * Validation loss:0.1210 (61 epochs, early-stop)
+   * Validation loss:0.1210 (62 epochs, early-stop)
    * 354845 in training
    * 55008 batches in validation
    * Learning rate: 1.41e-05
@@ -105,7 +105,7 @@ Datasets
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
    * Dummy loss: 0.2578
-   * Validation loss: TODO (TODO epochs with early-stop)
+   * Validation loss: 0.2016 (142 epochs with early-stop)
    * 247 batches in training
    * 47 batches in validation
    * Learning rate: 2.02e-2
@@ -158,16 +158,18 @@ Datasets
 
     Here ``<context>`` is any Carla preset name that you have used before.
 
+    #. Here we transferred all the parameters but freezed the first 2/3 of them.
+
     Results for velocity
     ~~~~~~~~~~~~~~~~~~~~
 
-       * Retrained parameters: 11 (last 11 layers)
+       * Retrained parameters: 14 (last 14 layers)
 
        #. pianoteq0:
 
-          * Dummy loss: TODO
+          * Dummy loss: 0.1328
           * Validation loss: TODO (TODO epochs with early-stop)
-          * Training 22669 batches, validation 6567 batches
+          * Training 136579 batches, validation 12003 batches
           * Learning rate: 7.32e-6
 
        #. pianoteq1:
@@ -208,14 +210,14 @@ Datasets
     Results for pedaling
     ~~~~~~~~~~~~~~~~~~~~
 
-       * Retrained parameters: TODO (last TODO conv modules)
-       * Training TODO batches, validation TODO batches
-       * Learning rate: TODO
+       * Retrained parameters: 21 (last 5 layers)
+       * Training 120 batches, validation 15 batches
+       * Learning rate: 8.33e-3
 
        #. pianoteq0:
 
-          * Dummy loss: TODO
-          * Validation loss: TODO (TODO epochs with early-stop)
+          * Dummy loss: 0.2646
+          * Validation loss: 0.2263 (500 epochs with no early-stop)
 
        #. pianoteq1:
 
