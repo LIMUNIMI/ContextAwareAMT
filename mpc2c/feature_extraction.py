@@ -295,22 +295,28 @@ class MIDIParameterEstimation(nn.Module):
 
     def freeze(self, num_layers=0):
         """
-        Set `requires_grad` to `False` except for the last `num_layers`. Note
-        that normalization layers are not controlled by `requires_grad` but by
-        `train` and `eval` mode, so we also set `track_running_stats` to False
-        for `InstanceNorm2d` layers.
+        Set `requires_grad` to `False` for layers until `num_layers`, to `True`
+        for the others. Note that normalization layers are not controlled by
+        `requires_grad` but by `train` and `eval` mode, so we also set
+        `track_running_stats` to False for `InstanceNorm2d` layers before
+        `num_layers` and True for the others.
+
+        The lstm is always set to requires_grad=False
         """
         if hasattr(self, 'lstm'):
             self.lstm.requires_grad_(False)
-
-        self.stack.requires_grad_(False)
-
-        for i in range(1, num_layers + 1):
-            m = self.stack[-i]
+ 
+        def set_parameters_to(m, boolean):
             for p in m.parameters():
-                p.requires_grad = True
+                p.requires_grad = boolean
             if type(m) is nn.InstanceNorm2d:
-                m.track_running_stats = False
+                m.track_running_stats = boolean
+
+        for m in self.stack[:num_layers]:
+            set_parameters_to(m, False)
+
+        for m in self.stack[num_layers:]:
+            set_parameters_to(m, True)
 
 
 class AbsLayer(nn.Module):
