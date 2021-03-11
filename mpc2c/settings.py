@@ -84,8 +84,9 @@ PED_HYPERPARAMS = {
     'lstm_hidden_size': 3,
     'middle_features': 0,
     "kernel_0": 6,
-    "middle_activation": AbsLayer,
-    "sigmoid_last": True
+    "middle_activation": nn.Identity,  # or AbsLayer?
+    "sigmoid_last":
+    True  # skopt returned `False`, but dependency graph showed `True`
 }
 VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1

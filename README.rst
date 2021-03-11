@@ -66,11 +66,11 @@ Datasets
    the complexity cost!).
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of TODO.
+   and loss function of 0.2189.
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
    * Dummy loss: 0.1207
-   * Validation loss: TODO (TODO epochs, early-stop)
+   * Validation loss:0.1210 (61 epochs, early-stop)
    * 354845 in training
    * 55008 batches in validation
    * Learning rate: 1.41e-05
