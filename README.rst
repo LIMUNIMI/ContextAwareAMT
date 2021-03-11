@@ -104,14 +104,29 @@ Datasets
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss: TODO
+   * Dummy loss: 0.2578
    * Validation loss: TODO (TODO epochs with early-stop)
-   * TODO batches in training
-   * TODO batches in validation
-   * Learning rate: TODO
-   * TODO parameters::
+   * 247 batches in training
+   * 47 batches in validation
+   * Learning rate: 2.02e-2
+   * 69 parameters::
 
-    TODO
+    MIDIParameterEstimation(
+      (dropout): Dropout(p=0.1, inplace=False)
+      (stack): Sequential(
+        (0): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
+        (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (2): AbsLayer()
+        (3): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
+        (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (5): AbsLayer()
+        (6): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
+        (7): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (8): AbsLayer()
+        (9): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
+        (10): Sigmoid()
+      )
+    )
 
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save it somewhere.
