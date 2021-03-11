@@ -164,7 +164,6 @@ def main():
 
             def objective(x):
                 return training.train(x,
-                                      s.WD,
                                       'pedaling',
                                       args.context,
                                       copy_checkpoint=False)
@@ -180,7 +179,6 @@ def main():
 
             def objective(x):
                 return training.train(x,
-                                      s.WD,
                                       'velocity',
                                       args.context,
                                       copy_checkpoint=False)
@@ -195,14 +193,12 @@ def main():
     if args.train:
         if args.pedaling:
             training.train(s.PED_HYPERPARAMS,
-                           s.WD,
                            'pedaling',
                            context=args.context,
                            state_dict=checkpoint)
 
         elif args.velocity:
             training.train(s.VEL_HYPERPARAMS,
-                           s.WD,
                            'velocity',
                            context=args.context,
                            state_dict=checkpoint)
