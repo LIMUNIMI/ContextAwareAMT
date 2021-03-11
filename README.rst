@@ -116,13 +116,13 @@ Datasets
       (stack): Sequential(
         (0): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
         (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (2): AbsLayer()
+        (2): Identity()
         (3): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
         (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (5): AbsLayer()
+        (5): Identity()
         (6): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
         (7): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (8): AbsLayer()
+        (8): Identity()
         (9): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
         (10): Sigmoid()
       )
@@ -131,116 +131,116 @@ Datasets
 #. After each training, you will find a file named `checkpoint0.????.pt`
    containing the checkpoint with the trained parameters. Save it somewhere.
 
----
+    ---
 
-* option ``-r`` preprocess the dataset using NMF; it should be used only once
-  per each type of model; each subsequent runs will use the already dumped
-  dataset
-* option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
-  1.5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
-  10% and 1.5%
+    * option ``-r`` preprocess the dataset using NMF; it should be used only once
+      per each type of model; each subsequent runs will use the already dumped
+      dataset
+    * option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
+      1.5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
+      10% and 1.5%
 
 
-3. Training the context-specific models
----------------------------------------
+    3. Training the context-specific models
+    ---------------------------------------
 
-#. Apply NMF to each context: ``python run.py -p -r -c <context>``, ``python
-   run.py -v -r -c <context>``
+    #. Apply NMF to each context: ``python run.py -p -r -c <context>``, ``python
+       run.py -v -r -c <context>``
 
-#. Fully train velocity model on the original context: ``python run.py -v -t -c
-   <context> -pt <path to generic model chekcpoint>``
+    #. Fully train velocity model on the original context: ``python run.py -v -t -c
+       <context> -pt <path to generic model chekcpoint>``
 
-#. Fully train pedaling model on the original context: ``python run.py -p -t -c
-   <context> -pt <path to generic model chekcpoint>``
+    #. Fully train pedaling model on the original context: ``python run.py -p -t -c
+       <context> -pt <path to generic model chekcpoint>``
 
-#. After each training, you will find a file named `checkpoint0.????.pt`
-   containing the checkpoint with the trained parameters. Save theme somewhere.
+    #. After each training, you will find a file named `checkpoint0.????.pt`
+       containing the checkpoint with the trained parameters. Save theme somewhere.
 
-Here ``<context>`` is any Carla preset name that you have used before.
+    Here ``<context>`` is any Carla preset name that you have used before.
 
-Results for velocity
-~~~~~~~~~~~~~~~~~~~~
+    Results for velocity
+    ~~~~~~~~~~~~~~~~~~~~
 
-   * Retrained parameters: 2 (last conv module)
+       * Retrained parameters: 11 (last 11 layers)
 
-   #. pianoteq0:
+       #. pianoteq0:
 
-      * Dummy loss: 0.1216
-      * Validation loss: 0.1214 (23 epochs with early-stop)
-      * Training 22669 batches, validation 6567 batches
-      * Learning rate: 2.21e-5
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs with early-stop)
+          * Training 22669 batches, validation 6567 batches
+          * Learning rate: 7.32e-6
 
-   #. pianoteq1:
+       #. pianoteq1:
 
-      * Dummy loss: 0.1204
-      * Validation loss: 0.1190 (30 epochs with early-stop)
-      * Training 24457 batches, validation 6672 batches
-      * Learning rate: 2.04e-4
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs with early-stop)
+          * Training TODO batches, validation TODO batches
+          * Learning rate: TODO
 
-   #. pianoteq2:
+       #. pianoteq2:
 
-      * Dummy loss: 0.1217
-      * Validation loss: 0.1202 (500 epochs NO early-stop)
-      * Training 22405 batches, validation 7729 batches
-      * Learning rate: 2.23e-4
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs NO early-stop)
+          * Training TODO batches, validation TODO batches
+          * Learning rate: TODO
+
+       #. pianoteq3:
+
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs with early-stop)
+          * Training TODO batches, validation TODO batches
+          * Learning rate: TODO
+
+       #. salamander0:
+
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs with early-stop)
+          * Training TODO batches, validation TODO batches
+          * Learning rate: TODO
+
+       #. salamander1:
+
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs with early-stop)
+          * Training TODO batches, validation TODO batches
+          * Learning rate: TODO
+
+    Results for pedaling
+    ~~~~~~~~~~~~~~~~~~~~
+
+       * Retrained parameters: TODO (last TODO conv modules)
+       * Training TODO batches, validation TODO batches
+       * Learning rate: TODO
+
+       #. pianoteq0:
+
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs with early-stop)
+
+       #. pianoteq1:
+
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs with early-stop)
+
+       #. pianoteq2:
+
+          * Dummy loss: TODO
+          * Validation loss: TODO (TODO epochs with early-stop)
 
    #. pianoteq3:
 
-      * Dummy loss: 0.1222
-      * Validation loss: 0.1223 (500 epochs with early-stop)
-      * Training 20394 batches, validation 8273 batches
-      * Learning rate: 2.45e-4
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs NO early-stop)
 
    #. salamander0:
 
-      * Dummy loss: 0.1134
-      * Validation loss: 0.1132 (23 epochs with early-stop)
-      * Training 20734 batches, validation 8329 batches
-      * Learning rate: 2.41e-4
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs with early-stop)
 
    #. salamander1:
 
-      * Dummy loss: 0.1213
-      * Validation loss: 0.1209 (23 epochs with early-stop)
-      * Training 22218 batches, validation 8626 batches
-      * Learning rate: 2.25e-4
-
-Results for pedaling
-~~~~~~~~~~~~~~~~~~~~
-
-   * Retrained parameters: 21 (last 2 conv modules)
-   * Training 120 batches, validation 15 batches
-   * Learning rate: 0.00833
-
-   #. pianoteq0:
-
-      * Dummy loss: 0.2646
-      * Validation loss: 0.2280 (92 epochs with early-stop)
-
-   #. pianoteq1:
-
-      * Dummy loss: 0.2751
-      * Validation loss: 0.2103 (302 epochs with early-stop)
-
-   #. pianoteq2:
-
-      * Dummy loss: 0.2721
-      * Validation loss: 0.2168 (49 epochs with early-stop)
-
-   #. pianoteq3:
-
-      * Dummy loss: 0.2395
-      * Validation loss: 0.19103 (500 epochs NO early-stop)
-
-   #. salamander0:
-
-      * Dummy loss: 0.2871
-      * Validation loss: 0.2417 (53 epochs with early-stop)
-
-   #. salamander1:
-
-      * Dummy loss: 0.2623
-      * Validation loss: 0.2255 (500 epochs with NO early-stop)
+      * Dummy loss: TODO
+      * Validation loss: TODO (TODO epochs with NO early-stop)
 
 
 4. Evaluating error distributions
