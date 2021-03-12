@@ -255,20 +255,16 @@ Results for pedaling
 
 #. Evaluate error distributions of velocity models whose checkpoints are in a
    given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can
-   use shell expansion like ``models/*_vel.pt``
+   use shell expansion like ``models/*_vel_0.pt``
 #. Evaluate error distributions of pedaling models whose checkpoints are in a
    given directory: ``python run.py -p -e <list of checkpoints> -cp``; you can
-   use shell expansion like ``models/*_ped.pt``
+   use shell expansion like ``models/*_ped_0.pt``
 
 These commands will create a plotly plots with violin plots of generic and
 specific contexts and Wilcoxon p-values.
 
 You can plot the tests multiple times without retesting: ``python run.py -p -cp -cf
 results/*.csv``.
-
-Note that the usage of ``-cp`` is only possible if you name your checkpoints
-with the relative context in the initial part of the filename (e.g.
-``models/pianoteq0_vel.pt``).
 
 5. Testing on a specific file
 -----------------------------

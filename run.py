@@ -212,7 +212,7 @@ def main():
         for step in steps:
             print("----------------")
             print(f"Training by freezing/transferring {step} layers")
-            fname = 'models/' + mode[:3] + '_' + args.context + '_' + str(
+            fname = 'models/' + args.context + '_' + mode[:3] + '_' + str(
                 step) + '.pt'
             training.train(hpar,
                            mode,
