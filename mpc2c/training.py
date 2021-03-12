@@ -1,4 +1,5 @@
 # from memory_profiler import profile
+
 from pprint import pprint
 
 import torch
@@ -49,8 +50,8 @@ def build_velocity_model(hpar, dropout):
         dropout=dropout,
         hyperparams=((hpar['kernel_0'], hpar['kernel_1']), (1, 1), (1, 1),
                      hpar['lstm_hidden_size'], hpar['lstm_layers'],
-                     hpar['middle_features'], hpar['middle_activation'],
-                     1, hpar['sigmoid_last'])).to(s.DEVICE).to(s.DTYPE)
+                     hpar['middle_features'], hpar['middle_activation'], 1,
+                     hpar['sigmoid_last'])).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
@@ -64,13 +65,18 @@ def build_pedaling_model(hpar, dropout):
         dropout=dropout,
         hyperparams=((hpar['kernel_0'], 1), (1, 1), (1, 1),
                      hpar['lstm_hidden_size'], hpar['lstm_layers'],
-                     hpar['middle_features'], hpar['middle_activation'],
-                     3, hpar['sigmoid_last'])).to(s.DEVICE).to(s.DTYPE)
+                     hpar['middle_features'], hpar['middle_activation'], 3,
+                     hpar['sigmoid_last'])).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
-def train(hpar, mode, context=None, state_dict=None, copy_checkpoint=True):
+def train(hpar,
+          mode,
+          transfer_step=None,
+          context=None,
+          state_dict=None,
+          copy_checkpoint=True):
     # loaders
     trainloader, validloader = data_management.multiple_splits_one_context(
         ['train', 'validation'], context, mode, False)
@@ -82,25 +88,21 @@ def train(hpar, mode, context=None, state_dict=None, copy_checkpoint=True):
         early_range = s.TRANSFER_EARLY_RANGE
         early_stop = s.TRANSFER_EARLY_STOP
         wd = s.TRANSFER_WD
+        transfer_layers = transfer_step
+        freeze_layers = transfer_step
     else:
         wd = s.WD
         lr_k = s.LR_K
         dropout = s.TRAIN_DROPOUT
-        transfer_layers = s.PED_TRANSFER_LAYERS
-        freeze_layers = s.PED_FREEZE_LAYERS
         early_range = s.EARLY_RANGE
         early_stop = s.EARLY_STOP
 
     if mode == 'velocity':
         model = build_velocity_model(hpar, dropout)
         axes = []
-        transfer_layers = s.VEL_TRANSFER_LAYERS
-        freeze_layers = s.VEL_FREEZE_LAYERS
     elif mode == 'pedaling':
         model = build_pedaling_model(hpar, dropout)
         axes = [-1]
-        transfer_layers = s.PED_TRANSFER_LAYERS
-        freeze_layers = s.PED_FREEZE_LAYERS
 
     if state_dict is not None:
         model.load_state_dict(state_dict, end=transfer_layers)
@@ -114,7 +116,10 @@ def train(hpar, mode, context=None, state_dict=None, copy_checkpoint=True):
     print(f"Using learning rate {lr:.2e}")
 
     # dummy model (baseline)
-    dummy_avg = compute_average(trainloader.dataset, *axes, n_jobs=-1, backend='threading')
+    dummy_avg = compute_average(trainloader.dataset,
+                                *axes,
+                                n_jobs=-1,
+                                backend='threading')
     # optimizer
     optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 

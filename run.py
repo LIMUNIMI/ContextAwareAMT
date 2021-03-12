@@ -166,7 +166,7 @@ def main():
                 return training.train(x,
                                       'pedaling',
                                       args.context,
-                                      copy_checkpoint=False)
+                                      copy_checkpoint='')
 
             space_constraint = training.model_test(
                 training.build_pedaling_model, torch.rand(1, s.BINS, 100))
@@ -181,7 +181,7 @@ def main():
                 return training.train(x,
                                       'velocity',
                                       args.context,
-                                      copy_checkpoint=False)
+                                      copy_checkpoint='')
 
         hyperopt(space,
                  s.SKCHECKPOINT,
@@ -192,16 +192,34 @@ def main():
 
     if args.train:
         if args.pedaling:
-            training.train(s.PED_HYPERPARAMS,
-                           'pedaling',
-                           context=args.context,
-                           state_dict=checkpoint)
+            mode = 'pedaling'
+            hpar = s.PED_HYPERPARAMS
+            if args.checkpoint:
+                steps = s.PED_STEP
+            else:
+                steps = [None]
 
         elif args.velocity:
-            training.train(s.VEL_HYPERPARAMS,
-                           'velocity',
+            mode = 'velocity'
+            hpar = s.VEL_HYPERPARAMS
+            if args.checkpoint:
+                # each step is a different size of transferred/freezed layers
+                steps = s.VEL_STEP
+            else:
+                # in this case the steps will only be used for the filename
+                steps = [None]
+
+        for step in steps:
+            print("----------------")
+            print(f"Training by freezing/transferring {step} layers")
+            training.train(hpar,
+                           mode,
+                           step,
                            context=args.context,
-                           state_dict=checkpoint)
+                           state_dict=checkpoint,
+                           copy_checkpoint=mode[:3] + '_' + args.context +
+                           '_' + step + '.pt')
+            input("\nPress a key to continue: ")
 
     if args.redump:
         if args.pedaling:
