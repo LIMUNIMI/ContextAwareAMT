@@ -136,8 +136,8 @@ Datasets
   per each type of model; each subsequent runs will use the already dumped
   dataset
 * option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
-  1.5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
-  10% and 1.5%
+  3% for velocity; thus, ``-sk -r`` would result in preprocessing only that
+  10% and 3%
 
 
 3. Training the context-specific models
@@ -146,10 +146,10 @@ Datasets
 #. Apply NMF to each context: ``python run.py -p -r -c <context>``, ``python
    run.py -v -r -c <context>``
 
-#. Fully train velocity model on the original context: ``python run.py -v -t -c
+#. Fully train velocity model on the specific context: ``python run.py -v -t -c
    <context> -pt <path to generic model chekcpoint>``
 
-#. Fully train pedaling model on the original context: ``python run.py -p -t -c
+#. Fully train pedaling model on the specific context: ``python run.py -p -t -c
    <context> -pt <path to generic model chekcpoint>``
 
 #. After each training, you will find 3 checkpoints in the `models`
@@ -158,8 +158,6 @@ Datasets
    before of going on with the next size of transferred layers
 
 Here ``<context>`` is any Carla preset name that you have used before.
-
-#. Here we transferred all the parameters but freezed the first 2/3 of them.
 
 Results for velocity
 ~~~~~~~~~~~~~~~~~~~~
