@@ -76,31 +76,31 @@ Datasets
    * Learning rate: 1.41e-05
    * 32 parameters::
 
-    MIDIParameterEstimation(                                               
-      (dropout): Dropout(p=0.1, inplace=False)
-      (stack): Sequential(
-        (0): Conv2d(1, 1, kernel_size=(3, 5), stride=(1, 1), bias=False)
-        (1): Identity()
-        (2): Tanh()
-        (3): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-        (4): Identity()
-        (5): Tanh()
-        (6): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-        (7): Identity()
-        (8): Tanh()
-        (9): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-        (10): Identity()
-        (11): Tanh()
-        (12): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-        (13): Identity()
-        (14): Tanh()
-        (15): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-        (16): Identity()
-        (17): Tanh()
-        (18): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
-        (19): Sigmoid()
+      MIDIParameterEstimation(                                               
+        (dropout): Dropout(p=0.1, inplace=False)
+        (stack): Sequential(
+          (0): Conv2d(1, 1, kernel_size=(3, 5), stride=(1, 1), bias=False)
+          (1): Identity()
+          (2): Tanh()
+          (3): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (4): Identity()
+          (5): Tanh()
+          (6): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (7): Identity()
+          (8): Tanh()
+          (9): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (10): Identity()
+          (11): Tanh()
+          (12): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (13): Identity()
+          (14): Tanh()
+          (15): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (16): Identity()
+          (17): Tanh()
+          (18): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
+          (19): Sigmoid()
+        )
       )
-    )
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
@@ -111,38 +111,37 @@ Datasets
    * Learning rate: 2.02e-2
    * 69 parameters::
 
-    MIDIParameterEstimation(
-      (dropout): Dropout(p=0.1, inplace=False)
-      (stack): Sequential(
-        (0): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
-        (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (2): Identity()
-        (3): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
-        (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (5): Identity()
-        (6): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
-        (7): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-        (8): Identity()
-        (9): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
-        (10): Sigmoid()
+      MIDIParameterEstimation(
+        (dropout): Dropout(p=0.1, inplace=False)
+        (stack): Sequential(
+          (0): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
+          (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (2): Identity()
+          (3): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
+          (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (5): Identity()
+          (6): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
+          (7): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          (8): Identity()
+          (9): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
+          (10): Sigmoid()
+        )
       )
-    )
 
-#. After each training, you will find a file named `checkpoint0.????.pt`
-   containing the checkpoint with the trained parameters. Save it somewhere.
+#. After each training, you will find a checkpoint file in the `models` directory
 
-    ---
+----
 
-    * option ``-r`` preprocess the dataset using NMF; it should be used only once
-      per each type of model; each subsequent runs will use the already dumped
-      dataset
-    * option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
-      1.5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
-      10% and 1.5%
+* option ``-r`` preprocess the dataset using NMF; it should be used only once
+  per each type of model; each subsequent runs will use the already dumped
+  dataset
+* option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
+  1.5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
+  10% and 1.5%
 
 
-    3. Training the context-specific models
-    ---------------------------------------
+3. Training the context-specific models
+---------------------------------------
 
     #. Apply NMF to each context: ``python run.py -p -r -c <context>``, ``python
        run.py -v -r -c <context>``
@@ -153,97 +152,103 @@ Datasets
     #. Fully train pedaling model on the original context: ``python run.py -p -t -c
        <context> -pt <path to generic model chekcpoint>``
 
-    #. After each training, you will find a file named `checkpoint0.????.pt`
-       containing the checkpoint with the trained parameters. Save theme somewhere.
+    #. After each training, you will find 3 checkpoints in the `models`
+       directory, each corresponding to a different size of transferred
+       knowledge. For each size, the procedure stops and wait for an input
+       before of going on with the next size of transferred layers
 
     Here ``<context>`` is any Carla preset name that you have used before.
 
     #. Here we transferred all the parameters but freezed the first 2/3 of them.
 
-    Results for velocity
-    ~~~~~~~~~~~~~~~~~~~~
+Results for velocity
+~~~~~~~~~~~~~~~~~~~~
 
-       * Retrained parameters: 14 (last 14 layers)
+    +-------------+---------+---------------+------------+-----------------+--------+
+    | context     | batches | learning rate | dummy loss | validation loss | epochs |
+    +-------------+---------+---------------+------------+-----------------+--------+
+    | pianoteq0   | 136579, |  3.66e-5      |   0.13284  |                 |        |
+    |             | 12003   +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    +-------------+---------+---------------+------------+-----------------+--------+
+    | pianoteq1   |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    +-------------+---------+---------------+------------+-----------------+--------+
+    | pianoteq2   |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    +-------------+---------+---------------+------------+-----------------+--------+
+    | pianoteq3   |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    +-------------+---------+---------------+------------+-----------------+--------+
+    | salamander0 |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    |             |         +---------------+            +-----------------+--------+
+    |             |         |               |            |                 |        |
+    +-------------+---------+---------------+------------+-----------------+--------+
+    | salamander1 |         |               |            |                 |        |
+    |             |         +---------------+------------+-----------------+--------+
+    |             |         |               |            |                 |        |
+    |             |         +---------------+------------+-----------------+--------+
+    |             |         |               |            |                 |        |
+    +-------------+---------+---------------+------------+-----------------+--------+
 
-       #. pianoteq0:
+Results for pedaling
+~~~~~~~~~~~~~~~~~~~~
 
-          * Dummy loss: 0.1328
-          * Validation loss: TODO (TODO epochs with early-stop)
-          * Training 136579 batches, validation 12003 batches
-          * Learning rate: 7.32e-6
+    Training batches: 120
+    Validation batches: 15
 
-       #. pianoteq1:
-
-          * Dummy loss: TODO
-          * Validation loss: TODO (TODO epochs with early-stop)
-          * Training TODO batches, validation TODO batches
-          * Learning rate: TODO
-
-       #. pianoteq2:
-
-          * Dummy loss: TODO
-          * Validation loss: TODO (TODO epochs NO early-stop)
-          * Training TODO batches, validation TODO batches
-          * Learning rate: TODO
-
-       #. pianoteq3:
-
-          * Dummy loss: TODO
-          * Validation loss: TODO (TODO epochs with early-stop)
-          * Training TODO batches, validation TODO batches
-          * Learning rate: TODO
-
-       #. salamander0:
-
-          * Dummy loss: TODO
-          * Validation loss: TODO (TODO epochs with early-stop)
-          * Training TODO batches, validation TODO batches
-          * Learning rate: TODO
-
-       #. salamander1:
-
-          * Dummy loss: TODO
-          * Validation loss: TODO (TODO epochs with early-stop)
-          * Training TODO batches, validation TODO batches
-          * Learning rate: TODO
-
-    Results for pedaling
-    ~~~~~~~~~~~~~~~~~~~~
-
-       * Retrained parameters: 21 (last 5 layers)
-       * Training 120 batches, validation 15 batches
-       * Learning rate: 8.33e-3
-
-       #. pianoteq0:
-
-          * Dummy loss: 0.2646
-          * Validation loss: 0.2263 (500 epochs with no early-stop)
-
-       #. pianoteq1:
-
-          * Dummy loss: TODO
-          * Validation loss: TODO (TODO epochs with early-stop)
-
-       #. pianoteq2:
-
-          * Dummy loss: TODO
-          * Validation loss: TODO (TODO epochs with early-stop)
-
-   #. pianoteq3:
-
-      * Dummy loss: TODO
-      * Validation loss: TODO (TODO epochs NO early-stop)
-
-   #. salamander0:
-
-      * Dummy loss: TODO
-      * Validation loss: TODO (TODO epochs with early-stop)
-
-   #. salamander1:
-
-      * Dummy loss: TODO
-      * Validation loss: TODO (TODO epochs with NO early-stop)
-
+    +-------------+---------------+------------+-----------------+--------+
+    | context     | learning rate | dummy loss | validation loss | epochs |
+    +-------------+---------------+------------+-----------------+--------+
+    | pianoteq0   |  4.17e-2      |   0.26464  |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    +-------------+---------------+------------+-----------------+--------+
+    | pianoteq1   |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    +-------------+---------------+------------+-----------------+--------+
+    | pianoteq2   |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    +-------------+---------------+------------+-----------------+--------+
+    | pianoteq3   |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    +-------------+---------------+------------+-----------------+--------+
+    | salamander0 |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    +-------------+---------------+------------+-----------------+--------+
+    | salamander1 |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    |             +---------------+            +-----------------+--------+
+    |             |               |            |                 |        |
+    +-------------+---------------+------------+-----------------+--------+
 
 4. Evaluating error distributions
 ---------------------------------
@@ -291,6 +296,7 @@ We used 6 different artificial contexts:
    ("Large", 2.15 sec decay)
 
 
+=======
 Credits
 =======
 
