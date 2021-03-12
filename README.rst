@@ -76,7 +76,7 @@ Datasets
    * Learning rate: 1.41e-05
    * 32 parameters::
 
-      MIDIParameterEstimation(                                               
+      MIDIParameterEstimation(
         (dropout): Dropout(p=0.1, inplace=False)
         (stack): Sequential(
           (0): Conv2d(1, 1, kernel_size=(3, 5), stride=(1, 1), bias=False)
