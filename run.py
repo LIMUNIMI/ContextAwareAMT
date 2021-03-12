@@ -212,13 +212,14 @@ def main():
         for step in steps:
             print("----------------")
             print(f"Training by freezing/transferring {step} layers")
+            fname = 'models/' + mode[:3] + '_' + args.context + '_' + str(
+                step) + '.pt'
             training.train(hpar,
                            mode,
                            step,
                            context=args.context,
                            state_dict=checkpoint,
-                           copy_checkpoint=mode[:3] + '_' + args.context +
-                           '_' + str(step) + '.pt')
+                           copy_checkpoint=fname)
             input("\nPress a key to continue: ")
 
     if args.redump:
