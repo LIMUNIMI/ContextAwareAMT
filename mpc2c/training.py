@@ -84,7 +84,6 @@ def train(hpar,
     # building model
     if state_dict is not None:
         dropout = s.TRANSFER_DROPOUT
-        lr_k = s.TRANSFER_LR_K
         early_range = s.TRANSFER_EARLY_RANGE
         early_stop = s.TRANSFER_EARLY_STOP
         wd = s.TRANSFER_WD
@@ -92,7 +91,6 @@ def train(hpar,
         freeze_layers = transfer_step
     else:
         wd = s.WD
-        lr_k = s.LR_K
         dropout = s.TRAIN_DROPOUT
         early_range = s.EARLY_RANGE
         early_stop = s.EARLY_STOP
@@ -108,11 +106,13 @@ def train(hpar,
         model.load_state_dict(state_dict, end=transfer_layers)
         model.freeze(freeze_layers)
 
+    n_params_free = count_params(model, requires_grad=True)
+    n_params_all = count_params(model, requires_grad=False)
     print(model)
-    print("Total number of parameters: ", count_params(model))
+    print("Total number of parameters: ", n_params_free)
 
     # learning rate
-    lr = lr_k / len(trainloader)
+    lr = (s.LR_K / len(trainloader)) * (n_params_all / n_params_free)
     print(f"Using learning rate {lr:.2e}")
 
     # dummy model (baseline)
