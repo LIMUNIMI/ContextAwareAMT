@@ -218,7 +218,7 @@ def main():
                            context=args.context,
                            state_dict=checkpoint,
                            copy_checkpoint=mode[:3] + '_' + args.context +
-                           '_' + step + '.pt')
+                           '_' + str(step) + '.pt')
             input("\nPress a key to continue: ")
 
     if args.redump:
