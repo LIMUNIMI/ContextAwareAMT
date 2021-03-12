@@ -112,7 +112,7 @@ def train(hpar,
     print("Total number of parameters: ", n_params_free)
 
     # learning rate
-    lr = (s.LR_K / len(trainloader)) * (n_params_all / n_params_free) ** 2
+    lr = (s.LR_K / len(trainloader)) * (n_params_all / n_params_free)
     print(f"Using learning rate {lr:.2e}")
 
     # dummy model (baseline)
