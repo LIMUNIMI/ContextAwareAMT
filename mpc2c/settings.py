@@ -44,7 +44,9 @@ RETUNING = False
 # NMF
 #: epsilon value used inside the nmf to prevent divisons by 0
 EPS = 2.0**-52
-#: width of mini spectrograms centered around the maximum value
+#: width of mini spectrograms: the number of frames after the onset; if the
+#: note lasts longer than this value, it is trimmed, if it lasts less it is
+#: padded with `PADDING_VALUE`
 MINI_SPEC_SIZE = 5
 #: value used for padding mini specs when their width is < MINI_SPEC_SIZE
 PADDING_VALUE = -1e-15
@@ -109,6 +111,7 @@ TRANSFER_WD = 0
 TRANSFER_DROPOUT = 0.1
 TRANSFER_EARLY_RANGE = 1e-4
 TRANSFER_EARLY_STOP = 20
+TRANSFER_VEL_BATCH_SIZE = 500
 
 # SKOPT
 VEL_SKSPACE = [

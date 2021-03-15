@@ -152,6 +152,7 @@ def main():
 
     if args.checkpoint:
         checkpoint = torch.load(args.checkpoint)['state_dict']
+        s.VEL_BATCH_SIZE = s.TRANSFER_VEL_BATCH_SIZE
     else:
         checkpoint = None
 
