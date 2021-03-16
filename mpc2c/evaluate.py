@@ -1,3 +1,4 @@
+import re
 import typing as T
 from pathlib import Path
 
@@ -41,11 +42,22 @@ def evaluate(checkpoints: T.Dict[str, T.Any], mode: str,
     return ret
 
 
+regex = re.compile("[a-zA-Z0-9]+_[a-zA-Z0-9]+_([0-9]+)")
+
+
 def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
                       contexts: T.List[str]) -> T.List[T.List[pd.DataFrame]]:
     evaluation: T.List[T.List[pd.DataFrame]] = []
 
     for checkpoint in checkpoints:
+        checkpoint_name = str(Path(checkpoint).stem)
+        match = regex.match(checkpoint_name)
+        if match is None:
+            # context orig
+            tl_size = -1
+        else:
+            tl_size = int(match.groups()[0])
+
         errors = [
             pd.DataFrame(),
         ]
@@ -60,8 +72,10 @@ def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
                 pd.DataFrame(
                     dict(values=res,
                          context=[context] * res.shape[0],
-                         checkpoint=[Path(checkpoint).stem] * res.shape[0])))
-        errors[0]['checkpoint'] = [Path(checkpoint).stem] * errors[0].shape[0]
+                         checkpoint=[
+                             checkpoint_name[:checkpoint_name.index('_')]
+                         ] * res.shape[0],
+                         tl_size=tl_size)))
         evaluation.append(errors)
 
     return evaluation
@@ -72,6 +86,14 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
     evaluation: T.List[T.List[pd.DataFrame]] = []
 
     for checkpoint in checkpoints:
+        checkpoint_name = Path(checkpoint).stem
+        match = regex.match(checkpoint_name)
+        if match is None:
+            # context orig
+            tl_size = -1
+        else:
+            tl_size = int(match.groups()[0])
+
         errors = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
         model = build_pedaling_model(s.PED_HYPERPARAMS, 0)
 
@@ -82,10 +104,13 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
             res = eval_model_context(model, context, 'pedaling')
             for i in range(len(errors)):
                 errors[i] = errors[i].append(
-                    pd.DataFrame(data=dict(values=res[i],
-                                           context=[context] * res[i].shape[0],
-                                           checkpoint=[Path(checkpoint).stem] *
-                                           res[0].shape[0])))
+                    pd.DataFrame(data=dict(
+                        values=res[i],
+                        context=[context] * res[i].shape[0],
+                        checkpoint=[
+                            checkpoint_name[:checkpoint_name.index('_')]
+                        ] * res[0].shape[0],
+                        tl_size=tl_size)))
 
         evaluation.append(errors)
 
@@ -136,10 +161,6 @@ def plot(df: pd.DataFrame,
     `save` is the path to the dir where figs will be saved (if `None`, no
     figure will be saved)
     """
-    if mode == 'velocity':
-        orig_checkpoint = 'orig_vel'
-    elif mode == 'pedaling':
-        orig_checkpoint = 'orig_ped'
 
     figs = []
     contexts = sorted(df['context'].unique().tolist())
@@ -161,7 +182,19 @@ def plot(df: pd.DataFrame,
                       box=True,
                       points=False,
                       range_y=[0, 1],
+                      facet_row='tl_size',
                       title=f"checkpoint {checkpoint}"))
+
+    # repeat checkpoint orig for each other values of tl_size
+    tl_size_vals = df['tl_size'].unique()
+    tl_size_vals = tl_size_vals[tl_size_vals >= 0]
+    # changing tl_size for the existing rows with ccheckpoint `orig`
+    df.loc[df['checkpoint'] == 'orig', 'tl_size'] = tl_size_vals[0]
+    # repeating the rows but changing the `tl_size` value
+    cp = df[df['checkpoint'] == 'orig'].copy()
+    for tl_size in tl_size_vals[1:]:
+        cp.loc[:, 'tl_size'] = tl_size
+        df.append(cp, ignore_index=True)
 
     # plotting all checkpoints for each context
     print(" 2. Plotting contexts")
@@ -177,6 +210,7 @@ def plot(df: pd.DataFrame,
                       box=True,
                       points=False,
                       range_y=[0, 1],
+                      facet_row='tl_size',
                       title=f"context {context}"))
 
     if compare:
@@ -193,16 +227,16 @@ def plot(df: pd.DataFrame,
         # selcting rows for which the checkpoint starts with the context or
         # with 'orig'
         cdf = pd.DataFrame()
-        idx = df['checkpoint'] == orig_checkpoint
+        idx = df['checkpoint'] == 'orig'
         cdf = cdf.append(df[idx])
         for context in contexts:
             cdf = cdf.append(df[(df['context'] == context)
-                                & (df['checkpoint'].str.startswith(context))])
+                                & (df['checkpoint'] == context)])
 
         # renaming checkpoints
         new_checkpoint = 'transfer-learnt'
         # ~ is for logical not
-        idx = cdf['checkpoint'] == orig_checkpoint
+        idx = cdf['checkpoint'] == 'orig'
         cdf.loc[~idx, 'checkpoint'] = new_checkpoint
 
         # plotting
@@ -218,6 +252,7 @@ def plot(df: pd.DataFrame,
                         box=True,
                         points=False,
                         range_y=[0, 1.1],
+                        facet_row='tl_size',
                         title="transfer-learning effect")
 
         # adding pvals
@@ -227,7 +262,7 @@ def plot(df: pd.DataFrame,
             # sample(frac=1) is used to shuffle data
             x = data.loc[data['checkpoint'] == new_checkpoint,
                          'values'].sample(frac=1)
-            y = data.loc[data['checkpoint'] == orig_checkpoint,
+            y = data.loc[data['checkpoint'] == 'orig',
                          'values'].sample(frac=1)
             L = min(len(x), len(y))
             stat, pval = wilcoxon(x[:L], y[:L])

@@ -103,9 +103,9 @@ DATASET_LEN = 1
 LR_K = 5
 
 # Transfer-learning
-# 100%, 35%, 70% = 0, 1, all but 2 conv layers
+# 0%, 35%, 70% = 0, 1, all but 2 conv layers
 PED_STEP = [0, 3, 5]
-# 100%, 47%, 84% = 0, 1, all but 2 conv layers
+# 0%, 47%, 84% = 0, 1, all but 2 conv layers
 VEL_STEP = [0, 3, 14]
 TRANSFER_WD = 0
 TRANSFER_DROPOUT = 0.1

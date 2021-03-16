@@ -259,6 +259,7 @@ def main():
             for i, df in enumerate(dfs):
                 evaluate.plot(df,
                               compare,
+                              mode=mode,
                               save=Path(s.IMAGES_PATH) / f"{mode}_eval.{i}")
 
 

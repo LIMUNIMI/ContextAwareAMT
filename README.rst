@@ -254,10 +254,10 @@ Learning rates: 4.17e-2, 6.39-2, 1.37e-1
 
 #. Evaluate error distributions of velocity models whose checkpoints are in a
    given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can
-   use shell expansion like ``models/*_vel_0.pt``
+   use shell expansion like ``models/*vel*.pt``
 #. Evaluate error distributions of pedaling models whose checkpoints are in a
    given directory: ``python run.py -p -e <list of checkpoints> -cp``; you can
-   use shell expansion like ``models/*_ped_0.pt``
+   use shell expansion like ``models/*ped*.pt``
 
 These commands will create a plotly plots with violin plots of generic and
 specific contexts and Wilcoxon p-values.
