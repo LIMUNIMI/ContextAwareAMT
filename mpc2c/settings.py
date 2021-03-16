@@ -43,13 +43,13 @@ RETUNING = False
 
 # NMF
 #: epsilon value used inside the nmf to prevent divisons by 0
-EPS = 2.0**-52
+EPS = 1.0**-52
 #: width of mini spectrograms: the number of frames after the onset; if the
 #: note lasts longer than this value, it is trimmed, if it lasts less it is
 #: padded with `PADDING_VALUE`
-MINI_SPEC_SIZE = 5
+MINI_SPEC_SIZE = 30
 #: value used for padding mini specs when their width is < MINI_SPEC_SIZE
-PADDING_VALUE = -1e-15
+PADDING_VALUE = 0
 #: cost function used in the NMF
 NMF_COST_FUNC = 'EucDist'
 EPS_RANGE = 0
@@ -96,7 +96,7 @@ EARLY_STOP = 10
 EARLY_RANGE = 1e-4
 TRAIN_DROPOUT = 0.1
 PLOT_LOSSES = True
-DTYPE = torch.float32
+DTYPE = torch.float64
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
@@ -112,6 +112,7 @@ TRANSFER_DROPOUT = 0.1
 TRANSFER_EARLY_RANGE = 1e-4
 TRANSFER_EARLY_STOP = 20
 TRANSFER_VEL_BATCH_SIZE = 500
+TRASFER_LR_K = 0.5
 
 # SKOPT
 VEL_SKSPACE = [
@@ -119,7 +120,7 @@ VEL_SKSPACE = [
     space.Integer(0, 7, name='lstm_hidden_size'),
     space.Integer(0, 7, name='middle_features'),
     space.Integer(3, 6, name='kernel_0'),
-    space.Integer(3, 5, name='kernel_1'),
+    space.Integer(3, 10, name='kernel_1'),
     space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
                       name='middle_activation'),
     space.Categorical([True, False], name='sigmoid_last'),

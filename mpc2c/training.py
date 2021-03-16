@@ -87,7 +87,7 @@ def train(hpar,
         early_range = s.TRANSFER_EARLY_RANGE
         early_stop = s.TRANSFER_EARLY_STOP
         wd = s.TRANSFER_WD
-        transfer_layers = transfer_step
+        transfer_layers = None
         freeze_layers = transfer_step
     else:
         wd = s.WD
@@ -112,7 +112,8 @@ def train(hpar,
     print("Total number of parameters: ", n_params_free)
 
     # learning rate
-    lr = (s.LR_K / len(trainloader)) * (n_params_all / n_params_free)
+    lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
+                                                          n_params_free)
     print(f"Using learning rate {lr:.2e}")
 
     # dummy model (baseline)

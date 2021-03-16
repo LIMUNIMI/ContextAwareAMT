@@ -266,14 +266,13 @@ class MIDIParameterEstimation(nn.Module):
     def predict(self, *args, **kwargs):
         return self.forward(*args, **kwargs)
 
-    def load_state_dict(self, state_dict, start=0, end=-1):
+    def load_state_dict(self, state_dict, start=None, end=None):
         """
         Load parameters contained in `state_dict` starting from `start` and
         ending with `end`, where `start` and `end` are indices of layers of
         the stack of this model, so that the first layer whose parameters are
         loaded is layer with index `start` (included) while the last is `end`
         (not ncluded). The LSTM is always loaded fully.
-        always reinitialized.
         """
         # back-up untouched parts (as they are now)
         cp = deepcopy(self.stack)
@@ -283,8 +282,10 @@ class MIDIParameterEstimation(nn.Module):
 
         # restore backed-up parts (as they were before)
         stack = list(self.stack)
-        stack[:start] = cp[:start]
-        stack[end:] = cp[end:]
+        if start is not None:
+            stack[:start] = cp[:start]
+        if end is not None:
+            stack[end:] = cp[end:]
 
         # restore all InstanceNorm layers
         # for i in range(len(stack)):
