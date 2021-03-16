@@ -166,7 +166,7 @@ def main():
             def objective(x):
                 return training.train(x,
                                       'pedaling',
-                                      args.context,
+                                      context=args.context,
                                       copy_checkpoint='')
 
             space_constraint = training.model_test(
@@ -181,7 +181,7 @@ def main():
             def objective(x):
                 return training.train(x,
                                       'velocity',
-                                      args.context,
+                                      context=args.context,
                                       copy_checkpoint='')
 
         hyperopt(space,
