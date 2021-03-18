@@ -158,6 +158,7 @@ def main():
 
     nmf_params = load_nmf_params()
     if args.skopt:
+        s.PLOT_LOSSES = False
 
         if args.pedaling:
             s.DATASET_LEN = 0.1
