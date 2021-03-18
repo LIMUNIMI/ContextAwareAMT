@@ -62,7 +62,7 @@ Datasets
 
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.1074 (about like the dummy predictor but there is
+   and loss function of 0.1084 (about like the dummy predictor but there is
    the complexity cost!).
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
@@ -70,35 +70,32 @@ Datasets
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
    * Dummy loss: 0.1207
-   * Validation loss:0.1210 (62 epochs, early-stop)
+   * Validation loss: TODO (TODO epochs, early-stop)
    * 354845 in training
    * 55008 batches in validation
-   * Learning rate: 1.41e-05
-   * 32 parameters::
+   * Learning rate: 7.05e-5
+   * 129 parameters::
 
       MIDIParameterEstimation(
         (dropout): Dropout(p=0.1, inplace=False)
         (stack): Sequential(
-          (0): Conv2d(1, 1, kernel_size=(3, 5), stride=(1, 1), bias=False)
+          (0): Conv2d(1, 1, kernel_size=(4, 10), stride=(1, 1), bias=False)
           (1): Identity()
-          (2): Tanh()
-          (3): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (2): AbsLayer()
+          (3): Conv2d(1, 1, kernel_size=(4, 10), stride=(1, 1), bias=False)
           (4): Identity()
-          (5): Tanh()
-          (6): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (5): AbsLayer()
+          (6): Conv2d(1, 1, kernel_size=(4, 10), stride=(1, 1), bias=False)
           (7): Identity()
-          (8): Tanh()
-          (9): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (8): AbsLayer()
+          (9): Conv2d(1, 1, kernel_size=(4, 1), stride=(1, 1), bias=False)
           (10): Identity()
-          (11): Tanh()
-          (12): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
+          (11): AbsLayer()
+          (12): Conv2d(1, 1, kernel_size=(1, 3), stride=(1, 1), bias=False)
           (13): Identity()
-          (14): Tanh()
-          (15): Conv2d(1, 1, kernel_size=(3, 1), stride=(1, 1), bias=False)
-          (16): Identity()
-          (17): Tanh()
-          (18): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
-          (19): Sigmoid()
+          (14): AbsLayer()
+          (15): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
+          (16): Sigmoid()
         )
       )
 

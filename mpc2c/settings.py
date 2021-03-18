@@ -74,11 +74,11 @@ DEVICE = 'cuda'
 EPOCHS = 500
 VEL_HYPERPARAMS = {
     'lstm_layers': 0,
-    'lstm_hidden_size': 5,
+    'lstm_hidden_size': 2,
     'middle_features': 0,
-    "kernel_0": 3,
-    "kernel_1": 5,
-    "middle_activation": nn.Tanh,
+    "kernel_0": 4,
+    "kernel_1": 10,
+    "middle_activation": AbsLayer,
     "sigmoid_last": True
 }
 PED_HYPERPARAMS = {
