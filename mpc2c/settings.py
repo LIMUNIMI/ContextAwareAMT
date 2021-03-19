@@ -87,13 +87,16 @@ PED_HYPERPARAMS = {
     'middle_features': 0,
     "kernel_0": 6,
     "middle_activation": nn.Identity,  # or AbsLayer?
-    "sigmoid_last":
-    True  # skopt returned `False`, but dependency graph showed `True`
+    # "sigmoid_last": False
+    "sigmoid_last": True
+    # skopt returned `False`, but dependency graph showed `True`; moreover, a
+    # training on original context showed a slightly lower loss for `True`
+    # (about 1e-3)
 }
-VEL_BATCH_SIZE = 5
+VEL_BATCH_SIZE = 500
 PED_BATCH_SIZE = 1
-EARLY_STOP = 10
-EARLY_RANGE = 1e-4
+EARLY_STOP = 20
+EARLY_RANGE = 1e-8
 TRAIN_DROPOUT = 0.1
 PLOT_LOSSES = True
 DTYPE = torch.float64

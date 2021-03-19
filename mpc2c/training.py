@@ -84,16 +84,12 @@ def train(hpar,
     # building model
     if state_dict is not None:
         dropout = s.TRANSFER_DROPOUT
-        early_range = s.TRANSFER_EARLY_RANGE
-        early_stop = s.TRANSFER_EARLY_STOP
         wd = s.TRANSFER_WD
         transfer_layers = None
         freeze_layers = transfer_step
     else:
         wd = s.WD
         dropout = s.TRAIN_DROPOUT
-        early_range = s.EARLY_RANGE
-        early_stop = s.EARLY_STOP
 
     if mode == 'velocity':
         model = build_velocity_model(hpar, dropout)
@@ -137,8 +133,8 @@ def train(hpar,
                               validloader,
                               dummy_loss=lambda x: dummy_avg,
                               trainloss_on_valid=True,
-                              early_stop=early_stop,
-                              early_range=early_range,
+                              early_stop=s.EARLY_STOP,
+                              early_range=s.EARLY_RANGE,
                               plot_losses=s.PLOT_LOSSES,
                               dtype=s.DTYPE,
                               copy_checkpoint=copy_checkpoint)
