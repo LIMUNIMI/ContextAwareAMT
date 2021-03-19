@@ -87,9 +87,11 @@ def train(hpar,
         wd = s.TRANSFER_WD
         transfer_layers = None
         freeze_layers = transfer_step
+        lr_k = s.TRANSFER_LR_K
     else:
         wd = s.WD
         dropout = s.TRAIN_DROPOUT
+        lr_k = s.LR_K
 
     if mode == 'velocity':
         model = build_velocity_model(hpar, dropout)
@@ -108,8 +110,10 @@ def train(hpar,
     print("Total number of parameters: ", n_params_free)
 
     # learning rate
-    lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
-                                                          n_params_free)
+    # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
+    #                                                       n_params_free)
+    lr = lr_k / len(trainloader)
+
     print(f"Using learning rate {lr:.2e}")
 
     # dummy model (baseline)

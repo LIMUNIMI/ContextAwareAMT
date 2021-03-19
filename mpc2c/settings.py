@@ -87,13 +87,13 @@ PED_HYPERPARAMS = {
     'middle_features': 0,
     "kernel_0": 6,
     "middle_activation": nn.Identity,  # or AbsLayer?
-    # "sigmoid_last": False
-    "sigmoid_last": True
+    "sigmoid_last": False
+    # "sigmoid_last": True
     # skopt returned `False`, but dependency graph showed `True`; moreover,
     # training on original context showed a slightly lower loss for `True`
     # (about 1e-3 lower than `False`)
 }
-VEL_BATCH_SIZE = 500
+VEL_BATCH_SIZE = 50
 PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8

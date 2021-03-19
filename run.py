@@ -173,7 +173,7 @@ def main():
             space_constraint = training.model_test(
                 training.build_pedaling_model, torch.rand(1, s.BINS, 100))
         elif args.velocity:
-            s.DATASET_LEN = 0.1
+            s.DATASET_LEN = 0.05
             space = s.VEL_SKSPACE
             space_constraint = training.model_test(
                 training.build_velocity_model,
