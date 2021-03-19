@@ -89,9 +89,9 @@ PED_HYPERPARAMS = {
     "middle_activation": nn.Identity,  # or AbsLayer?
     # "sigmoid_last": False
     "sigmoid_last": True
-    # skopt returned `False`, but dependency graph showed `True`; moreover, a
+    # skopt returned `False`, but dependency graph showed `True`; moreover,
     # training on original context showed a slightly lower loss for `True`
-    # (about 1e-3)
+    # (about 1e-3 lower than `False`)
 }
 VEL_BATCH_SIZE = 500
 PED_BATCH_SIZE = 1
@@ -112,10 +112,8 @@ PED_STEP = [0, 5, 8]
 VEL_STEP = [0, 8, 17]
 TRANSFER_WD = 0
 TRANSFER_DROPOUT = 0.1
-TRANSFER_EARLY_RANGE = 1e-4
-TRANSFER_EARLY_STOP = 20
 TRANSFER_VEL_BATCH_SIZE = 500
-TRANSFER_LR_K = 1
+TRANSFER_LR_K = 5
 
 # SKOPT
 VEL_SKSPACE = [

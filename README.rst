@@ -102,10 +102,10 @@ Datasets
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
    * Dummy loss: 0.2578
-   * Validation loss: 0.2016 (142 epochs with early-stop)
+   * Validation loss: 0.1962 (328 epochs with early-stop)
    * 247 batches in training
    * 47 batches in validation
-   * Learning rate: 2.02e-2
+   * Learning rate: 1.01e-1
    * 69 parameters::
 
       MIDIParameterEstimation(
