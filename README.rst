@@ -62,7 +62,7 @@ Datasets
 
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.1084 (about like the dummy predictor but there is
+   and loss function of 0.1132 (about like the dummy predictor but there is
    the complexity cost!).
 #. Look for hyper-parameters for pedaling using the original context: ``python
    run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
@@ -73,39 +73,33 @@ Datasets
    * Validation loss: TODO (TODO epochs, early-stop)
    * 354845 in training
    * 55008 batches in validation
-   * Learning rate: 7.05e-5
-   * 129 parameters::
+   * Learning rate: 1.04e-4
+   * 349 parameters::
 
       MIDIParameterEstimation(
         (dropout): Dropout(p=0.1, inplace=False)
         (stack): Sequential(
-          (0): Conv2d(1, 1, kernel_size=(4, 10), stride=(1, 1), bias=False)
-          (1): Identity()
+          (0): Conv2d(1, 2, kernel_size=(6, 8), stride=(1, 1), bias=False)
+          (1): InstanceNorm2d(2, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
           (2): AbsLayer()
-          (3): Conv2d(1, 1, kernel_size=(4, 10), stride=(1, 1), bias=False)
-          (4): Identity()
+          (3): Conv2d(2, 2, kernel_size=(6, 8), stride=(1, 1), bias=False)
+          (4): InstanceNorm2d(2, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
           (5): AbsLayer()
-          (6): Conv2d(1, 1, kernel_size=(4, 10), stride=(1, 1), bias=False)
+          (6): Conv2d(2, 1, kernel_size=(3, 16), stride=(1, 1), bias=False)
           (7): Identity()
-          (8): AbsLayer()
-          (9): Conv2d(1, 1, kernel_size=(4, 1), stride=(1, 1), bias=False)
-          (10): Identity()
-          (11): AbsLayer()
-          (12): Conv2d(1, 1, kernel_size=(1, 3), stride=(1, 1), bias=False)
-          (13): Identity()
-          (14): AbsLayer()
-          (15): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
-          (16): Sigmoid()
+          (8): Sigmoid()
+          (9): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
         )
       )
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
    * Dummy loss: 0.2578
-   * Validation loss: 0.1962 (328 epochs with early-stop)
+   * Validation loss: 0.1957 (500 epochs)
+     (using ``sigmoid_last=False``, validation loss is 0.2039 (88 epochs))
    * 247 batches in training
    * 47 batches in validation
-   * Learning rate: 1.01e-1
+   * Learning rate: 2.02e-2
    * 69 parameters::
 
       MIDIParameterEstimation(
@@ -204,46 +198,46 @@ Results for pedaling
 
 Training batches: 120
 Validation batches: 15
-Learning rates: 4.17e-2, 6.39e-2, 1.37e-1
+Learning rates: 8.33e-3
 
 +-------------+------------+-----------------+--------+
 | context     | dummy loss | validation loss | epochs |
 +-------------+------------+-----------------+--------+
-| pianoteq0   |   0.26464  |     0.2190      |  33    |
+| pianoteq0   |   0.26464  |     0.2178      |  61    |
 |             +            +-----------------+--------+
-|             |            |     0.2183      |  35    |
+|             |            |     0.2192      |  119   |
 |             +            +-----------------+--------+
-|             |            |     0.2235      |  31    |
+|             |            |     0.2248      |  103   |
 +-------------+------------+-----------------+--------+
-| pianoteq1   |   0.27372  |     0.2230      |  34    |
+| pianoteq1   |   0.27372  |     0.2206      |  99    |
 |             +            +-----------------+--------+
-|             |            |     0.2273      |  25    |
+|             |            |     0.2273      |  92    |
 |             +            +-----------------+--------+
-|             |            |     0.2344      |  25    |
+|             |            |     0.2338      |  23    |
 +-------------+------------+-----------------+--------+
-| pianoteq2   |   0.25987  |     0.2154      |  43    |
+| pianoteq2   |   0.25987  |     0.2146      |  214   |
 |             +            +-----------------+--------+
-|             |            |     0.2143      |  34    |
+|             |            |     0.2135      |  229   |
 |             +            +-----------------+--------+
-|             |            |     0.2176      |  31    |
+|             |            |     0.2177      |  175   |
 +-------------+------------+-----------------+--------+
-| pianoteq3   |   0.26856  |     0.2134      |  41    |
+| pianoteq3   |   0.26856  |     0.2101      |  132   |
 |             +            +-----------------+--------+
-|             |            |     0.2199      |  43    |
+|             |            |     0.2215      |  189   |
 |             +            +-----------------+--------+
-|             |            |     0.2314      |  26    |
+|             |            |     0.2383      |  42    |
 +-------------+------------+-----------------+--------+
-| salamander0 |   0.26678  |     0.2350      |  44    |
+| salamander0 |   0.26678  |     0.2337      |  213   |
 |             +            +-----------------+--------+
-|             |            |     0.2366      |  40    |
+|             |            |     0.2356      |  283   |
 |             +            +-----------------+--------+
-|             |            |     0.2399      |  36    |
+|             |            |     0.2394      |  465   |
 +-------------+------------+-----------------+--------+
-| salamander1 |   0.25548  |     0.2033      |  48    |
+| salamander1 |   0.25548  |     0.2008      |  91    |
 |             +            +-----------------+--------+
-|             |            |     0.2062      |  51    |
+|             |            |     0.2061      |  113   |
 |             +            +-----------------+--------+
-|             |            |     0.2083      |  42    |
+|             |            |     0.2106      |  87    |
 +-------------+------------+-----------------+--------+
 
 4. Evaluating error distributions
