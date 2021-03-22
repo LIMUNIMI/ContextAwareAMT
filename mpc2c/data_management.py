@@ -7,7 +7,8 @@ from . import nmf
 from . import settings as s
 from . import utils
 from .asmd.asmd import asmd
-from .mytorchutils import DatasetDump, dummy_collate, pad_collate
+from .mytorchutils import (DatasetDump, dummy_collate, pad_collate,
+                           no_batch_collate)
 
 
 def transform_func(arr: es.array):
@@ -17,7 +18,6 @@ def transform_func(arr: es.array):
     """
     out = []
     for col in range(arr.shape[1]):
-        # TODO check from here!
         out.append(s.MFCC(arr[:, col]))
 
     return es.array(out).T
@@ -52,9 +52,11 @@ def process_velocities(i, dataset, nmf_params):
     return minispecs, velocities
 
 
-def get_loader(groups, mode, redump, nmf_params=None):
+def get_loader(groups, mode, redump, nmf_params=None, song_level=False):
     """
     nmf_params is needed only if `redump` is True
+    `song_level` allows to make each bach correspond to one song (e.g. for
+    testing at the song-level)
     """
     dataset = asmd.Dataset(
         paths=[s.RESYNTH_DATA_PATH],
@@ -69,6 +71,7 @@ def get_loader(groups, mode, redump, nmf_params=None):
                                        pathlib.Path(s.VELOCITY_DATA_PATH) /
                                        "_".join(groups),
                                        not redump,
+                                       song_level=song_level,
                                        num_samples=num_samples)
         # max_nbytes=None disable shared memory for large arrays
         if redump:
@@ -76,16 +79,18 @@ def get_loader(groups, mode, redump, nmf_params=None):
                                   nmf_params,
                                   n_jobs=s.NJOBS,
                                   max_nbytes=None)
-        return DataLoader(velocity_dataset,
-                          batch_size=s.VEL_BATCH_SIZE,
-                          num_workers=s.NJOBS,
-                          pin_memory=True,
-                          collate_fn=dummy_collate)
+        return DataLoader(
+            velocity_dataset,
+            batch_size=s.VEL_BATCH_SIZE if not song_level else 1,
+            num_workers=s.NJOBS,
+            pin_memory=True,
+            collate_fn=dummy_collate if not song_level else no_batch_collate)
     elif mode == 'pedaling':
         pedaling_dataset = DatasetDump(dataset,
                                        pathlib.Path(s.PEDALING_DATA_PATH) /
                                        "_".join(groups),
                                        not redump,
+                                       song_level=song_level,
                                        num_samples=None)
         # max_nbytes=None disable shared memory for large arrays
         if redump:
@@ -93,11 +98,12 @@ def get_loader(groups, mode, redump, nmf_params=None):
                                   nmf_params,
                                   n_jobs=s.NJOBS,
                                   max_nbytes=None)
-        return DataLoader(pedaling_dataset,
-                          batch_size=s.PED_BATCH_SIZE,
-                          num_workers=s.NJOBS,
-                          pin_memory=True,
-                          collate_fn=pad_collate)
+        return DataLoader(
+            pedaling_dataset,
+            batch_size=s.PED_BATCH_SIZE if not song_level else 1,
+            num_workers=s.NJOBS,
+            pin_memory=True,
+            collate_fn=pad_collate if not song_level else no_batch_collate)
 
 
 def multiple_splits_one_context(splits, context, *args, **kwargs):

@@ -18,6 +18,8 @@ from .data_management import multiple_splits_one_context
 from .mytorchutils import make_loss_func, test
 from .training import build_pedaling_model, build_velocity_model
 
+SONG_LEVEL = True
+
 
 def evaluate(checkpoints: T.Dict[str, T.Any], mode: str,
              out_dir: Path) -> T.List[pd.DataFrame]:
@@ -67,7 +69,7 @@ def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
 
         for context in contexts:
             print(f"\nEvaluating {checkpoint} on {context}")
-            res = eval_model_context(model, context, 'velocity')
+            res = eval_model_context(model, context, 'velocity', SONG_LEVEL)
             errors[0] = errors[0].append(
                 pd.DataFrame(
                     dict(values=res,
@@ -101,7 +103,7 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
 
         for context in contexts:
             print(f"\nEvaluating {checkpoint} on {context}")
-            res = eval_model_context(model, context, 'pedaling')
+            res = eval_model_context(model, context, 'pedaling', SONG_LEVEL)
             for i in range(len(errors)):
                 errors[i] = errors[i].append(
                     pd.DataFrame(data=dict(
@@ -117,9 +119,14 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
     return evaluation
 
 
-def eval_model_context(model: torch.nn.Module, context: str, mode: str):
+def eval_model_context(model: torch.nn.Module, context: str, mode: str,
+                       song_level: bool):
 
-    testloader = multiple_splits_one_context(['test'], context, mode, False)
+    testloader = multiple_splits_one_context(['test'],
+                                             context,
+                                             mode,
+                                             False,
+                                             song_level=SONG_LEVEL)
     loss, predictions = test(model,
                              testloader,
                              make_loss_func(F.l1_loss),
@@ -134,11 +141,14 @@ def eval_model_context(model: torch.nn.Module, context: str, mode: str):
             errors.append(torch.abs(targets[0] - predictions[i][0][..., 0, 0]))
         else:
             for batch, L in enumerate(lens[0]):
-                errors.append(
-                    torch.abs(targets[0][batch, ..., :L] -
-                              predictions[i][0][batch, ..., :L]))
+                err = torch.abs(targets[0][batch, ..., :L] -
+                                predictions[i][0][batch, ..., :L])
+                if song_level:
+                    errors.append(torch.mean(err, dim=-1))
+                else:
+                    errors.append(err)
 
-    return np.concatenate(errors, -1)
+    return np.asarray(errors)
 
 
 def plot_dash(figs, port):
@@ -194,7 +204,7 @@ def plot(df: pd.DataFrame,
     cp = df[df['checkpoint'] == 'orig'].copy()
     for tl_size in tl_size_vals[1:]:
         cp.loc[:, 'tl_size'] = tl_size
-        df.append(cp, ignore_index=True)
+        df = df.append(cp, ignore_index=True)
 
     # plotting all checkpoints for each context
     print(" 2. Plotting contexts")
@@ -262,8 +272,7 @@ def plot(df: pd.DataFrame,
             # sample(frac=1) is used to shuffle data
             x = data.loc[data['checkpoint'] == new_checkpoint,
                          'values'].sample(frac=1)
-            y = data.loc[data['checkpoint'] == 'orig',
-                         'values'].sample(frac=1)
+            y = data.loc[data['checkpoint'] == 'orig', 'values'].sample(frac=1)
             L = min(len(x), len(y))
             stat, pval = wilcoxon(x[:L], y[:L])
             fig.add_annotation(x=n,
