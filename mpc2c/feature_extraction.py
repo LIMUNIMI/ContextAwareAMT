@@ -296,11 +296,11 @@ class MIDIParameterEstimation(nn.Module):
 
     def freeze(self, num_layers=0):
         """
-        Set `requires_grad` to `False` for layers until `num_layers`, to `True`
-        for the others. Note that normalization layers are not controlled by
-        `requires_grad` but by `train` and `eval` mode, so we also set
-        `track_running_stats` to False for `InstanceNorm2d` layers before
-        `num_layers` and True for the others.
+        Set `requires_grad` to `False` for layers until `num_layers` excluded,
+        to `True` for the others. Note that normalization layers are not
+        controlled by `requires_grad` but by `train` and `eval` mode, so we
+        also set `track_running_stats` to False for `InstanceNorm2d` layers
+        before `num_layers` and True for the others.
 
         The lstm is always set to requires_grad=False
         """
