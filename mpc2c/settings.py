@@ -74,12 +74,12 @@ DEVICE = 'cuda'
 EPOCHS = 500
 VEL_HYPERPARAMS = {
     'lstm_layers': 0,
-    'lstm_hidden_size': 2,
-    'middle_features': 0,
-    "kernel_0": 4,
-    "kernel_1": 10,
+    'lstm_hidden_size': 0,
+    'middle_features': 1,
+    "kernel_0": 6,
+    "kernel_1": 8,
     "middle_activation": AbsLayer,
-    "sigmoid_last": True
+    "sigmoid_last": False
 }
 PED_HYPERPARAMS = {
     'lstm_layers': 0,
@@ -87,11 +87,11 @@ PED_HYPERPARAMS = {
     'middle_features': 0,
     "kernel_0": 6,
     "middle_activation": nn.Identity,  # or AbsLayer?
-    "sigmoid_last": False
-    # "sigmoid_last": True
+    # "sigmoid_last": False
+    "sigmoid_last": True
     # skopt returned `False`, but dependency graph showed `True`; moreover,
     # training on original context showed a slightly lower loss for `True`
-    # (about 1e-3 lower than `False`)
+    # (about 8e-3 lower than `False`)
 }
 VEL_BATCH_SIZE = 50
 PED_BATCH_SIZE = 1
@@ -106,14 +106,12 @@ DATASET_LEN = 1
 LR_K = 5
 
 # Transfer-learning
-# 0%, 69%, 91% = 0, 2, all but 1 conv layers
-PED_STEP = [0, 5, 8]
-# 0%, 66%, 94% = 0, 3, all but 1 conv layers
-VEL_STEP = [0, 8, 17]
+PED_STEP = [0, 3, 6]
+VEL_STEP = [0, 3, 9]
 TRANSFER_WD = 0
 TRANSFER_DROPOUT = 0.1
-TRANSFER_VEL_BATCH_SIZE = 500
-TRANSFER_LR_K = 5
+TRANSFER_VEL_BATCH_SIZE = 50
+TRANSFER_LR_K = 1
 
 # SKOPT
 VEL_SKSPACE = [
