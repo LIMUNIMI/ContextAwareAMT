@@ -79,7 +79,10 @@ VEL_HYPERPARAMS = {
     "kernel_0": 6,
     "kernel_1": 8,
     "middle_activation": AbsLayer,
-    "sigmoid_last": False
+    # "sigmoid_last": False
+    "sigmoid_last": True
+    # skopt return `False`, but training on the original context returned a
+    # similar loss
 }
 PED_HYPERPARAMS = {
     'lstm_layers': 0,
