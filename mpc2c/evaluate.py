@@ -1,6 +1,7 @@
 import re
 import typing as T
 from pathlib import Path
+from typing import Tuple
 
 import dash
 import dash_core_components as dcc
@@ -10,6 +11,7 @@ import pandas as pd
 import plotly.express as px
 import torch
 import torch.nn.functional as F
+from plotly import graph_objs as go
 from scipy.stats import wilcoxon
 
 from . import settings as s
@@ -72,11 +74,14 @@ def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
             res = eval_model_context(model, context, 'velocity', SONG_LEVEL)
             errors[0] = errors[0].append(
                 pd.DataFrame(
-                    dict(values=res,
-                         context=[context] * res.shape[0],
+                    dict(values=res[0],
+                         std_neg=res[1],
+                         std_pos=res[2],
+                         context=[context] * res[0].shape[0],
+                         idx=list(range(res[0].shape[0])),
                          checkpoint=[
                              checkpoint_name[:checkpoint_name.index('_')]
-                         ] * res.shape[0],
+                         ] * res[0].shape[0],
                          tl_size=tl_size)))
         evaluation.append(errors)
 
@@ -107,8 +112,11 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
             for i in range(len(errors)):
                 errors[i] = errors[i].append(
                     pd.DataFrame(data=dict(
-                        values=res[i],
-                        context=[context] * res[i].shape[0],
+                        values=res[0][:, i],
+                        std_neg=res[1][:, i],
+                        std_pos=res[2][:, i],
+                        idx=list(range(res[0].shape[0])),
+                        context=[context] * res[0].shape[0],
                         checkpoint=[
                             checkpoint_name[:checkpoint_name.index('_')]
                         ] * res[0].shape[0],
@@ -119,8 +127,9 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
     return evaluation
 
 
-def eval_model_context(model: torch.nn.Module, context: str, mode: str,
-                       song_level: bool):
+def eval_model_context(
+        model: torch.nn.Module, context: str, mode: str,
+        song_level: bool) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     testloader = multiple_splits_one_context(['test'],
                                              context,
@@ -136,19 +145,35 @@ def eval_model_context(model: torch.nn.Module, context: str, mode: str,
 
     # computing L1 errors for each prediction
     errors = []
+    std_neg = []
+    std_pos = []
     for i, (inputs, targets, lens) in enumerate(testloader):
         if lens[0] == torch.tensor(False):
-            errors.append(torch.abs(targets[0] - predictions[i][0][..., 0, 0]))
+            err = [
+                torch.abs(targets[0] - predictions[i][0][..., 0, 0]),
+            ]
         else:
+            err = []
             for batch, L in enumerate(lens[0]):
-                err = torch.abs(targets[0][batch, ..., :L] -
-                                predictions[i][0][batch, ..., :L])
-                if song_level:
-                    errors.append(torch.mean(err, dim=-1))
-                else:
-                    errors.append(err)
+                err.append(
+                    torch.abs(targets[0][batch, ..., :L] -
+                              predictions[i][0][batch, ..., :L]))
 
-    return np.asarray(errors)
+        for error in err:
+            if song_level:
+                mean = np.mean(error.cpu().numpy(), axis=-1)
+                errors.append(mean)
+                _std_neg = np.zeros_like(mean)
+                _std_pos = np.zeros_like(mean)
+                for k in range(mean.shape[0]):
+                    _std_neg[k] = torch.std(error[k, error[k] < mean[k]])
+                    _std_pos[k] = torch.std(error[k, error[k] >= mean[k]])
+                std_neg.append(_std_neg)
+                std_pos.append(_std_pos)
+            else:
+                errors.append(error.numpy())
+
+    return np.asarray(errors), np.asarray(std_neg), np.asarray(std_pos)
 
 
 def plot_dash(figs, port):
@@ -222,6 +247,17 @@ def plot(df: pd.DataFrame,
                       range_y=[0, 1],
                       facet_row='tl_size',
                       title=f"context {context}"))
+        figs.append(
+            px.scatter(df[df['context'] == context],
+                       x='idx',
+                       y='values',
+                       color='checkpoint',
+                       facet_row='tl_size',
+                       log_y=True,
+                       marginal_y='box',
+                       opacity=0.5,
+                       symbol_sequence=['line-ew-open'],
+                       title=f"context {context} scatter"))
 
     if compare:
         print(" 3.1 Preparing orig vs all")
@@ -291,8 +327,9 @@ def plot(df: pd.DataFrame,
     # change box-plot styles
     for fig in figs:
         for data in fig.data:
-            data.box.line.color = 'rgba(255, 255, 255, 0.5)'
-            data.box.line.width = 1
+            if type(data) is go.Violin:
+                data.box.line.color = 'rgba(255, 255, 255, 0.5)'
+                data.box.line.width = 1
 
     # saving figures to svg files
     if save:
