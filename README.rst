@@ -70,10 +70,10 @@ Datasets
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
    * Dummy loss: 0.1207
-   * Validation loss: TODO (TODO epochs, early-stop)
+   * Validation loss: 0.1202 (37 epochs, early-stop)
    * 354845 in training
    * 55008 batches in validation
-   * Learning rate: 1.04e-4
+   * Learning rate: 1.41e-4
    * 349 parameters::
 
       MIDIParameterEstimation(
