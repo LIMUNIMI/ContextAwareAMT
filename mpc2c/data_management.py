@@ -26,7 +26,9 @@ def transform_func(arr: es.array):
 def process_pedaling(i, dataset, nmf_params):
     nmf_tools = nmf.NMFTools(*nmf_params)
     audio, sr = dataset.get_mix(i, sr=s.SR)
-    score = dataset_utils.get_score_mat(dataset, i, score_type=['precise_alignment'])
+    score = dataset_utils.get_score_mat(dataset,
+                                        i,
+                                        score_type=['precise_alignment'])
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
     diff_spec = transform_func(nmf_tools.initV) - transform_func(
@@ -43,11 +45,13 @@ def process_pedaling(i, dataset, nmf_params):
 def process_velocities(i, dataset, nmf_params):
     nmf_tools = nmf.NMFTools(*nmf_params)
     audio, sr = dataset.get_mix(i, sr=s.SR)
-    score = dataset_utils.get_score_mat(dataset, i, score_type=['precise_alignment'])
+    score = dataset_utils.get_score_mat(dataset,
+                                        i,
+                                        score_type=['precise_alignment'])
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
-    velocities = dataset_utils.get_score_mat(dataset, i, score_type=['precise_alignment'
-                                                  ])[:, 3] / 127
+    velocities = dataset_utils.get_score_mat(
+        dataset, i, score_type=['precise_alignment'])[:, 3] / 127
     minispecs = nmf_tools.get_minispecs(transform=transform_func)
     return minispecs, velocities
 
@@ -58,9 +62,10 @@ def get_loader(groups, mode, redump, nmf_params=None, song_level=False):
     `song_level` allows to make each bach correspond to one song (e.g. for
     testing at the song-level)
     """
-    dataset = dataset_utils.filter(asmd.Dataset(
-        paths=[s.RESYNTH_DATA_PATH], metadataset_path=s.METADATASET_PATH),
-                                   groups=groups)
+    dataset = dataset_utils.filter(
+        asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
+                     metadataset_path=s.METADATASET_PATH),
+        groups=groups)
     dataset, _ = dataset_utils.choice(dataset,
                                       p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
                                       random_state=1992)
