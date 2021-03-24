@@ -179,6 +179,10 @@ def skopt_objective(hpar: dict, mode: str):
 
     contexts = get_contexts(Path(s.CARLA_PROJ))
     # train on orig
+    print("\n============================\n")
+    print("----------------------------")
+    print("training on orig")
+    print("----------------------------\n")
     orig_checkpoint = train(hpar,
                             mode,
                             context='orig',
@@ -187,6 +191,9 @@ def skopt_objective(hpar: dict, mode: str):
                             transfer_step=None,
                             return_model=True)
 
+    print("----------------------------")
+    print("testing transfer-learning")
+    print("----------------------------\n")
     # train on the other contexts
     losses = []
     for context in contexts.keys():
@@ -202,4 +209,5 @@ def skopt_objective(hpar: dict, mode: str):
                   copy_checkpoint='',
                   return_model=False))
 
+    print("\n============================\n")
     return np.mean(losses)
