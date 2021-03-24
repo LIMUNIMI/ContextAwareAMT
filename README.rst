@@ -58,6 +58,10 @@ Datasets
    * Test set: 25 songs for specific contexts, 28 for the orig
    * TODO: after resynthesis with maestro v3.0, update these data
 
+#. Apply NMF to each context: ``python run.py -p -r -c <context>``, ``python
+   run.py -v -r -c <context>``
+
+
 2. Training the generic model
 -----------------------------
 
@@ -104,9 +108,6 @@ Datasets
 
 3. Training the context-specific models
 ---------------------------------------
-
-#. Apply NMF to each context: ``python run.py -p -r -c <context>``, ``python
-   run.py -v -r -c <context>``
 
 #. Fully train velocity model on the specific context: ``python run.py -v -t -c
    <context> -pt <path to generic model chekcpoint>``

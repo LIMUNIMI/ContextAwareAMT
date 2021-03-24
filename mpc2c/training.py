@@ -121,7 +121,7 @@ def train(hpar,
         model.freeze(freeze_layers)
 
     n_params_free = count_params(model, requires_grad=True)
-    n_params_all = count_params(model, requires_grad=False)
+    # n_params_all = count_params(model, requires_grad=False)
     print(model)
     print("Total number of parameters: ", n_params_free)
 
