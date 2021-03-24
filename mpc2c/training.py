@@ -184,18 +184,20 @@ def skopt_objective(hpar: dict, mode: str):
     print("----------------------------")
     print("training on orig")
     print("----------------------------\n")
-    _, orig_checkpoint = train(hpar,
-                               mode,
-                               context='orig',
-                               state_dict=None,
-                               copy_checkpoint='',
-                               transfer_step=None,
-                               return_model=True)
+    _, orig_model = train(hpar,
+                          mode,
+                          context='orig',
+                          state_dict=None,
+                          copy_checkpoint='',
+                          transfer_step=None,
+                          return_model=True)
 
     print("----------------------------")
     print("testing transfer-learning")
     print("----------------------------\n")
     # train on the other contexts
+    state_dict = orig_model.state_dict()
+    del orig_model
     losses = []
     for context in contexts.keys():
         if context == 'orig':
@@ -205,7 +207,7 @@ def skopt_objective(hpar: dict, mode: str):
             train(hpar,
                   mode,
                   context=context,
-                  state_dict=deepcopy(orig_checkpoint),
+                  state_dict=deepcopy(state_dict),
                   transfer_step=None,
                   copy_checkpoint='',
                   return_model=False))
