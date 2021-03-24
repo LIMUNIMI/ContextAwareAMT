@@ -1,12 +1,16 @@
 # from memory_profiler import profile
 
+from pathlib import Path
 from pprint import pprint
 
 import torch
 import torch.nn.functional as F
+import numpy as np
+from copy import deepcopy
 
 from . import data_management, feature_extraction
 from . import settings as s
+from .asmd_resynth import get_contexts
 from .mytorchutils import (compute_average, count_params, make_loss_func,
                            train_epochs)
 
@@ -76,7 +80,8 @@ def train(hpar,
           transfer_step=None,
           context=None,
           state_dict=None,
-          copy_checkpoint=True):
+          copy_checkpoint='',
+          return_model=False):
     # loaders
     trainloader, validloader = data_management.multiple_splits_one_context(
         ['train', 'validation'], context, mode, False)
@@ -143,5 +148,40 @@ def train(hpar,
                               dtype=s.DTYPE,
                               copy_checkpoint=copy_checkpoint)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
+    loss = train_loss + complexity_loss
 
-    return train_loss + complexity_loss
+    if return_model:
+        return loss, model
+    else:
+        del model
+        return loss
+
+
+def skopt_objective(hpar: dict, mode: str):
+
+    contexts = get_contexts(Path(s.CARLA_PROJ))
+    # train on orig
+    orig_checkpoint = train(hpar,
+                            mode,
+                            context='orig',
+                            state_dict=None,
+                            copy_checkpoint='',
+                            transfer_step=None,
+                            return_model=True)
+
+    # train on the other contexts
+    losses = []
+    for context in contexts.keys():
+        if context == 'orig':
+            # skip the `orig` context
+            continue
+        losses.append(
+            train(hpar,
+                  mode,
+                  context=context,
+                  state_dict=deepcopy(orig_checkpoint),
+                  transfer_step=None,
+                  copy_checkpoint='',
+                  return_model=False))
+
+    return np.mean(losses)

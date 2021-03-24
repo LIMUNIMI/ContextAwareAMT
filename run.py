@@ -165,10 +165,7 @@ def main():
             space = s.PED_SKSPACE
 
             def objective(x):
-                return training.train(x,
-                                      'pedaling',
-                                      context=args.context,
-                                      copy_checkpoint='')
+                return training.skopt_objective(x, 'pedaling')
 
             space_constraint = training.model_test(
                 training.build_pedaling_model, torch.rand(1, s.BINS, 100))
@@ -180,10 +177,7 @@ def main():
                 torch.rand(1, s.BINS, s.MINI_SPEC_SIZE))
 
             def objective(x):
-                return training.train(x,
-                                      'velocity',
-                                      context=args.context,
-                                      copy_checkpoint='')
+                return training.skopt_objective(x, 'velocity')
 
         hyperopt(space,
                  s.SKCHECKPOINT,
