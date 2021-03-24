@@ -1,12 +1,12 @@
 # from memory_profiler import profile
 
+from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
 
+import numpy as np
 import torch
 import torch.nn.functional as F
-import numpy as np
-from copy import deepcopy
 
 from . import data_management, feature_extraction
 from . import settings as s
@@ -183,13 +183,13 @@ def skopt_objective(hpar: dict, mode: str):
     print("----------------------------")
     print("training on orig")
     print("----------------------------\n")
-    orig_checkpoint = train(hpar,
-                            mode,
-                            context='orig',
-                            state_dict=None,
-                            copy_checkpoint='',
-                            transfer_step=None,
-                            return_model=True)
+    _, orig_checkpoint = train(hpar,
+                               mode,
+                               context='orig',
+                               state_dict=None,
+                               copy_checkpoint='',
+                               transfer_step=None,
+                               return_model=True)
 
     print("----------------------------")
     print("testing transfer-learning")
