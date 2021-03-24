@@ -124,8 +124,7 @@ VEL_SKSPACE = [
     space.Integer(3, 6, name='kernel_0'),
     space.Integer(3, 10, name='kernel_1'),
     space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
-                      name='middle_activation'),
-    space.Categorical([True, False], name='sigmoid_last'),
+                      name='middle_activation')
 ]
 PED_SKSPACE = [
     space.Integer(0, 4, name='lstm_layers'),
@@ -133,8 +132,7 @@ PED_SKSPACE = [
     space.Integer(0, 7, name='middle_features'),
     space.Integer(3, 6, name='kernel_0'),
     space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
-                      name='middle_activation'),
-    space.Categorical([True, False], name='sigmoid_last'),
+                      name='middle_activation')
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
 SKITERATIONS = (0, 80)

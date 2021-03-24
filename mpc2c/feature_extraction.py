@@ -45,7 +45,6 @@ class MIDIParameterEstimation(nn.Module):
             * middle_features: int [x in k*(2^x)]
             * middle_activation: int
             * k: int
-            * sigmoid_last: tuple
 
         * `input_size` is a tuple[int] containing the number of rows (features)
         and columns (frames) of each input. It can contain 1 if the size of a
@@ -87,8 +86,7 @@ class MIDIParameterEstimation(nn.Module):
 
         # setup the `note_level` stuffs
         kernel_size, stride, dilation, lstm_hidden_size,\
-            lstm_layers, middle_features, middle_activation,\
-            k, sigmoid_last = hyperparams
+            lstm_layers, middle_features, middle_activation, k = hyperparams
 
         middle_features = k * (2**middle_features)
 
@@ -190,10 +188,7 @@ class MIDIParameterEstimation(nn.Module):
                 nn.InstanceNorm2d(
                     output_features, affine=True, track_running_stats=True
                 ) if output_features > 1 else nn.Identity()]
-            if sigmoid_last:
-                self.stack.append(middle_activation())
-            else:
-                self.stack.append(nn.Sigmoid())
+            self.stack.append(middle_activation())
 
             self.stack.append(
                 nn.Conv2d(output_features,
@@ -201,19 +196,15 @@ class MIDIParameterEstimation(nn.Module):
                           groups=output_features,
                           kernel_size=1))
 
-            if sigmoid_last:
-                self.stack.append(nn.Sigmoid())
+            self.stack.append(nn.Sigmoid())
         else:
             # change the last activation so that the outputs are in (0, 1)
-            if not sigmoid_last:
-                self.stack[-1] = nn.Sigmoid()
             self.stack.append(
                 nn.Conv2d(output_features,
                           output_features,
                           groups=output_features,
                           kernel_size=1))
-            if sigmoid_last:
-                self.stack.append(nn.Sigmoid())
+            self.stack.append(nn.Sigmoid())
 
         self.stack = nn.Sequential(*self.stack)
 

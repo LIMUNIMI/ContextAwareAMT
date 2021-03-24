@@ -50,8 +50,8 @@ def build_velocity_model(hpar, dropout):
         dropout=dropout,
         hyperparams=((hpar['kernel_0'], hpar['kernel_1']), (1, 1), (1, 1),
                      hpar['lstm_hidden_size'], hpar['lstm_layers'],
-                     hpar['middle_features'], hpar['middle_activation'], 1,
-                     hpar['sigmoid_last'])).to(s.DEVICE).to(s.DTYPE)
+                     hpar['middle_features'], hpar['middle_activation'],
+                     1)).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
@@ -63,10 +63,10 @@ def build_pedaling_model(hpar, dropout):
         note_level=False,
         max_layers=s.MAX_LAYERS,
         dropout=dropout,
-        hyperparams=((hpar['kernel_0'], 1), (1, 1), (1, 1),
-                     hpar['lstm_hidden_size'], hpar['lstm_layers'],
-                     hpar['middle_features'], hpar['middle_activation'], 3,
-                     hpar['sigmoid_last'])).to(s.DEVICE).to(s.DTYPE)
+        hyperparams=((hpar['kernel_0'],
+                      1), (1, 1), (1, 1), hpar['lstm_hidden_size'],
+                     hpar['lstm_layers'], hpar['middle_features'],
+                     hpar['middle_activation'], 3)).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
