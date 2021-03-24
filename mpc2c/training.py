@@ -18,7 +18,8 @@ from .mytorchutils import (compute_average, count_params, make_loss_func,
 def model_test(model_build_func, test_sample):
     """
     A function to build a constraint around the model size; the constraint
-    tries to build the model and use it with a random function
+    tries to build the model and to use it with a give ntest sample (can be
+    created randomly, but shapes must be similar to a real case)
     """
     def constraint(hpar):
         print("----------")
@@ -82,6 +83,16 @@ def train(hpar,
           state_dict=None,
           copy_checkpoint='',
           return_model=False):
+    """
+    1. Builds a model given `hpar` and `mode`
+    2. Transfer knowledge from `state_dict` if provided
+    3. Freeze first `transfer_step` layers
+    4. Train the model on `context`
+    5. Saves the trained model weights to `copy_checkpoint`
+    6. Returns the best validation loss function + the complexity penalty set
+       in `settings`
+    7. Also returns the model checkpoint if `return_model` is True
+    """
     # loaders
     trainloader, validloader = data_management.multiple_splits_one_context(
         ['train', 'validation'], context, mode, False)
@@ -158,6 +169,13 @@ def train(hpar,
 
 
 def skopt_objective(hpar: dict, mode: str):
+    """
+    Runs a training on `orig` context and then retrain the model on each
+    specific context.
+
+    Returns the average loss function of the training on the
+    specific contexts, including the complexity penalty.
+    """
 
     contexts = get_contexts(Path(s.CARLA_PROJ))
     # train on orig
