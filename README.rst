@@ -56,6 +56,7 @@ Datasets
    * Train set: 20 songs for specific contexts, 847 for the orig
    * Validation set: 10 songs for specific contexts, 77 for the orig
    * Test set: 25 songs for specific contexts, 28 for the orig
+   * TODO: after resynthesis with maestro v3.0, update these data
 
 2. Training the generic model
 -----------------------------
