@@ -137,7 +137,7 @@ PED_SKSPACE = [
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
 SKITERATIONS = (0, 80)
 PLOT_GRAPHS = True
-COMPLEXITY_PENALIZER = 1e-5
+COMPLEXITY_PENALIZER = 1e-6
 
 #: If compiling code with cython in pure-python mode
 BUILD = False
