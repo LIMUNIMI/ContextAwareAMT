@@ -61,60 +61,44 @@ Datasets
 -----------------------------
 
 #. Look for hyper-parameters for velocity using the original context: ``python
-   run.py -v -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.1132 (about like the dummy predictor but there is
+   run.py -v -sk``. We obtained hyperparams defined in ``settings.py``
+   and loss function of TODO (about like the dummy predictor but there is
    the complexity cost!).
 #. Look for hyper-parameters for pedaling using the original context: ``python
-   run.py -p -sk -c orig``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.2189.
+   run.py -p -sk``. We obtained hyperparams defined in ``settings.py``
+   and loss function of TODO.
 #. Fully train velocity model on the original context: ``python run.py -v -t -c orig``
 
-   * Dummy loss: 0.1207
-   * Validation loss: 0.1202 (37 epochs, early-stop)
-   * 354845 in training
-   * 55008 batches in validation
-   * Learning rate: 1.41e-4
-   * 349 parameters::
+   * Dummy loss: TODO
+   * Validation loss: TODO (TODO epochs)
+   * TODO batches in training
+   * TODO batches in validation
+   * Learning rate: TODO
+   * TODO parameters::
 
      TODO
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss: 0.2578
-   * Validation loss: 0.1957 (500 epochs)
-     (using ``sigmoid_last=False``, validation loss is 0.2039 (88 epochs))
-   * 247 batches in training
-   * 47 batches in validation
-   * Learning rate: 2.02e-2
-   * 69 parameters::
+   * Dummy loss: TODO
+   * Validation loss: TODO (TODO epochs)
+   * TODO batches in training
+   * TODO batches in validation
+   * Learning rate: TODO
+   * TODO parameters::
 
-      MIDIParameterEstimation(
-        (dropout): Dropout(p=0.1, inplace=False)
-        (stack): Sequential(
-          (0): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
-          (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (2): Identity()
-          (3): Conv2d(3, 3, kernel_size=(6, 1), stride=(1, 1), groups=3, bias=False)
-          (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (5): Identity()
-          (6): Conv2d(3, 3, kernel_size=(3, 1), stride=(1, 1), groups=3, bias=False)
-          (7): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-          (8): Identity()
-          (9): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
-          (10): Sigmoid()
-        )
-      )
+     TODO
 
 #. After each training, you will find a checkpoint file in the `models` directory
 
 ----
 
 * option ``-r`` preprocess the dataset using NMF; it should be used only once
-  per each type of model; each subsequent runs will use the already dumped
+  per each context; each subsequent runs will use the already dumped
   dataset
 * option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
-  3% for velocity; thus, ``-sk -r`` would result in preprocessing only that
-  10% and 3%
+  5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
+  10% and 5%
 
 
 3. Training the context-specific models
@@ -184,46 +168,46 @@ Results for pedaling
 
 Training batches: 120
 Validation batches: 15
-Learning rates: 8.33e-3
+Learning rates: TODO
 
 +-------------+------------+-----------------+--------+
 | context     | dummy loss | validation loss | epochs |
 +-------------+------------+-----------------+--------+
-| pianoteq0   |   0.26464  |     0.2178      |  61    |
+| pianoteq0   |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2192      |  119   |
+|             |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2248      |  103   |
+|             |            |                 |        |
 +-------------+------------+-----------------+--------+
-| pianoteq1   |   0.27372  |     0.2206      |  99    |
+| pianoteq1   |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2273      |  92    |
+|             |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2338      |  23    |
+|             |            |                 |        |
 +-------------+------------+-----------------+--------+
-| pianoteq2   |   0.25987  |     0.2146      |  214   |
+| pianoteq2   |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2135      |  229   |
+|             |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2177      |  175   |
+|             |            |                 |        |
 +-------------+------------+-----------------+--------+
-| pianoteq3   |   0.26856  |     0.2101      |  132   |
+| pianoteq3   |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2215      |  189   |
+|             |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2383      |  42    |
+|             |            |                 |        |
 +-------------+------------+-----------------+--------+
-| salamander0 |   0.26678  |     0.2337      |  213   |
+| salamander0 |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2356      |  283   |
+|             |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2394      |  465   |
+|             |            |                 |        |
 +-------------+------------+-----------------+--------+
-| salamander1 |   0.25548  |     0.2008      |  91    |
+| salamander1 |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2061      |  113   |
+|             |            |                 |        |
 |             +            +-----------------+--------+
-|             |            |     0.2106      |  87    |
+|             |            |                 |        |
 +-------------+------------+-----------------+--------+
 
 4. Evaluating error distributions
