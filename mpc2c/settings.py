@@ -135,7 +135,7 @@ PED_SKSPACE = [
                       name='middle_activation')
 ]
 SKCHECKPOINT = 'skopt_checkpoint.pkl'
-SKITERATIONS = (0, 80)
+SKITERATIONS = (0, 40)
 PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 1e-6
 
