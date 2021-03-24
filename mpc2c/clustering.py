@@ -8,7 +8,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
-from .asmd.asmd import asmd
+from .asmd.asmd import asmd, dataset_utils
 from .mytorchutils.context import vis
 
 
@@ -30,8 +30,8 @@ def extract_pedaling_features(ped: np.ndarray):
 
 
 def parallel_feature_extraction(i, dataset):
-    velocities = dataset.get_score(
-        i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
+    velocities = dataset_utils.get_score_mat(
+        dataset, i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
     vel_data = extract_velocity_features(velocities)
 
     pedaling = dataset.get_pedaling(i, frame_based=True)[0]

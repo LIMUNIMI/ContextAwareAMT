@@ -6,9 +6,9 @@ from torch.utils.data import DataLoader
 from . import nmf
 from . import settings as s
 from . import utils
-from .asmd.asmd import asmd
-from .mytorchutils import (DatasetDump, dummy_collate, pad_collate,
-                           no_batch_collate)
+from .asmd.asmd import asmd, dataset_utils
+from .mytorchutils import (DatasetDump, dummy_collate, no_batch_collate,
+                           pad_collate)
 
 
 def transform_func(arr: es.array):
@@ -26,7 +26,7 @@ def transform_func(arr: es.array):
 def process_pedaling(i, dataset, nmf_params):
     nmf_tools = nmf.NMFTools(*nmf_params)
     audio, sr = dataset.get_mix(i, sr=s.SR)
-    score = dataset.get_score(i, score_type=['precise_alignment'])
+    score = dataset_utils.get_score_mat(dataset, i, score_type=['precise_alignment'])
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
     diff_spec = transform_func(nmf_tools.initV) - transform_func(
@@ -43,10 +43,10 @@ def process_pedaling(i, dataset, nmf_params):
 def process_velocities(i, dataset, nmf_params):
     nmf_tools = nmf.NMFTools(*nmf_params)
     audio, sr = dataset.get_mix(i, sr=s.SR)
-    score = dataset.get_score(i, score_type=['precise_alignment'])
+    score = dataset_utils.get_score_mat(dataset, i, score_type=['precise_alignment'])
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
-    velocities = dataset.get_score(i, score_type=['precise_alignment'
+    velocities = dataset_utils.get_score_mat(dataset, i, score_type=['precise_alignment'
                                                   ])[:, 3] / 127
     minispecs = nmf_tools.get_minispecs(transform=transform_func)
     return minispecs, velocities
@@ -58,10 +58,13 @@ def get_loader(groups, mode, redump, nmf_params=None, song_level=False):
     `song_level` allows to make each bach correspond to one song (e.g. for
     testing at the song-level)
     """
-    dataset = asmd.Dataset(
-        paths=[s.RESYNTH_DATA_PATH],
-        metadataset_path=s.METADATASET_PATH).filter(groups=groups)
-    dataset.paths = dataset.paths[:int(s.DATASET_LEN * len(dataset.paths))]
+    dataset = dataset_utils.filter(asmd.Dataset(
+        paths=[s.RESYNTH_DATA_PATH], metadataset_path=s.METADATASET_PATH),
+                                   groups=groups)
+    dataset, _ = dataset_utils.choice(dataset,
+                                      p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
+                                      random_state=1992)
+    # dataset.paths = dataset.paths[:int(s.DATASET_LEN * len(dataset.paths))]
     if mode == 'velocity':
         num_samples = [
             len(gt['precise_alignment']['pitches'])

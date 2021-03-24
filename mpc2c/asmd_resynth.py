@@ -8,9 +8,9 @@ import mido
 import numpy as np
 from tqdm import tqdm
 
-from .asmd.asmd import asmd
-from .pycarla import pycarla
+from .asmd.asmd import asmd, dataset_utils
 from .clustering import cluster_choice
+from .pycarla import pycarla
 
 
 def group_split(datasets: t.List[str],
@@ -36,13 +36,13 @@ def group_split(datasets: t.List[str],
     groups.
     """
 
-    dataset = asmd.Dataset().filter(datasets=datasets)
+    dataset = dataset_utils.filter(asmd.Dataset(), datasets=datasets)
     new_definition = {"songs": [], "name": "new_def"}
     clusters_groups = []
     songs_groups = []
     for i, group in enumerate(groups):
         print(f"Splitting group {group}")
-        d = dataset.filter(groups=[group], copy=True)
+        d = dataset_utils.filter(dataset, groups=[group], copy=True)
         songs = d.get_songs()
         songs_groups.append(songs)
 
@@ -141,7 +141,7 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                 carla.start()
 
             # get the songs with this context
-            d = dataset.filter(groups=[group], copy=True)
+            d = dataset_utils.filter(dataset, groups=[group], copy=True)
             for j in range(len(d)):
 
                 # for each song in this context, get the new audio_path
@@ -216,8 +216,8 @@ def correctly_synthesized(i: int, dataset: asmd.Dataset) -> bool:
         print(f"Song {i} check: couldn't correctly load the recorded song")
         return False
 
-    midi = dataset.get_score(
-        i, score_type=['precise_alignment', 'broad_alignment'])
+    midi = dataset_utils.get_score_mat(
+        dataset, i, score_type=['precise_alignment', 'broad_alignment'])
 
     # check duration
     if len(audio) / sr < midi[:, 2].max():
