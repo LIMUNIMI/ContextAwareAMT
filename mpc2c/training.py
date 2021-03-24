@@ -157,6 +157,7 @@ def train(hpar,
                               early_range=s.EARLY_RANGE,
                               plot_losses=s.PLOT_LOSSES,
                               dtype=s.DTYPE,
+                              checkpoint_path=f"checkpoint_{mode}",
                               copy_checkpoint=copy_checkpoint)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
     loss = train_loss + complexity_loss
