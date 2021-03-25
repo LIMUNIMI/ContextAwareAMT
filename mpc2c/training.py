@@ -192,9 +192,6 @@ def skopt_objective(hpar: dict, mode: str):
                           transfer_step=None,
                           return_model=True)
 
-    print("----------------------------")
-    print("testing transfer-learning")
-    print("----------------------------\n")
     # train on the other contexts
     state_dict = orig_model.state_dict()
     del orig_model
@@ -203,6 +200,10 @@ def skopt_objective(hpar: dict, mode: str):
         if context == 'orig':
             # skip the `orig` context
             continue
+
+        print("\n----------------------------")
+        print(f"testing tl on {context}")
+        print("----------------------------\n")
         losses.append(
             train(hpar,
                   mode,
