@@ -96,7 +96,7 @@ PED_HYPERPARAMS = {
     # training on original context showed a slightly lower loss for `True`
     # (about 8e-3 lower than `False`)
 }
-VEL_BATCH_SIZE = 50
+VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8
