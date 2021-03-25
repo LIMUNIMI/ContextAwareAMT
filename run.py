@@ -171,7 +171,7 @@ def main():
                 return training.skopt_objective(x, 'pedaling')
 
         elif args.velocity:
-            s.DATASET_LEN = 0.05
+            s.DATASET_LEN = 0.1
             space = s.VEL_SKSPACE
             space_constraint = training.model_test(
                 training.build_velocity_model,

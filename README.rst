@@ -101,9 +101,8 @@ Datasets
 * option ``-r`` preprocess the dataset using NMF; it should be used only once
   per each context; each subsequent runs will use the already dumped
   dataset
-* option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
-  5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
-  10% and 5%
+* option ``-sk`` reduces the dataset to 10% of its total; thus, ``-sk -r``
+  would result in preprocessing only that 10%
 
 
 3. Training the context-specific models
