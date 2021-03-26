@@ -212,6 +212,9 @@ def skopt_objective(hpar: dict, mode: str):
                   transfer_step=None,
                   copy_checkpoint='',
                   return_model=False))
+        if losses[-1] > 1:
+            # if loss was an error, e.g. a nan
+            return 9999.0
 
     print("\n============================\n")
     return np.mean(losses)
