@@ -301,7 +301,7 @@ class MIDIParameterEstimation(nn.Module):
         def set_parameters_to(m, boolean):
             for p in m.parameters():
                 p.requires_grad = boolean
-            if type(m) is nn.InstanceNorm2d:
+            if hasattr(m, 'track_running_stats'):
                 m.track_running_stats = boolean
 
         for m in self.stack[:num_layers]:
