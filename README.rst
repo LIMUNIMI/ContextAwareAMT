@@ -103,10 +103,10 @@ Datasets
 
 #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
-   * Dummy loss: TODO
-   * Validation loss: TODO (TODO epochs)
-   * TODO batches in training
-   * TODO batches in validation
+   * Dummy loss: 0.2578
+   * Validation loss: 0.1963 (500 epochs)
+   * 247 batches in training
+   * 47 batches in validation
    * Learning rate: 2.02e-2
    * 6052 parameters::
 
@@ -159,10 +159,10 @@ Results for velocity
 +-------------+---------+---------------+------------+-----------------+--------+
 | context     | batches | learning rate | dummy loss | validation loss | epochs |
 +-------------+---------+---------------+------------+-----------------+--------+
-| pianoteq0   |         |               |            |                 |        |
-|             |         +---------------+            +-----------------+--------+
-|             |         |               |            |                 |        |
-|             |         +---------------+            +-----------------+--------+
+| pianoteq0   | 13658,  | 7.32e-6       |  0.1329    |  0.1333         |  500   |
+|             | 1201    +               +            +-----------------+--------+
+|             |         |               |            |  0.1333         |  500   |
+|             |         +               +            +-----------------+--------+
 |             |         |               |            |                 |        |
 +-------------+---------+---------------+------------+-----------------+--------+
 | pianoteq1   |         |               |            |                 |        |
