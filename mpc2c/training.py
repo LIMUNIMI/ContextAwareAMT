@@ -78,8 +78,11 @@ def build_pedaling_model(hpar, dropout):
 
 def train(hpar,
           mode,
+          # TODO: remove transfer_step param
           transfer_step=None,
+          # TODO: remove context param
           context=None,
+          # TODO: remove state_dict param
           state_dict=None,
           copy_checkpoint='',
           return_model=False):
@@ -94,6 +97,7 @@ def train(hpar,
     7. Also returns the model checkpoint if `return_model` is True
     """
     # loaders
+    # TODO: get loaders for all the contexts
     trainloader, validloader = data_management.multiple_splits_one_context(
         ['train', 'validation'], context, mode, False)
 
@@ -109,6 +113,8 @@ def train(hpar,
         dropout = s.TRAIN_DROPOUT
         lr_k = s.LR_K
 
+    # TODO: get 3 models (encoder, decoder, performer)
+    # TODO: copy the performer to all the contexts
     if mode == 'velocity':
         model = build_velocity_model(hpar, dropout)
         axes = []
@@ -116,10 +122,12 @@ def train(hpar,
         model = build_pedaling_model(hpar, dropout)
         axes = [-1]
 
+    # TODO: remove
     if state_dict is not None:
         model.load_state_dict(state_dict, end=transfer_layers)
         model.freeze(freeze_layers)
 
+    # TODO: remove this
     n_params_free = count_params(model, requires_grad=True)
     # n_params_all = count_params(model, requires_grad=False)
     print(model)
@@ -145,6 +153,7 @@ def train(hpar,
     validloss_fn = make_loss_func(F.l1_loss)
 
     # training
+    # TODO: train epoch by epoch on each different context (and different model
     train_loss = train_epochs(model,
                               optim,
                               trainloss_fn,

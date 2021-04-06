@@ -31,6 +31,8 @@ def conv_output_size(size, dilation, kernel, stride):
     return tuple(out)
 
 
+# TODO: split in: encoder, decoder, performer
+
 class MIDIParameterEstimation(nn.Module):
     def __init__(self, input_size, output_features, note_level, max_layers,
                  dropout, hyperparams):

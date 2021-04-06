@@ -29,6 +29,7 @@ pandas = "^1.2.1"
 matplotlib = "^3.3.4"
 dash = "^1.19.0"
 kaleido = "0.1.0"
+pytorch-lightning = "^1.2.6"
 
 [tool.poetry.dev-dependencies]
 jedi = "<0.18.0"

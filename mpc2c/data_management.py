@@ -10,6 +10,10 @@ from .asmd.asmd import asmd, dataset_utils
 from .mytorchutils import (DatasetDump, dummy_collate, no_batch_collate,
                            pad_collate)
 
+# TODO: create a DumpableDataset which inherits and overloads `get_target`
+# TODO: self._get_sample(i, getter_fn=self._get_input) not filtered
+# among the inverted index
+
 
 def transform_func(arr: es.array):
     """
@@ -39,6 +43,7 @@ def process_pedaling(i, dataset, nmf_params):
         i, frame_based=True, winlen=winlen, hop=hop)[0] / 127
     # padding so that pedaling and diff_spec have the same length
     pedaling, diff_spec = utils.pad(pedaling[:, 1:].T, diff_spec)
+    # TODO: pedaling should now return frames like velocities...
     return diff_spec[None], pedaling[None]
 
 
@@ -62,6 +67,7 @@ def get_loader(groups, mode, redump, nmf_params=None, song_level=False):
     `song_level` allows to make each bach correspond to one song (e.g. for
     testing at the song-level)
     """
+    # TODO: dump the whole dataset here
     dataset = dataset_utils.filter(
         asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
                      metadataset_path=s.METADATASET_PATH),
@@ -75,6 +81,9 @@ def get_loader(groups, mode, redump, nmf_params=None, song_level=False):
             len(gt['precise_alignment']['pitches'])
             for i in range(len(dataset.paths)) for gt in dataset.get_gts(i)
         ]
+        # TODO: select only the needed groups
+        # TODO: sub-sample the dataset here
+        # use `apply_func`
         velocity_dataset = DatasetDump(dataset,
                                        pathlib.Path(s.VELOCITY_DATA_PATH) /
                                        "_".join(groups),
