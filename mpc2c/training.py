@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.loggers import MLFlowLogger
 
 from . import data_management, feature_extraction
 from . import settings as s
@@ -171,9 +171,8 @@ def train(
     ],
                       precision=s.PRECISION,
                       max_epochs=s.EPOCHS,
-                      logger=TensorBoardLogger(
-                          './tensorboard',
-                          name=f'{mode}_{context}_{transfer_step}'))
+                      logger=MLFlowLogger(
+                          experiment_name=f'{mode}_{context}_{transfer_step}'))
     trainer.fit(model, trainloader, validloader)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
     loss = early_stopper.best_score + complexity_loss

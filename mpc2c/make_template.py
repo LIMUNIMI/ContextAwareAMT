@@ -7,6 +7,7 @@ import numpy as np
 import plotly.graph_objects as go
 import pretty_midi as pm
 
+from . import settings as s
 from .essentiaspec import Spectrometer, peaks_enhance
 
 
@@ -15,7 +16,7 @@ def make_template(scale_path: Tuple[str, str],
                   basis: int,
                   basis_frames: Tuple[int, int],
                   retuning: bool = False,
-                  peaks_enhancing=False) -> np.ndarray:
+                  peaks_enhancing=False) -> Tuple[np.ndarray, int, int]:
     """
     Creates a template.
 
@@ -62,7 +63,7 @@ def make_template(scale_path: Tuple[str, str],
 
     # compute the whole spectrogram
     print("Computing spectrogram...")
-    retuning = 440 if retuning else 0
+    retuning = 440 if retuning else 0  # type: ignore
     ttt = time.time()
     audio = spec.spectrogram(audio, retuning=retuning)
     print(f"Needed time: {time.time() - ttt: .2f}s")
@@ -141,9 +142,6 @@ def make_template(scale_path: Tuple[str, str],
 
 
 def main():
-    import visdom
-
-    from . import settings as s
 
     template = make_template(scale_path=s.SCALE_PATH,
                              spec=s.SPEC,
@@ -154,8 +152,9 @@ def main():
     # plot template
     fig = go.Figure(data=go.Heatmap(z=template[0]))
     try:
-        vis = visdom.Visdom()
-        vis.plotlyplot(fig)
+        import mlflow
+        with mlflow.start_run():
+            mlflow.log_figure(fig, str(int(time.time())) + '.html')
     except:
         fig.show()
 

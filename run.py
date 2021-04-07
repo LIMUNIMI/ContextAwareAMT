@@ -247,7 +247,6 @@ def main():
                 evaluate.plot_from_file(fname,
                                         compare=compare,
                                         mode=mode,
-                                        port=False,
                                         ext='.svg')
         else:
 

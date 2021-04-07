@@ -13,7 +13,6 @@ tqdm = "^4.52.0"
 joblib = "^0.17.0"
 pretty_midi = "^0.2.9"
 essentia = "^2.1b6.dev184"
-visdom = "^0.1.8"
 plotly = "^4.12.0"
 torch = "^1.7.0"
 # TODO: change this when this branch is merged!
@@ -27,9 +26,9 @@ mido = {git = "https://github.com/mido/mido.git", rev="2f53ba0bfa4c0fc5949bd5802
 python-rtmidi = "^1.4.6"
 pandas = "^1.2.1"
 matplotlib = "^3.3.4"
-dash = "^1.19.0"
 kaleido = "0.1.0"
 pytorch-lightning = "^1.2.6"
+mlflow = "^1.15.0"
 
 [tool.poetry.dev-dependencies]
 jedi = "<0.18.0"

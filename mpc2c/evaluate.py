@@ -3,9 +3,6 @@ import typing as T
 from pathlib import Path
 from typing import Tuple
 
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -176,13 +173,6 @@ def eval_model_context(
     return np.asarray(errors), np.asarray(std_neg), np.asarray(std_pos)
 
 
-def plot_dash(figs, port):
-
-    app = dash.Dash()
-    app.layout = html.Div([dcc.Graph(figure=fig) for fig in figs])
-    app.run_server(port=port, debug=False, use_reloader=False)
-
-
 def plot(df: pd.DataFrame,
          compare: bool,
          mode: str,
@@ -350,20 +340,10 @@ def write_figs(figs, save, ext):
             print(e)
 
 
-def plot_from_file(fname, compare, mode, port, ext='.svg'):
-    """
-    if `port` is None, dash won't be started
-    """
+def plot_from_file(fname, compare, mode, ext='.svg'):
 
     fname = Path(fname)
     print("Reading from file...")
     df = pd.read_csv(fname)
     print("Creating figures...")
-    figs = plot(df,
-                compare,
-                mode,
-                save=Path(s.IMAGES_PATH) / fname.stem,
-                ext=ext)
-    if port:
-        print("Starting dash...")
-        plot_dash(figs, port)
+    plot(df, compare, mode, save=Path(s.IMAGES_PATH) / fname.stem, ext=ext)
