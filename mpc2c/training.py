@@ -7,12 +7,15 @@ from pprint import pprint
 import numpy as np
 import torch
 import torch.nn.functional as F
+from pytorch_lightning import Trainer
+from pytorch_lightning.loggers import TensorBoardLogger
 
 from . import data_management, feature_extraction
 from . import settings as s
 from .asmd_resynth import get_contexts
-from .mytorchutils import (compute_average, count_params, make_loss_func,
-                           train_epochs)
+from .mytorchutils import (VL_MM_Trainable, best_checkpoint_saver,
+                           checkpoint_saver, compute_average, count_params,
+                           early_stopping, make_loss_func)
 
 
 def model_test(model_build_func, test_sample):
@@ -76,16 +79,17 @@ def build_pedaling_model(hpar, dropout):
     return m
 
 
-def train(hpar,
-          mode,
-          # TODO: remove transfer_step param
-          transfer_step=None,
-          # TODO: remove context param
-          context=None,
-          # TODO: remove state_dict param
-          state_dict=None,
-          copy_checkpoint='',
-          return_model=False):
+def train(
+        hpar,
+        mode,
+        # TODO: remove transfer_step param
+        transfer_step=None,
+        # TODO: remove context param
+        context=None,
+        # TODO: remove state_dict param
+        state_dict=None,
+        copy_checkpoint='',
+        return_model=False):
     """
     1. Builds a model given `hpar` and `mode`
     2. Transfer knowledge from `state_dict` if provided
@@ -145,31 +149,34 @@ def train(hpar,
                                 *axes,
                                 n_jobs=-1,
                                 backend='threading')
-    # optimizer
-    optim = torch.optim.Adadelta(model.parameters(), lr=lr, weight_decay=wd)
 
     # loss functions
     trainloss_fn = make_loss_func(F.l1_loss)
     validloss_fn = make_loss_func(F.l1_loss)
 
+    model = VL_MM_Trainable(model,
+                            inferenceloss_fn=validloss_fn,
+                            dummyloss_fn=lambda x, y, z: dummy_avg,
+                            optimizer=torch.optim.Adadelta,
+                            lr=lr,
+                            wd=wd,
+                            trainingloss_fn=trainloss_fn)
+
     # training
     # TODO: train epoch by epoch on each different context (and different model
-    train_loss = train_epochs(model,
-                              optim,
-                              trainloss_fn,
-                              validloss_fn,
-                              trainloader,
-                              validloader,
-                              dummy_loss=lambda x: dummy_avg,
-                              trainloss_on_valid=True,
-                              early_stop=s.EARLY_STOP,
-                              early_range=s.EARLY_RANGE,
-                              plot_losses=s.PLOT_LOSSES,
-                              dtype=s.DTYPE,
-                              checkpoint_path=f"checkpoint_{mode}",
-                              copy_checkpoint=copy_checkpoint)
+    early_stopper = early_stopping(s.EARLY_STOP, s.EARLY_RANGE)
+    trainer = Trainer(callbacks=[
+        best_checkpoint_saver(copy_checkpoint), early_stopper,
+        checkpoint_saver(f"checkpoint_{mode}")
+    ],
+                      precision=s.PRECISION,
+                      max_epochs=s.EPOCHS,
+                      logger=TensorBoardLogger(
+                          './tensorboard',
+                          name=f'{mode}_{context}_{transfer_step}'))
+    trainer.fit(model, trainloader, validloader)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
-    loss = train_loss + complexity_loss
+    loss = early_stopper.best_score + complexity_loss
 
     if return_model:
         return loss, model
