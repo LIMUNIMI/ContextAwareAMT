@@ -310,6 +310,12 @@ class NMFTools:
             see `gen_notes_from_H`
         `transform` : Optional[Callable]
             a callable that is applied to each mini spec
+
+        Returns
+        -------
+
+        np.array:
+            3d array with shape (minispecs, H, W)
         """
         mini_specs = []
         for mini_spec in self.generate_minispecs(onsets_from_H):

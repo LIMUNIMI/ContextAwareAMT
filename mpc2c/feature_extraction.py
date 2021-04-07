@@ -280,11 +280,6 @@ class MIDIParameterEstimation(nn.Module):
         if end is not None:
             stack[end:] = cp[end:]
 
-        # restore all InstanceNorm layers
-        # for i in range(len(stack)):
-        #     if type(stack[i]) is nn.InstanceNorm2d:
-        #         stack[i] = cp[i]
-
         self.stack = nn.Sequential(*stack)
 
     def freeze(self, num_layers=0):
@@ -319,84 +314,6 @@ class AbsLayer(nn.Module):
 
     def forward(self, x):
         return torch.abs(x)
-
-
-class SpaceVariant(nn.Module):
-    def __init__(self, module, normalize_func, shape=None):
-        """
-        A space-variant convolution.
-        1. `module` is applied to the input
-        2. `normalize_func` is used while creating the map of the positions
-        3. indices are extracted from that map
-        4. the 2 outputs are multiplied entry-wise
-
-        Arguments
-        ---------
-
-        `module` : callable
-            e.g. a `torch.nn.Conv2d` object
-        `normalize_fun` : callable
-            a function which takes as arguments the ndices of one dimension (a
-            tensor) and returns another tensor with same dimensions
-        `shape` : None or tuple
-            the shape expected as input; if you know that, insert it as it
-            improves performances
-        """
-        super().__init__()
-        self.module = module
-        self.pos = nn.Conv2d(2,
-                             1,
-                             module.kernel_size,
-                             module.stride,
-                             module.padding,
-                             module.dilation,
-                             groups=1,
-                             bias=module.bias is not None,
-                             padding_mode=module.padding_mode)
-        self.normalize = normalize_func
-        if shape:
-            self.positions = self.make_positions(shape)
-
-    def forward(self, x):
-        if hasattr(self, 'positions'):
-            positions = self.positions.to(x.dtype).to(x.device)
-        else:
-            positions = self.make_positions(x.shape).to(x.dtype).to(x.device)
-        x = self.module(x)
-        positions = self.pos(positions)
-        return x * positions
-
-    def make_positions(self, shape):
-        """
-        Arguments:
-        ----------
-
-        `shape` : tuple of int
-            the shape of the tensor for which positions should be built.
-            4 dimensions: (batches, channels, x, y)
-        """
-        # making arrays between -1 and +1
-        # X = torch.arange(1, shape[-2] + 1)
-        # X = self.normalize(X)
-        # X = torch.stack([X, torch.flip(X, [0])])
-        # # expand X to match Y
-        # X = X.unsqueeze(2).expand(2, shape[-2], shape[-1])
-
-        Y = torch.arange(1, shape[-1] + 1)
-        Y = self.normalize(Y)
-        Y = torch.stack([Y, torch.flip(Y, [0])])
-        # expand Y to match X
-        Y = Y.unsqueeze(1).expand(2, shape[-2], shape[-1])
-
-        # positions = torch.cat([X, Y], dim=0)
-        # positions = torch.stack([X, Y], dim=0)
-        # here `positions` has 3 dimensions:
-        #   0. dimension 0 has size 2 and contains (X, X_flip, Y, Y_flip)
-        #   1. dimension 1 has the indices for x
-        #   2. dimension 2 has the indices for y
-
-        # the returned whould have one more position for batches
-        return Y.unsqueeze(0).expand(shape[0], 2, shape[2], shape[3])
 
 
 def init_weights(m, initializer):
