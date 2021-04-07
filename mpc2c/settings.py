@@ -26,7 +26,7 @@ SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
-NJOBS = 5
+NJOBS = 4
 # number of mfcc
 BINS = 13
 SPEC = essentiaspec.Spectrometer(
@@ -94,14 +94,15 @@ EARLY_RANGE = 1e-8
 TRAIN_DROPOUT = 0.1
 PLOT_LOSSES = True
 DTYPE = torch.float64
+PRECISION = 64
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
 LR_K = 5
 
 # Transfer-learning
-PED_STEP = [0, 6, 9]
-VEL_STEP = [0, 3, 6]
+PED_STEP = [0, 3, 6]
+VEL_STEP = [0, 6, 9]
 TRANSFER_WD = 0
 TRANSFER_DROPOUT = 0.1
 TRANSFER_VEL_BATCH_SIZE = 50
