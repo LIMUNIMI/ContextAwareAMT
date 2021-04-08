@@ -218,7 +218,6 @@ def main():
                            context=args.context,
                            state_dict=checkpoint,
                            copy_checkpoint=fname)
-            input("\nPress a key to continue: ")
 
     if args.redump:
         if args.pedaling:

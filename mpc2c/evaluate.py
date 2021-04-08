@@ -2,6 +2,7 @@ import re
 import typing as T
 from pathlib import Path
 from typing import Tuple
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
@@ -101,7 +102,16 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
         errors = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
         model = build_pedaling_model(s.PED_HYPERPARAMS, 0)
 
-        model.load_state_dict(torch.load(checkpoint)['state_dict'])
+        state_dict = torch.load(checkpoint)['state_dict']
+
+        # TODO: fix the loading/saving models for lightning
+        # removing 'model', inserted by pytorch-lightning (my fault sorry)
+        for key, value in deepcopy(state_dict).items():
+            if key.startswith('model.'):
+                state_dict[key[6:]] = value
+                del state_dict[key]
+
+        model.load_state_dict(state_dict)
 
         for context in contexts:
             print(f"\nEvaluating {checkpoint} on {context}")
