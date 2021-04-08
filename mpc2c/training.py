@@ -4,6 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
 
+import mlflow
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -141,41 +142,42 @@ def train(
     # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
     #                                                       n_params_free)
     lr = lr_k / len(trainloader)
-
-    print(f"Using learning rate {lr:.2e}")
+    mlflow.log_metric("initial_lr", lr)
 
     # dummy model (baseline)
     dummy_avg = compute_average(trainloader.dataset,
                                 *axes,
                                 n_jobs=-1,
                                 backend='threading')
+    mlflow.log_metric("dummy_avg", dummy_avg)
 
     # loss functions
     trainloss_fn = make_loss_func(F.l1_loss)
     validloss_fn = make_loss_func(F.l1_loss)
 
-    model = VL_MM_Trainable(model,
-                            inferenceloss_fn=validloss_fn,
-                            dummyloss_fn=lambda x, y, z: dummy_avg,
-                            optimizer=torch.optim.Adadelta,
-                            lr=lr,
-                            wd=wd,
-                            trainingloss_fn=trainloss_fn)
+    model = VL_MM_Trainable(
+        model, (trainloss_fn, validloss_fn, lambda x, y, z: dummy_avg),
+        (torch.optim.Adadelta, lr, wd))
 
     # training
     # TODO: train epoch by epoch on each different context (and different model
     early_stopper = early_stopping(s.EARLY_STOP, s.EARLY_RANGE)
-    trainer = Trainer(callbacks=[
+    callbacks = [
         best_checkpoint_saver(copy_checkpoint), early_stopper,
         checkpoint_saver(f"checkpoint_{mode}")
-    ],
+    ]
+    trainer = Trainer(callbacks=callbacks,
                       precision=s.PRECISION,
                       max_epochs=s.EPOCHS,
                       logger=MLFlowLogger(
-                          experiment_name=f'{mode}_{context}_{transfer_step}'))
+                          experiment_name=f'{mode}_{context}_{transfer_step}'),
+                      gpus=s.GPUS)
     trainer.fit(model, trainloader, validloader)
+
+    mlflow.log_metric("best_validation_loss", early_stopper.best_score)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
     loss = early_stopper.best_score + complexity_loss
+    mlflow.log_metric("total_loss", loss)
 
     if return_model:
         return loss, model

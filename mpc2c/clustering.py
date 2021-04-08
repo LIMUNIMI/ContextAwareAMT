@@ -7,9 +7,9 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
+import mlflow
 
 from .asmd.asmd import asmd, dataset_utils
-from .mytorchutils.context import vis
 
 
 def extract_velocity_features(vel: np.ndarray):
@@ -112,21 +112,21 @@ def _plot_clusters(points: np.ndarray, data_to_cluster: np.ndarray,
                 n_clusters=n_clusters, linkage='ward').fit_predict(points)
         ],
         title=f"{title} agglomerative clustering")
-    vis.plotlyplot(fig)
+    mlflow.log_figure(fig, "agglomerative_clustering.html")
 
     fig = px.scatter(x=points[:, 0],
                      y=points[:, 1],
                      color=[str(cl) for cl in cluster1],
                      category_orders=dict(color=[str(cl) for cl in cluster1]),
                      title=f"{title} color: standard")
-    vis.plotlyplot(fig)
+    mlflow.log_figure(fig, "standard_clustering.html")
 
     fig = px.scatter(x=points[:, 0],
                      y=points[:, 1],
                      color=[str(cl) for cl in cluster2],
                      category_orders=dict(color=[str(cl) for cl in cluster1]),
                      title=f"{title} color: distributed")
-    vis.plotlyplot(fig)
+    mlflow.log_figure(fig, "distriduted_clustering.html")
 
 
 def redistribute(*args, mode='robinhood', **kwargs) -> t.List[t.List[int]]:

@@ -71,6 +71,7 @@ PREPROCESSING = "pad"
 # NN
 MAX_LAYERS = 30
 DEVICE = 'cuda'
+GPUS = 1
 EPOCHS = 500
 VEL_HYPERPARAMS = {
     'lstm_layers': 1,
@@ -93,8 +94,8 @@ EARLY_STOP = 20
 EARLY_RANGE = 1e-8
 TRAIN_DROPOUT = 0.1
 PLOT_LOSSES = True
-DTYPE = torch.float64
-PRECISION = 64
+DTYPE = torch.float32
+PRECISION = 32
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
