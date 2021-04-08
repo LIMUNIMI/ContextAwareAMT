@@ -1,5 +1,6 @@
 # from memory_profiler import profile
 
+import os
 from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
@@ -105,6 +106,8 @@ def train(
     # TODO: get loaders for all the contexts
     trainloader, validloader = data_management.multiple_splits_one_context(
         ['train', 'validation'], context, mode, False)
+    logger = MLFlowLogger(experiment_name=f'{mode}_{context}_{transfer_step}',
+                          tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
 
     # building model
     if state_dict is not None:
@@ -142,14 +145,12 @@ def train(
     # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
     #                                                       n_params_free)
     lr = lr_k / len(trainloader)
-    mlflow.log_metric("initial_lr", lr)
 
     # dummy model (baseline)
     dummy_avg = compute_average(trainloader.dataset,
                                 *axes,
                                 n_jobs=-1,
                                 backend='threading')
-    mlflow.log_metric("dummy_avg", dummy_avg)
 
     # loss functions
     trainloss_fn = make_loss_func(F.l1_loss)
@@ -158,6 +159,13 @@ def train(
     model = VL_MM_Trainable(
         model, (trainloss_fn, validloss_fn, lambda x, y, z: dummy_avg),
         (torch.optim.Adadelta, lr, wd))
+    # logging initial stuffs
+    logger.log_graph(model)
+    logger.log_metrics({
+        "initial_lr": lr,
+        "train_batches": len(trainloader),
+        "valid_batches": len(validloader)
+    })
 
     # training
     # TODO: train epoch by epoch on each different context (and different model
@@ -169,16 +177,18 @@ def train(
     trainer = Trainer(callbacks=callbacks,
                       precision=s.PRECISION,
                       max_epochs=s.EPOCHS,
-                      logger=MLFlowLogger(
-                          experiment_name=f'{mode}_{context}_{transfer_step}'),
+                      logger=logger,
                       gpus=s.GPUS)
     trainer.fit(model, trainloader, validloader)
 
-    mlflow.log_metric("best_validation_loss", early_stopper.best_score)
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
     loss = early_stopper.best_score + complexity_loss
-    mlflow.log_metric("total_loss", loss)
+    logger.log_metrics({
+        "best_validation_loss": float(early_stopper.best_score),
+        "total_loss": float(loss)
+    })
 
+    mlflow.end_run()
     if return_model:
         return loss, model
     else:
