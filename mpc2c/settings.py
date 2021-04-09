@@ -110,23 +110,18 @@ TRANSFER_VEL_BATCH_SIZE = 50
 TRANSFER_LR_K = 0.1
 
 # SKOPT
-VEL_SKSPACE = [
-    space.Integer(0, 2, name='lstm_layers'),
-    space.Integer(0, 7, name='lstm_hidden_size'),
-    space.Integer(0, 7, name='middle_features'),
-    space.Integer(3, 6, name='kernel_0'),
-    space.Integer(3, 10, name='kernel_1'),
-    space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
-                      name='middle_activation')
-]
 PED_SKSPACE = [
     space.Integer(0, 4, name='lstm_layers'),
     space.Integer(0, 7, name='lstm_hidden_size'),
-    space.Integer(0, 7, name='middle_features'),
+    space.Integer(0, 7, name='latent_features'),
+    space.Integer(0, 7, name='encoder_features'),
     space.Integer(3, 6, name='kernel_0'),
     space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
-                      name='middle_activation')
+                      name='middle_activation'),
+    space.Integer(3, 6, name='performer_layers'),
+    space.Integer(0, 7, name='performer_features'),
 ]
+VEL_SKSPACE = PED_SKSPACE + [space.Integer(3, 10, name='kernel_1')]
 SKITERATIONS = (0, 40)
 PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 1e-6

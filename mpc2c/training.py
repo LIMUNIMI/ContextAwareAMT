@@ -2,22 +2,17 @@
 
 import os
 from copy import deepcopy
-from pathlib import Path
 from pprint import pprint
 
-import mlflow
-import numpy as np
-import torch
 import torch.nn.functional as F
 from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import MLFlowLogger
 
 from . import data_management, feature_extraction
 from . import settings as s
-from .asmd_resynth import get_contexts
-from .mytorchutils import (VL_MM_Trainable, best_checkpoint_saver,
-                           checkpoint_saver, compute_average, count_params,
-                           early_stopping, make_loss_func)
+from .mytorchutils import best_checkpoint_saver, compute_average, count_params
 
 
 def model_test(model_build_func, test_sample):
@@ -51,33 +46,35 @@ def model_test(model_build_func, test_sample):
     return constraint
 
 
-def build_velocity_model(hpar, dropout):
-    m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, s.MINI_SPEC_SIZE),
-        output_features=1,
-        note_level=True,
-        max_layers=s.MAX_LAYERS,
-        dropout=dropout,
-        hyperparams=((hpar['kernel_0'], hpar['kernel_1']), (1, 1), (1, 1),
-                     hpar['lstm_hidden_size'], hpar['lstm_layers'],
-                     hpar['middle_features'], hpar['middle_activation'],
-                     1)).to(s.DEVICE).to(s.DTYPE)
+def build_autoencoder(hpar, dropout):
+    m = feature_extraction.AutoEncoder(loss_fn=F.l1_loss,
+                                       input_size=(s.BINS, s.MINI_SPEC_SIZE),
+                                       max_layers=s.MAX_LAYERS,
+                                       dropout=dropout,
+                                       hyperparams=hpar).to(s.DEVICE).to(
+                                           s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
-def build_pedaling_model(hpar, dropout):
-    m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, 1),
-        output_features=3,
-        note_level=False,
-        max_layers=s.MAX_LAYERS,
-        dropout=dropout,
-        hyperparams=((hpar['kernel_0'],
-                      1), (1, 1), (1, 1), hpar['lstm_hidden_size'],
-                     hpar['lstm_layers'], hpar['middle_features'],
-                     hpar['middle_activation'], 3)).to(s.DEVICE).to(s.DTYPE)
-    # feature_extraction.init_weights(m, s.INIT_PARAMS)
+def get_pedaling_hpar(hpar):
+    return (1, (hpar['kernel_0'], 1), (1, 1), (1, 1), hpar['lstm_hidden_size'],
+            hpar['lstm_layers'], hpar['encoder_features'],
+            hpar['middle_activation'], hpar['latent_features'])
+
+
+def get_velocity_hpar(hpar):
+    return (1, (hpar['kernel_0'], 1), (1, 1), (1, 1), hpar['lstm_hidden_size'],
+            hpar['lstm_layers'], hpar['encoder_features'],
+            hpar['middle_activation'], hpar['latent_features'])
+
+
+def build_performer_model(hpar, avg_pred):
+    m = feature_extraction.Performer(
+        (hpar['performer_layers'], 1, hpar['latent_features'],
+         hpar['performer_features'], hpar['middle_activation']), F.l1_loss,
+        avg_pred)
+
     return m
 
 
@@ -90,8 +87,7 @@ def train(
         context=None,
         # TODO: remove state_dict param
         state_dict=None,
-        copy_checkpoint='',
-        return_model=False):
+        copy_checkpoint=''):
     """
     1. Builds a model given `hpar` and `mode`
     2. Transfer knowledge from `state_dict` if provided
@@ -102,66 +98,58 @@ def train(
        in `settings`
     7. Also returns the model checkpoint if `return_model` is True
     """
+    # the logger
+    logger = MLFlowLogger(experiment_name=f'{mode}_{context}_{transfer_step}',
+                          tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
+
     # loaders
     # TODO: get loaders for all the contexts
     trainloader, validloader = data_management.multiple_splits_one_context(
         ['train', 'validation'], context, mode, False)
-    logger = MLFlowLogger(experiment_name=f'{mode}_{context}_{transfer_step}',
-                          tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
+    # suppose to have multiple couples of loaders:
+    loaders = [(trainloader, validloader)] * 6
 
     # building model
     if state_dict is not None:
         dropout = s.TRANSFER_DROPOUT
         wd = s.TRANSFER_WD
-        transfer_layers = None
-        freeze_layers = transfer_step
-        lr_k = s.TRANSFER_LR_K
     else:
         wd = s.WD
         dropout = s.TRAIN_DROPOUT
-        lr_k = s.LR_K
 
-    # TODO: get 3 models (encoder, decoder, performer)
     # TODO: copy the performer to all the contexts
     if mode == 'velocity':
-        model = build_velocity_model(hpar, dropout)
+        ae_hpar = get_velocity_hpar(hpar)
         axes = []
     elif mode == 'pedaling':
-        model = build_pedaling_model(hpar, dropout)
+        ae_hpar = get_pedaling_hpar(hpar)
         axes = [-1]
-
-    # TODO: remove
-    if state_dict is not None:
-        model.load_state_dict(state_dict, end=transfer_layers)
-        model.freeze(freeze_layers)
-
-    # TODO: remove this
-    n_params_free = count_params(model, requires_grad=True)
-    # n_params_all = count_params(model, requires_grad=False)
-    print(model)
-    print("Total number of parameters: ", n_params_free)
-
-    # learning rate
-    # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
-    #                                                       n_params_free)
-    lr = lr_k / len(trainloader)
 
     # dummy model (baseline)
     dummy_avg = compute_average(trainloader.dataset,
                                 *axes,
                                 n_jobs=-1,
-                                backend='threading')
+                                backend='threading').to(s.DEVICE)
 
-    # loss functions
-    trainloss_fn = make_loss_func(F.l1_loss)
-    validloss_fn = make_loss_func(F.l1_loss)
-    dummyloss_fn = make_loss_func(lambda x, y: F.l1_loss(dummy_avg, y))
+    autoencoder = build_autoencoder(ae_hpar, dropout)
+    performer = build_performer_model(hpar, dummy_avg)
 
-    model = VL_MM_Trainable(
-        model, (trainloss_fn, validloss_fn, dummyloss_fn),
-        (torch.optim.Adadelta, lr, wd))
+    print(performer)
+    print(autoencoder)
+
+    # learning rate
+    # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
+    #                                                       n_params_free)
+    # lr = lr_k / len(trainloader)
+    lr = 1
+
+    models = [
+        feature_extraction.EncoderDecoderPerformer(autoencoder,
+                                                   deepcopy(performer), lr, wd)
+        for i in range(len(loaders))
+    ]
+
     # logging initial stuffs
-    logger.log_graph(model)
     logger.log_metrics({
         "initial_lr": lr,
         "train_batches": len(trainloader),
@@ -169,80 +157,45 @@ def train(
     })
 
     # training
-    # TODO: train epoch by epoch on each different context (and different model
-    early_stopper = early_stopping(s.EARLY_STOP, s.EARLY_RANGE)
-    callbacks = [
-        best_checkpoint_saver(copy_checkpoint), early_stopper,
-        checkpoint_saver(f"checkpoint_{mode}")
-    ]
+    # TODO: monitored loss should be something else...
+    # this loss is also the same used for hyper-parameters tuning
+    early_stopper = EarlyStopping(monitor='ae_loss',
+                                  min_delta=s.EARLY_RANGE,
+                                  patience=s.EARLY_STOP)
+
+    checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}",
+                                       filename='{epoch}-{ae_loss:.2f}',
+                                       monitor='ae_loss',
+                                       save_top_k=1,
+                                       mode='min',
+                                       save_weights_only=True)
+    callbacks = [early_stopper, checkpoint_saver]
+    if copy_checkpoint:
+        callbacks.append(best_checkpoint_saver(copy_checkpoint))
+
     trainer = Trainer(callbacks=callbacks,
                       precision=s.PRECISION,
                       max_epochs=s.EPOCHS,
                       logger=logger,
                       gpus=s.GPUS)
-    trainer.fit(model, trainloader, validloader)
+    my_train(trainer, models, loaders)
 
-    complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
+    complexity_loss = count_params(models[0]) * s.COMPLEXITY_PENALIZER
     loss = early_stopper.best_score + complexity_loss
     logger.log_metrics({
         "best_validation_loss": float(early_stopper.best_score),
         "total_loss": float(loss)
     })
 
-    mlflow.end_run()
-    if return_model:
-        return loss, model
-    else:
-        del model
-        return loss
+    return loss
 
 
-def skopt_objective(hpar: dict, mode: str):
-    """
-    Runs a training on `orig` context and then retrain the model on each
-    specific context.
+def my_train(trainer, models, loaders):
 
-    Returns the average loss function of the training on the
-    specific contexts, including the complexity penalty.
-    """
+    L = len(models)
+    for epoch in range(s.EPOCHS):
 
-    contexts = get_contexts(Path(s.CARLA_PROJ))
-    # train on orig
-    print("\n============================\n")
-    print("----------------------------")
-    print("training on orig")
-    print("----------------------------\n")
-    _, orig_model = train(hpar,
-                          mode,
-                          context='orig',
-                          state_dict=None,
-                          copy_checkpoint='',
-                          transfer_step=None,
-                          return_model=True)
-
-    # train on the other contexts
-    state_dict = orig_model.state_dict()
-    del orig_model
-    losses = []
-    for context in contexts.keys():
-        if context == 'orig':
-            # skip the `orig` context
-            continue
-
-        print("\n----------------------------")
-        print(f"testing tl on {context}")
-        print("----------------------------\n")
-        losses.append(
-            train(hpar,
-                  mode,
-                  context=context,
-                  state_dict=deepcopy(state_dict),
-                  transfer_step=0,
-                  copy_checkpoint='',
-                  return_model=False))
-        # if losses[-1] > 1:
-        #     # if loss was an error, e.g. a nan
-        #     return 9999.0
-
-    print("\n============================\n")
-    return np.mean(losses)
+        # TODO handle the number of the epoch here...
+        trainer.fit(models[epoch % L], *loaders[epoch % L], max_epochs=1)
+        if trainer.should_stop:
+            break
