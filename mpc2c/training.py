@@ -155,9 +155,10 @@ def train(
     # loss functions
     trainloss_fn = make_loss_func(F.l1_loss)
     validloss_fn = make_loss_func(F.l1_loss)
+    dummyloss_fn = make_loss_func(lambda x, y: F.l1_loss(dummy_avg, y))
 
     model = VL_MM_Trainable(
-        model, (trainloss_fn, validloss_fn, lambda x, y, z: dummy_avg),
+        model, (trainloss_fn, validloss_fn, dummyloss_fn),
         (torch.optim.Adadelta, lr, wd))
     # logging initial stuffs
     logger.log_graph(model)
