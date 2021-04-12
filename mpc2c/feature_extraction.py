@@ -231,10 +231,10 @@ class MIDIParameterEstimation(nn.Module):
         if hasattr(self, 'lstm'):
             # put the frames before of the features (see nn.LSTM)
             x = torch.transpose(x, 1, 2)
-            if lens != torch.tensor(False):
+            if len(lens) > 1 or lens != torch.tensor(False):
                 x = pack_padded_sequence(x, lens, batch_first=True)
             x, _ = self.lstm(x)
-            if lens != torch.tensor(False):
+            if len(lens) > 1 or lens != torch.tensor(False):
                 x, lens = pad_packed_sequence(x,
                                               batch_first=True,
                                               padding_value=0)

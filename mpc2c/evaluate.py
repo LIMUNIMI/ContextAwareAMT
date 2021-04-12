@@ -65,7 +65,16 @@ def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
         ]
         model = build_velocity_model(s.VEL_HYPERPARAMS, 0)
 
-        model.load_state_dict(torch.load(checkpoint)['state_dict'])
+        state_dict = torch.load(checkpoint)['state_dict']
+
+        # TODO: fix the loading/saving models for lightning
+        # removing 'model', inserted by pytorch-lightning (my fault sorry)
+        for key, value in deepcopy(state_dict).items():
+            if key.startswith('model.'):
+                state_dict[key[6:]] = value
+                del state_dict[key]
+
+        model.load_state_dict(state_dict)
 
         for context in contexts:
             print(f"\nEvaluating {checkpoint} on {context}")
@@ -155,7 +164,7 @@ def eval_model_context(
     std_neg = []
     std_pos = []
     for i, (inputs, targets, lens) in enumerate(testloader):
-        if lens[0] == torch.tensor(False):
+        if len(lens[0]) > 1 or lens[0] == torch.tensor(False):
             err = [
                 torch.abs(targets[0] - predictions[i][0][..., 0, 0]),
             ]
@@ -170,13 +179,17 @@ def eval_model_context(
             if song_level:
                 mean = np.mean(error.cpu().numpy(), axis=-1)
                 errors.append(mean)
-                _std_neg = np.zeros_like(mean)
-                _std_pos = np.zeros_like(mean)
-                for k in range(mean.shape[0]):
-                    _std_neg[k] = torch.std(error[k, error[k] < mean[k]])
-                    _std_pos[k] = torch.std(error[k, error[k] >= mean[k]])
-                std_neg.append(_std_neg)
-                std_pos.append(_std_pos)
+                if mode == 'pedaling':
+                    _std_neg = np.zeros_like(mean)
+                    _std_pos = np.zeros_like(mean)
+                    for k in range(mean.shape[0]):
+                        _std_neg[k] = torch.std(error[k, error[k] < mean[k]])
+                        _std_pos[k] = torch.std(error[k, error[k] >= mean[k]])
+                    std_neg.append(_std_neg)
+                    std_pos.append(_std_pos)
+                else:
+                    std_neg.append(torch.std(error[error < mean]).numpy())
+                    std_pos.append(torch.std(error[error >= mean]).numpy())
             else:
                 errors.append(error.numpy())
 
