@@ -12,6 +12,7 @@ from .asmd.asmd import asmd, dataset_utils
 from .clustering import cluster_choice
 from .pycarla import pycarla
 
+# TODO: remove code relative to the `orig` context (not used anymore)
 
 def group_split(datasets: t.List[str],
                 contexts: t.Dict[str, t.Any],
@@ -30,7 +31,7 @@ def group_split(datasets: t.List[str],
     group to form the context-specific group. This means that each group is
     clustered with `context_splits` clusters.
 
-    N.B. the `orig` context, if used,must come after everything!
+    N.B. the `orig` context, if used, must come after everything!
 
     Returns a new dict object representing an ASMD definition with the new
     groups.
@@ -201,7 +202,7 @@ def get_contexts(carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:
     contexts: t.Dict[str, t.Optional[Path]] = {}
     for p in glob:
         contexts[p.stem] = p
-    contexts['orig'] = None
+    # contexts['orig'] = None
     return contexts
 
 
