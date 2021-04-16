@@ -410,3 +410,12 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
                       kernel_size=1))
         stack.append(middle_activation())
     return nn.Sequential(*stack)
+
+
+class AbsLayer(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return torch.abs(x)
