@@ -1,18 +1,44 @@
-import pathlib
+import random
 
 import essentia as es
+import numpy as np
 from torch.utils.data import DataLoader
 
 from . import nmf
 from . import settings as s
 from . import utils
 from .asmd.asmd import asmd, dataset_utils
-from .mytorchutils import (DatasetDump, dummy_collate, no_batch_collate,
-                           pad_collate)
+from .mytorchutils import DatasetDump, no_batch_collate
 
-# TODO: create a DumpableDataset which inherits and overloads `get_target`
-# TODO: self._get_sample(i, getter_fn=self._get_input) not filtered
-# among the inverted index
+
+class AEDataset(DatasetDump):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def get_target(self, i):
+        """
+        Get two targets: the first one is the value (velocity or pedaling
+        level), while the second one is another note/frame with the same value
+        but from a different context
+        """
+        value = self._get_sample(self.included[i], getter_fn=self._get_target)
+        # value should have shape returned by `process_velocities` or
+        # `process_pedaling`, something like (note/frames,)
+        ae_target = []
+        for val in value:
+            # search the inverted index for another element with the same value
+            # as `element`
+
+            # compute the value's bin
+            bin = np.searchsorted(self.bins, val)
+
+            # pick a random element in the list
+            _i, _j, = random.choice(self.inverted[bin])
+
+            # get that val element using chosen
+            ae_target.append(
+                self._get_sample(_i, getter_fn=self._get_input)[_j])
+        return value, np.asarray(ae_target)
 
 
 def transform_func(arr: es.array):
@@ -43,7 +69,7 @@ def process_pedaling(i, dataset, nmf_params):
         i, frame_based=True, winlen=winlen, hop=hop)[0] / 127
     # padding so that pedaling and diff_spec have the same length
     pedaling, diff_spec = utils.pad(pedaling[:, 1:].T, diff_spec)
-    # TODO: pedaling should now return frames like velocities...
+    # TODO check the shape here, it should be (frames, features, 1)
     return diff_spec[None], pedaling[None]
 
 
@@ -58,69 +84,49 @@ def process_velocities(i, dataset, nmf_params):
     velocities = dataset_utils.get_score_mat(
         dataset, i, score_type=['precise_alignment'])[:, 3] / 127
     minispecs = nmf_tools.get_minispecs(transform=transform_func)
+    # now the shape should be (notes, features, frames) for minispecs
+    # now the shape should be (notes, ) for velocities
     return minispecs, velocities
 
 
-def get_loader(groups, mode, redump, nmf_params=None, song_level=False):
+def get_loader(groups, redump, mode=None, nmf_params=None):
     """
-    nmf_params is needed only if `redump` is True
-    `song_level` allows to make each bach correspond to one song (e.g. for
-    testing at the song-level)
+    `nmf_params` and `mode` are needed only if `redump` is True
     """
-    # TODO: dump the whole dataset here
-    dataset = dataset_utils.filter(
+    # create a dataset always at the song_level
+    # dump the whole dataset
+    if redump:
+        dumped = False
+    else:
+        dumped = True
+
+    dataset = AEDataset(
         asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
-                     metadataset_path=s.METADATASET_PATH),
-        groups=groups)
-    dataset, _ = dataset_utils.choice(dataset,
-                                      p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
-                                      random_state=1992)
-    # dataset.paths = dataset.paths[:int(s.DATASET_LEN * len(dataset.paths))]
-    if mode == 'velocity':
-        num_samples = [
-            len(gt['precise_alignment']['pitches'])
-            for i in range(len(dataset.paths)) for gt in dataset.get_gts(i)
-        ]
-        # TODO: select only the needed groups
-        # TODO: sub-sample the dataset here
-        # use `apply_func`
-        velocity_dataset = DatasetDump(dataset,
-                                       pathlib.Path(s.VELOCITY_DATA_PATH) /
-                                       "_".join(groups),
-                                       not redump,
-                                       song_level=song_level,
-                                       num_samples=num_samples)
-        # max_nbytes=None disable shared memory for large arrays
-        if redump:
-            velocity_dataset.dump(process_velocities,
-                                  nmf_params,
-                                  n_jobs=s.NJOBS,
-                                  max_nbytes=None)
-        return DataLoader(
-            velocity_dataset,
-            batch_size=s.VEL_BATCH_SIZE if not song_level else 1,
-            num_workers=s.NJOBS,
-            pin_memory=True,
-            collate_fn=dummy_collate if not song_level else no_batch_collate)
-    elif mode == 'pedaling':
-        pedaling_dataset = DatasetDump(dataset,
-                                       pathlib.Path(s.PEDALING_DATA_PATH) /
-                                       "_".join(groups),
-                                       not redump,
-                                       song_level=song_level,
-                                       num_samples=None)
-        # max_nbytes=None disable shared memory for large arrays
-        if redump:
-            pedaling_dataset.dump(process_pedaling,
-                                  nmf_params,
-                                  n_jobs=s.NJOBS,
-                                  max_nbytes=None)
-        return DataLoader(
-            pedaling_dataset,
-            batch_size=s.PED_BATCH_SIZE if not song_level else 1,
-            num_workers=s.NJOBS,
-            pin_memory=True,
-            collate_fn=pad_collate if not song_level else no_batch_collate)
+                     metadataset_path=s.METADATASET_PATH), s.DATA_PATH, dumped)
+
+    if not dumped:
+        if mode == 'velocity':
+            process_fn = process_velocities
+        elif mode == 'pedaling':
+            process_fn = process_pedaling
+        else:
+            raise RuntimeError(
+                f"mode {mode} not known: available are `velocity` and `pedaling`"
+            )
+
+        dataset.dump(process_fn, nmf_params, n_jobs=s.NJOBS, max_nbytes=None)
+
+    # select the groups and subsample dataset
+    dataset.apply_func(dataset_utils.filter, groups=groups)
+    dataset.apply_func(lambda *x, **y: dataset_utils.choice(*x, **y)[0],
+                       p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
+                       random_state=1992)
+
+    return DataLoader(dataset,
+                      batch_size=1,
+                      num_workers=s.NJOBS,
+                      pin_memory=True,
+                      collate_fn=no_batch_collate)
 
 
 def multiple_splits_one_context(splits, context, *args, **kwargs):

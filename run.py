@@ -156,6 +156,11 @@ def main():
     else:
         checkpoint = None
 
+    if args.pedaling:
+        mode = 'pedaling'
+    elif args.velocity:
+        mode = 'velocity'
+
     nmf_params = load_nmf_params()
     if args.skopt:
         s.PLOT_LOSSES = False
@@ -190,7 +195,6 @@ def main():
 
     if args.train:
         if args.pedaling:
-            mode = 'pedaling'
             hpar = s.PED_HYPERPARAMS
             if args.checkpoint:
                 steps = s.PED_STEP
@@ -198,8 +202,6 @@ def main():
                 steps = [None]
 
         elif args.velocity:
-            mode = 'velocity'
-            hpar = s.VEL_HYPERPARAMS
             if args.checkpoint:
                 # each step is a different size of transferred/freezed layers
                 steps = s.VEL_STEP
@@ -220,26 +222,14 @@ def main():
                            copy_checkpoint=fname)
 
     if args.redump:
-        if args.pedaling:
-            data_management.multiple_splits_one_context(
-                ['train', 'validation', 'test'],
-                args.context,
-                'pedaling',
-                True,
-                nmf_params=nmf_params)
-        elif args.velocity:
-            data_management.multiple_splits_one_context(
-                ['train', 'validation', 'test'],
-                args.context,
-                'velocity',
-                True,
-                nmf_params=nmf_params)
+        data_management.multiple_splits_one_context(
+            ['train', 'validation', 'test'],
+            args.context,
+            True,
+            mode=mode,
+            nmf_params=nmf_params)
 
     if args.evaluate or args.csv_file:
-        if args.pedaling:
-            mode = 'pedaling'
-        elif args.velocity:
-            mode = 'velocity'
         compare = args.compare
         if args.csv_file:
             for fname in args.csv_file:

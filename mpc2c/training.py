@@ -13,6 +13,7 @@ from pytorch_lightning.loggers import MLFlowLogger
 from . import data_management, feature_extraction
 from . import settings as s
 from .mytorchutils import best_checkpoint_saver, compute_average, count_params
+from .asmd_resynth import get_contexts
 
 
 def model_test(model_build_func, test_sample):
@@ -78,46 +79,26 @@ def build_performer_model(hpar, avg_pred):
     return m
 
 
-def train(
-        hpar,
-        mode,
-        # TODO: remove transfer_step param
-        transfer_step=None,
-        # TODO: remove context param
-        context=None,
-        # TODO: remove state_dict param
-        state_dict=None,
-        copy_checkpoint=''):
+def train(hpar, mode, copy_checkpoint=''):
     """
     1. Builds a model given `hpar` and `mode`
-    2. Transfer knowledge from `state_dict` if provided
-    3. Freeze first `transfer_step` layers
-    4. Train the model on `context`
-    5. Saves the trained model weights to `copy_checkpoint`
-    6. Returns the best validation loss function + the complexity penalty set
+    2. Train the model
+    3. Saves the trained model weights to `copy_checkpoint`
+    4. Returns the best validation loss function + the complexity penalty set
        in `settings`
-    7. Also returns the model checkpoint if `return_model` is True
     """
     # the logger
-    logger = MLFlowLogger(experiment_name=f'{mode}_{context}_{transfer_step}',
+    logger = MLFlowLogger(experiment_name=f'{mode}',
                           tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
 
     # loaders
-    # TODO: get loaders for all the contexts
-    trainloader, validloader = data_management.multiple_splits_one_context(
-        ['train', 'validation'], context, mode, False)
-    # suppose to have multiple couples of loaders:
-    loaders = [(trainloader, validloader)] * 6
+    loaders = []
+    for context in get_contexts():
+        trainloader, validloader = data_management.multiple_splits_one_context(
+            ['train', 'validation'], context, False)
+        loaders.append((trainloader, validloader))
 
     # building model
-    if state_dict is not None:
-        dropout = s.TRANSFER_DROPOUT
-        wd = s.TRANSFER_WD
-    else:
-        wd = s.WD
-        dropout = s.TRAIN_DROPOUT
-
-    # TODO: copy the performer to all the contexts
     if mode == 'velocity':
         ae_hpar = get_velocity_hpar(hpar)
         axes = []
@@ -131,7 +112,7 @@ def train(
                                 n_jobs=-1,
                                 backend='threading').to(s.DEVICE)
 
-    autoencoder = build_autoencoder(ae_hpar, dropout)
+    autoencoder = build_autoencoder(ae_hpar, s.TRAIN_DROPOUT)
     performer = build_performer_model(hpar, dummy_avg)
 
     print(performer)
@@ -145,7 +126,8 @@ def train(
 
     models = [
         feature_extraction.EncoderDecoderPerformer(autoencoder,
-                                                   deepcopy(performer), lr, wd)
+                                                   deepcopy(performer), lr,
+                                                   s.WD)
         for i in range(len(loaders))
     ]
 
@@ -159,13 +141,13 @@ def train(
     # training
     # TODO: monitored loss should be something else...
     # this loss is also the same used for hyper-parameters tuning
-    early_stopper = EarlyStopping(monitor='ae_loss',
+    early_stopper = EarlyStopping(monitor='perfm_loss',
                                   min_delta=s.EARLY_RANGE,
                                   patience=s.EARLY_STOP)
 
     checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}",
                                        filename='{epoch}-{ae_loss:.2f}',
-                                       monitor='ae_loss',
+                                       monitor='perfm_loss',
                                        save_top_k=1,
                                        mode='min',
                                        save_weights_only=True)
@@ -195,7 +177,9 @@ def my_train(trainer, models, loaders):
     L = len(models)
     for epoch in range(s.EPOCHS):
 
-        # TODO handle the number of the epoch here...
+        # TODO: check that it runs this function at each loop and that logging
+        # works correctly
         trainer.fit(models[epoch % L], *loaders[epoch % L], max_epochs=1)
         if trainer.should_stop:
+            # early stop...
             break
