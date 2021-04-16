@@ -130,6 +130,7 @@ class Decoder(nn.Module):
 
     def forward(self, x):
         # TODO: chack shapes
+        __import__('ipdb').set_trace()
         x = self.stack(x)
 
         if hasattr(self, 'lstm'):

@@ -70,6 +70,7 @@ def process_pedaling(i, dataset, nmf_params):
     # padding so that pedaling and diff_spec have the same length
     pedaling, diff_spec = utils.pad(pedaling[:, 1:].T, diff_spec)
     # TODO check the shape here, it should be (frames, features, 1)
+    __import__('ipdb').set_trace()
     return diff_spec[None], pedaling[None]
 
 

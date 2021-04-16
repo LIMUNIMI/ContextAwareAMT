@@ -179,6 +179,7 @@ def my_train(trainer, models, loaders):
 
         # TODO: check that it runs this function at each loop and that logging
         # works correctly
+        __import__('ipdb').set_trace()
         trainer.fit(models[epoch % L], *loaders[epoch % L], max_epochs=1)
         if trainer.should_stop:
             # early stop...

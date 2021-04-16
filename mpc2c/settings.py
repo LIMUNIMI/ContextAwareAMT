@@ -19,7 +19,7 @@ RESULT_PATH = './result/'
 
 # resynthesis of the datasets
 DATASETS = ["Maestro"]
-CONTEXT_SPLITS = [120, 15, 25]
+CONTEXT_SPLITS = [160, 23, 29]
 RESYNTH_FINAL_DECAY = 4
 
 # GENERIC
