@@ -14,6 +14,7 @@ from .pycarla import pycarla
 
 # TODO: remove code relative to the `orig` context (not used anymore)
 
+
 def group_split(datasets: t.List[str],
                 contexts: t.Dict[str, t.Any],
                 context_splits: t.List[int],
@@ -281,7 +282,7 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
 
     # load the new dataset
-    dataset = asmd.Dataset(paths=[output_path])
+    dataset = asmd.Dataset(definitions=[output_path])
     old_install_dir = Path(dataset.install_dir)
 
     # prepare and save the new metadataset
