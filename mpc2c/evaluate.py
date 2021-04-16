@@ -16,7 +16,7 @@ from . import settings as s
 from .asmd_resynth import get_contexts
 from .data_management import multiple_splits_one_context
 from .mytorchutils import make_loss_func, test
-from .training import build_pedaling_model, build_velocity_model
+from .training import build_performer_model
 
 SONG_LEVEL = True
 
@@ -63,7 +63,8 @@ def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
         errors = [
             pd.DataFrame(),
         ]
-        model = build_velocity_model(s.VEL_HYPERPARAMS, 0)
+        # TODO build autoencoder and performer
+        model = build_performer_model(s.VEL_HYPERPARAMS, 0.5)
 
         model.load_state_dict(torch.load(checkpoint)['state_dict'])
 
@@ -100,7 +101,7 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
             tl_size = int(match.groups()[0])
 
         errors = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
-        model = build_pedaling_model(s.PED_HYPERPARAMS, 0)
+        model = build_performer_model(s.PED_HYPERPARAMS, 0.5)
 
         state_dict = torch.load(checkpoint)['state_dict']
 
