@@ -3,19 +3,12 @@ import pickle
 from pathlib import Path
 
 import torch
-from Cython.Build import Cythonize
 
 from mpc2c import create_midi_scale, data_management, evaluate, make_template
 from mpc2c import settings as s
 from mpc2c import training
 from mpc2c.asmd_resynth import split_resynth
 from mpc2c.mytorchutils import hyperopt
-
-# from cylang import cylang
-# cylang.compile()
-
-if s.BUILD:
-    Cythonize.main(["mpc2c/[!data_management.py]**.py", "-3", "--inplace"])
 
 
 def parse_args():

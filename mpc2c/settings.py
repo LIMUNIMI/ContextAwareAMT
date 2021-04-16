@@ -128,4 +128,4 @@ PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 1e-6
 
 #: If compiling code with cython in pure-python mode
-BUILD = False
+BUILD = True
