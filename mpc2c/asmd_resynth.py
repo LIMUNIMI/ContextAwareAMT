@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import time
 import typing as t
@@ -6,13 +7,13 @@ from pathlib import Path
 
 import mido
 import numpy as np
-from tqdm import tqdm
 
 from .asmd.asmd import asmd, dataset_utils
-from .clustering import cluster_choice
 from .pycarla import pycarla
 
 # TODO: remove code relative to the `orig` context (not used anymore)
+
+SAVED_ = "asmd_resynth.txt"
 
 
 def group_split(datasets: t.List[str],
@@ -118,6 +119,41 @@ def synthesize_song(midi_path: str, audio_path: str,
     return timeout
 
 
+class BackupManager():
+    def __init__(self, save_path: str):
+        # loading data about already synthesized songs
+        self.save_path = save_path
+        if os.path.exists(save_path):
+            with open(save_path, "rt") as f:
+                lines = f.readlines()
+                self.backup_i = int(lines[0])
+                self.backup_j = int(lines[1])
+        else:
+            self.backup_i, self.backup_j = 0, 0
+
+    def add_song(self, j: int):
+        self.backup_j = j
+
+    def write(self):
+        with open(self.save_path, "wt") as f:
+            f.writelines([str(self.backup_i), str(self.backup_j)])
+
+    def add_group(self, i: int):
+        self.backup_i = i
+
+    def test_song(self, j: int):
+        if j < self.backup_j:
+            return True
+        else:
+            return False
+
+    def test_group(self, i: int):
+        if i < self.backup_i:
+            return True
+        else:
+            return False
+
+
 def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
           output_path: Path, old_install_dir: Path,
           final_decay: float) -> bool:
@@ -125,8 +161,12 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
     Try to synthesize the provided contexts from dataset. If success returns
     True, otherwise False.
     """
+    backup = BackupManager(SAVED_)
     try:
-        for group, proj in contexts.items():
+        for i, (group, proj) in enumerate(contexts.items()):
+            if backup.test_group(i):
+                print(f"`{group}` was already synthesized")
+                continue
             print("\n------------------------------------")
             print("Working on context ", group)
             print("------------------------------------\n")
@@ -145,11 +185,15 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             # get the songs with this context
             d = dataset_utils.filter(dataset, groups=[group], copy=True)
             for j in range(len(d)):
+                if backup.test_song(j):
+                    print(f"song `{j}` was already synthesized")
+                    continue
 
                 # for each song in this context, get the new audio_path
                 audio_path = output_path / d.paths[j][0][0]
                 if audio_path.exists() and audio_path.stat().st_size > 0:
                     if correctly_synthesized(j, d):
+                        backup.add_song(j)
                         print(f"{audio_path} already exists")
                         continue
                 audio_path.parent.mkdir(parents=True, exist_ok=True)
@@ -160,20 +204,17 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                     timeout = False
                     while not correctly_synthesized(j, d) or timeout:
                         # delete file if it exists (only python >= 3.8)
-                        audio_path.unlink(missing_ok=True)
-                        # check that Carla is still alive..
-                        if not carla.exists():
-                            print(
-                                "Carla doesn't exists... restarting everything"
-                            )
-                            carla.restart()
-                        timeout = synthesize_song(str(midi_path),
-                                                  str(audio_path), server,
-                                                  final_decay)
+                        timeout = resynthesize(audio_path, carla, midi_path,
+                                               server, final_decay)
                 else:
                     old_audio_path = str(old_install_dir / d.paths[j][0][0])
                     print(f"Orig context, {old_audio_path} > {audio_path}")
                     shutil.copy(old_audio_path, audio_path)
+
+                # saving this song as synthesized
+                backup.add_song(j)
+            # saving this group as synthesized
+            backup.add_group(i)
             if group != "orig":
                 # if this is a new context, close Carla
                 carla.kill()
@@ -188,6 +229,19 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
         return False
     else:
         return True
+
+
+def resynthesize(audio_path, carla, midi_path, server, final_decay):
+    # delete file if it exists (only python >= 3.8)
+    audio_path.unlink(missing_ok=True)
+    # check that Carla is still alive..
+    if not carla.exists():
+        print("Carla doesn't exists... restarting everything")
+        carla.restart()
+    timeout = synthesize_song(str(midi_path), str(audio_path), server,
+                              final_decay)
+    time.sleep(8)
+    return timeout
 
 
 def get_contexts(carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:
@@ -275,11 +329,11 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     contexts = get_contexts(carla_proj)
 
     # split the dataset in contexts and save the new definition
-    new_def = group_split(datasets, contexts, context_splits, cluster_choice)
+    # new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
     # create output_path if it doesn't exist and save the new_def
-    output_path.mkdir(parents=True, exist_ok=True)
-    json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
+    # output_path.mkdir(parents=True, exist_ok=True)
+    # json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
 
     # load the new dataset
     dataset = asmd.Dataset(definitions=[output_path])
@@ -290,18 +344,18 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     dataset.metadataset['install_dir'] = str(output_path)
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
 
-    print("Copying ground-truth files...")
-    for dataset_name in datasets:
-        for old_file in tqdm(
-                old_install_dir.glob(f"{dataset_name}/**/*.json.gz")):
-            new_file = output_path / old_file.relative_to(old_install_dir)
-            new_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(old_file, new_file)
+    # print("Copying ground-truth files...")
+    # for dataset_name in datasets:
+    #     for old_file in tqdm(
+    #             old_install_dir.glob(f"{dataset_name}/**/*.json.gz")):
+    #         new_file = output_path / old_file.relative_to(old_install_dir)
+    #         new_file.parent.mkdir(parents=True, exist_ok=True)
+    #         shutil.copy(old_file, new_file)
 
     print("Synthesizing contexts")
-    for i in range(10):
+    for i in range(4):
         if not trial(contexts, dataset, output_path, old_install_dir,
                      final_decay):
-            time.sleep(2)
+            time.sleep(4)
         else:
             break

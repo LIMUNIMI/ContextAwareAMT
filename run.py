@@ -9,6 +9,9 @@ from mpc2c import settings as s
 from mpc2c import training
 from mpc2c.asmd_resynth import split_resynth
 from mpc2c.mytorchutils import hyperopt
+from mpc2c import build
+
+build.build()
 
 
 def parse_args():
