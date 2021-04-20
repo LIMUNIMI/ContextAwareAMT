@@ -130,16 +130,19 @@ class BackupManager():
                 self.backup_j = int(lines[1])
         else:
             self.backup_i, self.backup_j = 0, 0
+            self.write()
 
     def add_song(self, j: int):
         self.backup_j = j
+        self.write()
 
     def write(self):
         with open(self.save_path, "wt") as f:
-            f.writelines([str(self.backup_i), str(self.backup_j)])
+            f.writelines([str(self.backup_i) + "\n", str(self.backup_j) + "\n"])
 
     def add_group(self, i: int):
         self.backup_i = i
+        self.write()
 
     def test_song(self, j: int):
         if j < self.backup_j:
