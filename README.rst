@@ -17,7 +17,7 @@ Config
 ------
 
 #. Open ``mpc2c/settings.py`` and check the variables in section 'PATH',
-   especially ``VELOCIY_DATA_PATH``, ``PEDALING_DATA_PATH``, and
+   especially ``VELOCITY_DATA_PATH``, ``PEDALING_DATA_PATH``, and
    ``RESYNTHESIS_DATA_PATH``. Set them to meaningful paths for your system.
 #. Make sure that you have ``jackd`` installed
 #. Run ``poetry run python -m pycarla.carla -d`` to download Carla host
@@ -38,9 +38,13 @@ Datasets
 #. Install Carla with ``python -m mpc2c.pycarla.pycarla.carla -d``
 #. Install ``jackd`` in your path
 #. Prepare the new dataset with the resynthesized parts: ``python run.py -d``
-#. If the process stops, relaunch it (it will skip the already synthesized songs)
-#. If it fails, it's probably because Carla died in zombie process; just stop
-   (CTRL+C) and restart (it will skip already synthesized songs)
+#. If the process stops, re-launch it (it will skip the already synthesized songs)
+#. If it fails, it's probably because Carla crashed; just stop
+   (CTRL+C) and restart (it will skip already synthesized songs); try to
+   ``killall -9 jackd`` before restarting the process.
+#. After having synthesized , you can do a full check that everything has
+   correctly been synthesized by ``rm asmd_resynth.txt`` and relaunching the
+   process ``python run.py -d``
 #. The datasets were split using PCA and retaining 0.89, 0.93, 0.91 of total
    variance for `train`, `validation` and `test` set respectively.
 

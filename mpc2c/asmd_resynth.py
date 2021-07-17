@@ -11,6 +11,7 @@ import numpy as np
 from .asmd.asmd import asmd, dataset_utils
 from .pycarla import pycarla
 
+
 # TODO: remove code relative to the `orig` context (not used anymore)
 
 SAVED_ = "asmd_resynth.txt"
@@ -38,6 +39,8 @@ def group_split(datasets: t.List[str],
     Returns a new dict object representing an ASMD definition with the new
     groups.
     """
+
+    get_audio
 
     dataset = dataset_utils.filter(asmd.Dataset(), datasets=datasets)
     new_definition = {"songs": [], "name": "new_def"}
@@ -129,7 +132,7 @@ class BackupManager():
                 self.backup_i = int(lines[0])
                 self.backup_j = int(lines[1])
         else:
-            self.backup_i, self.backup_j = 0, 0
+            self.backup_i, self.backup_j = -1, -1
             self.write()
 
     def add_song(self, j: int):
@@ -142,6 +145,7 @@ class BackupManager():
 
     def add_group(self, i: int):
         self.backup_i = i
+        self.backup_j = -1
         self.write()
 
     def test_song(self, j: int):
@@ -151,7 +155,7 @@ class BackupManager():
             return False
 
     def test_group(self, i: int):
-        if i < self.backup_i:
+        if i <= self.backup_i:
             return True
         else:
             return False
