@@ -4,13 +4,14 @@ import shutil
 import time
 import typing as t
 from pathlib import Path
+from tqdm import tqdm
 
 import mido
 import numpy as np
 
 from .asmd.asmd import asmd, dataset_utils
 from .pycarla import pycarla
-
+from .clustering import cluster_choice
 
 # TODO: remove code relative to the `orig` context (not used anymore)
 
@@ -29,18 +30,15 @@ def group_split(datasets: t.List[str],
 
     `cluster_func` is a function which takes a dataset and the number of
     clusters and returns a list of clusters; each cluster is a List[int].
-    For each group, the group of the whole dataset is clustered; then, for each
-    context/group combination, one song is taken from each cluster of that
-    group to form the context-specific group. This means that each group is
-    clustered with `context_splits` clusters.
+    Each group of the dataset is clustered in `len(contexts)` sets.
+    One song is taken from each new set so that each group is split in
+    contexts.
 
     N.B. the `orig` context, if used, must come after everything!
 
     Returns a new dict object representing an ASMD definition with the new
     groups.
     """
-
-    get_audio
 
     dataset = dataset_utils.filter(asmd.Dataset(), datasets=datasets)
     new_definition = {"songs": [], "name": "new_def"}
@@ -141,7 +139,9 @@ class BackupManager():
 
     def write(self):
         with open(self.save_path, "wt") as f:
-            f.writelines([str(self.backup_i) + "\n", str(self.backup_j) + "\n"])
+            f.writelines(
+                [str(self.backup_i) + "\n",
+                 str(self.backup_j) + "\n"])
 
     def add_group(self, i: int):
         self.backup_i = i
@@ -256,7 +256,7 @@ def get_contexts(carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:
     Loads contexts and Carla project files from the provided directory
 
     Returns a dictionary which maps context names to the corresponding carla
-    project file. The additional context 'orig' with project `None` is added.
+    project file.
     """
     glob = list(carla_proj.glob("**/*.carxp"))
 
@@ -264,7 +264,6 @@ def get_contexts(carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:
     contexts: t.Dict[str, t.Optional[Path]] = {}
     for p in glob:
         contexts[p.stem] = p
-    # contexts['orig'] = None
     return contexts
 
 
@@ -336,11 +335,13 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     contexts = get_contexts(carla_proj)
 
     # split the dataset in contexts and save the new definition
-    # new_def = group_split(datasets, contexts, context_splits, cluster_choice)
+    new_def_fname = output_path / "new_dataset.json"
+    if not os.path.exists(new_def_fname):
+        new_def = group_split(datasets, contexts, context_splits, cluster_choice)
 
-    # create output_path if it doesn't exist and save the new_def
-    # output_path.mkdir(parents=True, exist_ok=True)
-    # json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
+        # create output_path if it doesn't exist and save the new_def
+        output_path.mkdir(parents=True, exist_ok=True)
+        json.dump(new_def, open(new_def_fname, "wt"))
 
     # load the new dataset
     dataset = asmd.Dataset(definitions=[output_path])
@@ -352,12 +353,13 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
 
     # print("Copying ground-truth files...")
-    # for dataset_name in datasets:
-    #     for old_file in tqdm(
-    #             old_install_dir.glob(f"{dataset_name}/**/*.json.gz")):
-    #         new_file = output_path / old_file.relative_to(old_install_dir)
-    #         new_file.parent.mkdir(parents=True, exist_ok=True)
-    #         shutil.copy(old_file, new_file)
+    for dataset_name in datasets:
+        for old_file in tqdm(
+                old_install_dir.glob(f"{dataset_name}/**/*.json.gz")):
+            new_file = output_path / old_file.relative_to(old_install_dir)
+            new_file.parent.mkdir(parents=True, exist_ok=True)
+            if not os.path.exists(new_file):
+                shutil.copy(old_file, new_file)
 
     print("Synthesizing contexts")
     for i in range(4):
