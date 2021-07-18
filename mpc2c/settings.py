@@ -6,7 +6,6 @@ from . import essentiaspec
 from .feature_extraction import AbsLayer
 
 # PATHS
-DATA_PATH = '/datasets/mpc2c/resynth'
 VELOCITY_DATA_PATH = '/datasets/mpc2c/resynth/velocity/'
 PEDALING_DATA_PATH = '/datasets/mpc2c/resynth/pedaling/'
 RESYNTH_DATA_PATH = '/datasets/mpc2c/resynth/'

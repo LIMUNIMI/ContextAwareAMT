@@ -343,13 +343,14 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
         output_path.mkdir(parents=True, exist_ok=True)
         json.dump(new_def, open(new_def_fname, "wt"))
 
-    # load the new dataset
+    # load the new definition while retaining the old install_dir
     dataset = asmd.Dataset(definitions=[output_path])
+    # update the install_dir
     old_install_dir = Path(dataset.install_dir)
-
-    # prepare and save the new metadataset
     dataset.install_dir = str(output_path)
     dataset.metadataset['install_dir'] = str(output_path)
+
+    # save the new metadataset
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
 
     # print("Copying ground-truth files...")
