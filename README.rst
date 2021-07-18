@@ -8,8 +8,8 @@ Setup
 #. Enter the root git directory
 #. Install ``poetry``
 #. Install ``pyenv``
-#. Install python 3.6.9: ``pyenv install 3.6.9``
-#. Activate it: ``pyenv shell 3.6.9``
+#. Install python 3.9.0: ``pyenv install 3.9.0``
+#. Activate it: ``pyenv shell 3.9.0``
 #. Create a new venv with poetry and install the dependencies: ``poetry update``
 #. Start a new shell in this venv: ``poetry shell``
 

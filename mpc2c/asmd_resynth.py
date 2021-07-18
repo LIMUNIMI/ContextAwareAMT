@@ -13,8 +13,6 @@ from .asmd.asmd import asmd, dataset_utils
 from .pycarla import pycarla
 from .clustering import cluster_choice
 
-# TODO: remove code relative to the `orig` context (not used anymore)
-
 SAVED_ = "asmd_resynth.txt"
 
 
