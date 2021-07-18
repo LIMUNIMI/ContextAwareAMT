@@ -54,6 +54,9 @@ Datasets
 #. Create the MIDI file for the initial template: ``python run.py -sc``
 #. Synthesize the midi scale and name it ``pianoteq_scales.mp3`` (TODO: resynthesize using pycarla)
 #. Compute the initial template and save it to file: ``python run.py --template``
+
+TODO: remove the `orig` context
+
 #. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c orig``
 #. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c orig``
 
@@ -66,8 +69,10 @@ Datasets
    run.py -v -r -c <context>``
 
 
-2. Training the generic model
------------------------------
+2. Training the models
+----------------------
+
+N.B. TODO
 
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -v -sk``. We obtained hyperparams defined in ``settings.py``
@@ -141,114 +146,10 @@ Datasets
   10% and 5%
 
 
-3. Training the context-specific models
----------------------------------------
-
-#. Fully train velocity model on the specific context: ``python run.py -v -t -c
-   <context> -pt <path to generic model chekcpoint>``
-
-#. Fully train pedaling model on the specific context: ``python run.py -p -t -c
-   <context> -pt <path to generic model chekcpoint>``
-
-#. After each training, you will find 3 checkpoints in the `models`
-   directory, each corresponding to a different size of transferred
-   knowledge. For each size, the procedure stops and wait for an input
-   before going on with the next size of transferred layers
-
-Here ``<context>`` is any Carla preset name that you have used before.
-
-Results for velocity
-~~~~~~~~~~~~~~~~~~~~
-
-+-------------+---------+---------------+------------+-----------------+--------+
-| context     | batches | learning rate | dummy loss | validation loss | epochs |
-+-------------+---------+---------------+------------+-----------------+--------+
-| pianoteq0   | 13658,  | 7.32e-6       |            |  0.1335         |  20    |
-|             | 1201    +               +            +-----------------+--------+
-|             |         |               |            |  0.1335         |  20    |
-|             |         +               +            +-----------------+--------+
-|             |         |               |            |  0.1335         |  20    |
-+-------------+---------+---------------+------------+-----------------+--------+
-| pianoteq1   | 12598,  | 7.94e-6       |            |  0.1225         |  20    |
-|             | 1356    +               +            +-----------------+--------+
-|             |         |               |            |  0.1225         |  20    |
-|             |         +               +            +-----------------+--------+
-|             |         |               |            |  0.1225         |  20    |
-+-------------+---------+---------------+------------+-----------------+--------+
-| pianoteq2   | 13106,  | 7.63e-6       |  0.1109    |  0.1116         |  20    |
-|             | 1052    +               +            +-----------------+--------+
-|             |         |               |            |  0.1116         |  20    |
-|             |         +               +            +-----------------+--------+
-|             |         |               |            |  0.1116         |  20    |
-+-------------+---------+---------------+------------+-----------------+--------+
-| pianoteq3   | 12568,  | 7.96e-6       |  0.1207    |  0.1208         |  20    |
-|             | 1179    +               +            +-----------------+--------+
-|             |         |               |            |  0.1208         |  20    |
-|             |         +               +            +-----------------+--------+
-|             |         |               |            |  0.1208         |  20    |
-+-------------+---------+---------------+------------+-----------------+--------+
-| salamander0 | 13877,  | 7.21e-6       |  0.1161    |  0.1171         |  20    |
-|             | 1320    +               +            +-----------------+--------+
-|             |         |               |            |  0.1171         |  20    |
-|             |         +               +            +-----------------+--------+
-|             |         |               |            |  0.1171         |  20    |
-+-------------+---------+---------------+------------+-----------------+--------+
-| salamander1 | 13227,  | 7.56e-6       |  0.1227    |  0.1242         |  20    |
-|             | 1180    +               +            +-----------------+--------+
-|             |         |               |            |  0.1242         |  20    |
-|             |         +               +            +-----------------+--------+
-|             |         |               |            |  0.1242         |  20    |
-+-------------+---------+---------------+------------+-----------------+--------+
-
-Results for pedaling
-~~~~~~~~~~~~~~~~~~~~
-
-Training batches: 120
-Validation batches: 15
-Learning rates: 8.33e-4
-
-+-------------+------------+-----------------+--------+
-| context     | dummy loss | validation loss | epochs |
-+-------------+------------+-----------------+--------+
-| pianoteq0   |            |   0.2135        |  24    |
-|             +            +-----------------+--------+
-|             |            |   0.2099        |  23    |
-|             +            +-----------------+--------+
-|             |            |   0.2097        |  23    |
-+-------------+------------+-----------------+--------+
-| pianoteq1   |            |   0.2333        |  500   |
-|             +            +-----------------+--------+
-|             |            |   0.2312        |  500   |
-|             +            +-----------------+--------+
-|             |            |   0.2314        |  500   |
-+-------------+------------+-----------------+--------+
-| pianoteq2   |            |   0.2150        |  41    |
-|             +            +-----------------+--------+
-|             |            |   0.2162        |  42    |
-|             +            +-----------------+--------+
-|             |            |   0.2136        |  20    |
-+-------------+------------+-----------------+--------+
-| pianoteq3   |            |   0.2052        |  22    |
-|             +            +-----------------+--------+
-|             |            |   0.1998        |  38    |
-|             +            +-----------------+--------+
-|             |            |   0.1996        |  20    |
-+-------------+------------+-----------------+--------+
-| salamander0 |            |   0.2374        |  24    |
-|             +            +-----------------+--------+
-|             |            |   0.2335        |  39    |
-|             +            +-----------------+--------+
-|             |            |   0.2334        |  20    |
-+-------------+------------+-----------------+--------+
-| salamander1 |            |   0.2086        |  45    |
-|             +            +-----------------+--------+
-|             |            |   0.1997        |  30    |
-|             +            +-----------------+--------+
-|             |            |   0.1995        |  20    |
-+-------------+------------+-----------------+--------+
-
 4. Evaluating error distributions
 ---------------------------------
+
+N.B. TODO
 
 #. Evaluate error distributions of velocity models whose checkpoints are in a
    given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can
@@ -263,31 +164,30 @@ specific contexts and Wilcoxon p-values.
 You can plot the tests multiple times without retesting: ``python run.py -p -cp -cf
 results/*.csv``.
 
-5. Testing on a specific file
------------------------------
-
-N.B. Not yet implemented!
-
-#. Fully test a velocity model on a specific audio/midi file: ``python run.py -v -pt <path to model checkpoint.pt> -i <input midi path> <input audio path>``
-#. Fully test a pedaling model on a specific audio/midi file: ``python run.py -p -pt <path to model checkpoint.pt> -i <input midi path> <input audio path>``
-
 Notes
 -----
 
-We used 6 different artificial contexts:
+We used 6 different artificial contexts generated from Pianoteq LV2 plugin.
+The following table shows the differences among the 6 contexts:
 
-#. `pianoteq0` is based on `Pianoteq Stage Steinway Model B`; linear mapping of
-   velocities (0-127) -> (ppp-fff) and small/no reverb ("Jazz Studio")
-#. `pianoteq1` is based on `Pianoteq Stage  Grotrian Recording 3`; linear mapping of
-   velocities (0-127) -> (p-f) and medium reverb ("Medium Hall")
-#. `pianoteq2` is based on `Pianoteq Stage  Grotrian Player`; linear mapping of
-   velocities (23-94) -> (ppp-fff) and  small/no reverb ("Jazz Studio")
-#. `pianoteq3` is based on `Pianoteq Stage  Grotrian Player`; almost exponential mapping of
-   velocities (0-127) -> (ppp-fff) and large reverb ("Large Hall")
-#. `salamander0` is based on `SalamnderGrandPianoV3Retuned` with no reverb
-#. `salamander1` is based on `SalamnderGrandPianoV3Retuned` with `Calf` reverb
-   ("Large", 2.15 sec decay)
++-----------+--------------+---------------+---------------------+
+|  Context  | Velocity Map |    Reverb     |     Instrument      |
++-----------+--------------+---------------+---------------------+
+| pianoteq0 |    Linear    |  Jazz Studio  |  Steinway B Prelude |
++-----------+--------------+---------------+---------------------+
+| pianoteq1 | Logarithmic  |  Jazz Studio  |  Steinway B Prelude |
++-----------+--------------+---------------+---------------------+
+| pianoteq2 | Logarithmic  |   Cathedral   |  Steinway B Prelude |
++-----------+--------------+---------------+---------------------+
+| pianoteq3 |    Linear    |  Jazz Studio  |  Grotrian Cabaret   |
++-----------+--------------+---------------+---------------------+
+| pianoteq4 | Logarithmic  |  Jazz Studio  |  Grotrian Cabaret   |
++-----------+--------------+---------------+---------------------+
+| pianoteq5 | Logarithmic  |   Cathedral   |  Grotrian Cabaret   |
++-----------+--------------+---------------+---------------------+
 
+The Carla project files available in the repo allow to see each individual
+parameter of the contexts.
 
 =======
 Credits
