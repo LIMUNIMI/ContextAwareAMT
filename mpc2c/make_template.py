@@ -153,7 +153,7 @@ def main():
     template = make_template(scale_path=s.SCALE_PATH,
                              spec=s.SPEC,
                              basis=s.BASIS,
-                             basis_frames=(s.ATTACK, s.BASIS_L),
+                             basis_frames=(s.ATTACK, s.BASIS_L, s.RELEASE),
                              retuning=s.RETUNING)
 
     # plot template

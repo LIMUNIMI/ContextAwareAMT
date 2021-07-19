@@ -172,8 +172,9 @@ class NMFTools:
                  spec=s.SPEC,
                  realign=False,
                  cost_func=s.NMF_COST_FUNC):
-        self.initW = initW[:, minpitch * s.BASIS:(maxpitch + 1) *
-                           s.BASIS].astype(np.float32)
+        self.basis = s.BASIS + 2
+        self.initW = initW[:, minpitch * self.basis:(maxpitch + 1) *
+                           self.basis].astype(np.float32)
         self.minpitch = minpitch
         self.maxpitch = maxpitch
         self.sr = spec.sample_rate
@@ -194,9 +195,12 @@ class NMFTools:
         self.res = len(audio) / self.sr / self.initV.shape[1]
         self.initH = make_pianoroll(score,
                                     res=self.res,
-                                    basis=s.BASIS,
                                     velocities=False,
+                                    only_onsets=False,
+                                    only_offsets=False,
+                                    basis=s.BASIS,
                                     attack=s.ATTACK,
+                                    release=s.RELEASE,
                                     eps=s.EPS_ACTIVATIONS,
                                     eps_range=s.EPS_RANGE).astype(np.float32)
 
@@ -212,8 +216,8 @@ class NMFTools:
         elif s.PREPROCESSING == "pad":
             self.initV, self.initH = pad(self.initV, self.initH)
 
-        self.initH = self.initH[self.minpitch * s.BASIS:(self.maxpitch + 1) *
-                                s.BASIS, :]
+        self.initH = self.initH[self.minpitch *
+                                self.basis:(self.maxpitch + 1) * self.basis, :]
 
         # check shapes
         assert self.initV.shape == (self.initW.shape[0], self.initH.shape[1]),\
@@ -242,7 +246,7 @@ class NMFTools:
         NMF(self.V,
             self.W,
             self.H,
-            B=s.BASIS,
+            B=self.basis,
             num_iter=5,
             cost_func=self.cost_func,
             fixH=False,
@@ -252,19 +256,21 @@ class NMFTools:
         if self.initW.ndim != 3:
             npitch = self.maxpitch - self.minpitch + 1
             if hasattr(self, 'H'):
-                self.H = self.H.reshape(npitch, s.BASIS, -1)
-                self.initH = self.initH.reshape(npitch, s.BASIS, -1)
-            self.W = self.W.reshape((-1, npitch, s.BASIS), order='C')
-            self.initW = self.initW.reshape((-1, npitch, s.BASIS), order='C')
+                self.H = self.H.reshape(npitch, self.basis, -1)
+                self.initH = self.initH.reshape(npitch, self.basis, -1)
+            self.W = self.W.reshape((-1, npitch, self.basis), order='C')
+            self.initW = self.initW.reshape((-1, npitch, self.basis),
+                                            order='C')
 
     def to2d(self):
         if self.initW.ndim != 2:
             npitch = self.maxpitch - self.minpitch + 1
             if hasattr(self, 'H'):
-                self.H = self.H.reshape(npitch * s.BASIS, -1)
-                self.initH = self.initH.reshape(npitch * s.BASIS, -1)
-            self.W = self.W.reshape((-1, npitch * s.BASIS), order='C')
-            self.initW = self.initW.reshape((-1, npitch * s.BASIS), order='C')
+                self.H = self.H.reshape(npitch * self.basis, -1)
+                self.initH = self.initH.reshape(npitch * self.basis, -1)
+            self.W = self.W.reshape((-1, npitch * self.basis), order='C')
+            self.initW = self.initW.reshape((-1, npitch * self.basis),
+                                            order='C')
 
     def generate_minispecs(self, onsets_from_H=False):
         """

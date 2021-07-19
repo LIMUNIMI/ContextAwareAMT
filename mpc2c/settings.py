@@ -58,9 +58,11 @@ EPS_ACTIVATIONS = 0
 
 # MAKE_TEMPLATE
 #: how many basis use in total (except the last one)
-BASIS = 19
+BASIS = 18
 #: the number of frames for the attack
 ATTACK = 1
+#: the number of frames for the onset
+RELEASE = 2
 #: the number of frames for the other basis
 BASIS_L = 1
 
