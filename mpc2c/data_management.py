@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from . import nmf
 from . import settings as s
 from . import utils
+from .asmd_resynth import get_contexts
 from .asmd.asmd import asmd, dataset_utils
 from .mytorchutils import DatasetDump, no_batch_collate
 
@@ -130,12 +131,13 @@ def get_loader(groups, redump, mode=None, nmf_params=None):
                       collate_fn=no_batch_collate)
 
 
-def multiple_splits_one_context(splits, context, *args, **kwargs):
+def multiple_splits_one_context(splits, *args, contexts=None, **kwargs):
     ret = []
-    for split in splits:
-        ret.append(
-            get_loader([split, context] if context is not None else [split],
-                       *args, **kwargs))
+    for context in contexts or get_contexts():
+        for split in splits:
+            ret.append(
+                get_loader([split, context] if context is not None else [split],
+                           *args, **kwargs))
     if len(ret) == 1:
         ret = ret[0]
     return ret

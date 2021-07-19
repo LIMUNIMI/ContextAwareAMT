@@ -220,8 +220,8 @@ def main():
     if args.redump:
         data_management.multiple_splits_one_context(
             ['train', 'validation', 'test'],
-            args.context,
-            True,
+            contexts=args.context,
+            redump=True,
             mode=mode,
             nmf_params=nmf_params)
 

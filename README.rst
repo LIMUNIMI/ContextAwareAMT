@@ -54,20 +54,9 @@ Datasets
 #. Create the MIDI file for the initial template: ``python run.py -sc``
 #. Synthesize the midi scale and name it ``pianoteq_scales.mp3`` (TODO: resynthesize using pycarla)
 #. Compute the initial template and save it to file: ``python run.py --template``
-
-TODO: remove the `orig` context
-
-#. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r -c orig``
-#. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r -c orig``
-
-   * Train set: 20 songs for specific contexts, 847 for the orig
-   * Validation set: 10 songs for specific contexts, 77 for the orig
-   * Test set: 25 songs for specific contexts, 28 for the orig
-   * TODO: after resynthesis with maestro v3.0, update these data
-
-#. Apply NMF to each context: ``python run.py -p -r -c <context>``, ``python
-   run.py -v -r -c <context>``
-
+#. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r``
+#. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r``
+#. You can restrict to each single context by using option ``-c``
 
 2. Training the models
 ----------------------
