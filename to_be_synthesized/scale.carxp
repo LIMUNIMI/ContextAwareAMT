@@ -1,0 +1,619 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE CARLA-PROJECT>
+<CARLA-PROJECT VERSION='2.3'>
+ <EngineSettings>
+  <ForceStereo>false</ForceStereo>
+  <PreferPluginBridges>false</PreferPluginBridges>
+  <PreferUiBridges>true</PreferUiBridges>
+  <UIsAlwaysOnTop>false</UIsAlwaysOnTop>
+  <MaxParameters>200</MaxParameters>
+  <UIBridgesTimeout>4000</UIBridgesTimeout>
+ </EngineSettings>
+
+ <Transport>
+  <BeatsPerMinute>120</BeatsPerMinute>
+ </Transport>
+
+ <!-- Pianoteq 6 STAGE -->
+ <Plugin>
+  <Info>
+   <Type>LV2</Type>
+   <Name>Pianoteq 6 STAGE</Name>
+   <URI>http://pianoteq.com/lv2/Pianoteq6STAGE</URI>
+  </Info>
+
+  <Data>
+   <Active>Yes</Active>
+   <ControlChannel>1</ControlChannel>
+   <Options>0x3f1</Options>
+
+   <Parameter>
+    <Index>2</Index>
+    <Name>Condition</Name>
+    <Symbol>lv2_port_1</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>3</Index>
+    <Name>Dynamics</Name>
+    <Symbol>lv2_port_2</Symbol>
+    <Value>0.393938958644867</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>4</Index>
+    <Name>Pitch Bend</Name>
+    <Symbol>lv2_port_3</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>5</Index>
+    <Name>Stereo Width</Name>
+    <Symbol>lv2_port_4</Symbol>
+    <Value>0.595470011234283</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>6</Index>
+    <Name>Sustain Pedal</Name>
+    <Symbol>lv2_port_5</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>7</Index>
+    <Name>Soft Pedal</Name>
+    <Symbol>lv2_port_6</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>8</Index>
+    <Name>Sostenuto Pedal</Name>
+    <Symbol>lv2_port_7</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>9</Index>
+    <Name>Harmonic Pedal</Name>
+    <Symbol>lv2_port_8</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>10</Index>
+    <Name>Rattle Pedal</Name>
+    <Symbol>lv2_port_9</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>11</Index>
+    <Name>Buff Stop Pedal</Name>
+    <Symbol>lv2_port_10</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>12</Index>
+    <Name>Celeste Pedal</Name>
+    <Symbol>lv2_port_11</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>13</Index>
+    <Name>Super Sostenuto</Name>
+    <Symbol>lv2_port_12</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>14</Index>
+    <Name>Pinch Harmonic Pedal</Name>
+    <Symbol>lv2_port_13</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>15</Index>
+    <Name>Glissando Pedal</Name>
+    <Symbol>lv2_port_14</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>16</Index>
+    <Name>Harpsichord Register 1</Name>
+    <Symbol>lv2_port_15</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>17</Index>
+    <Name>Harpsichord Register 2</Name>
+    <Symbol>lv2_port_16</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>18</Index>
+    <Name>Harpsichord Register 3</Name>
+    <Symbol>lv2_port_17</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>19</Index>
+    <Name>Reversed Sustain</Name>
+    <Symbol>lv2_port_18</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>20</Index>
+    <Name>Volume</Name>
+    <Symbol>lv2_port_19</Symbol>
+    <Value>0.727273046970367</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>21</Index>
+    <Name>Diapason</Name>
+    <Symbol>lv2_port_20</Symbol>
+    <Value>0.33333295583725</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>22</Index>
+    <Name>Bounce Switch</Name>
+    <Symbol>lv2_port_21</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>23</Index>
+    <Name>Bounce Delay</Name>
+    <Symbol>lv2_port_22</Symbol>
+    <Value>0.458332985639572</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>24</Index>
+    <Name>Bounce Sync</Name>
+    <Symbol>lv2_port_23</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>25</Index>
+    <Name>Bounce Sync Speed</Name>
+    <Symbol>lv2_port_24</Symbol>
+    <Value>0.52173912525177</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>26</Index>
+    <Name>Bounce Velocity Sensitivity</Name>
+    <Symbol>lv2_port_25</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>27</Index>
+    <Name>Bounce Delay Loss</Name>
+    <Symbol>lv2_port_26</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>28</Index>
+    <Name>Bounce Velocity Loss</Name>
+    <Symbol>lv2_port_27</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>29</Index>
+    <Name>Bounce Humanization</Name>
+    <Symbol>lv2_port_28</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>30</Index>
+    <Name>Eff 1 Switch</Name>
+    <Symbol>lv2_port_29</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>31</Index>
+    <Name>Eff 1 DelMix</Name>
+    <Symbol>lv2_port_30</Symbol>
+    <Value>0.0599999986588955</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>32</Index>
+    <Name>Eff 1 DelTime</Name>
+    <Symbol>lv2_port_31</Symbol>
+    <Value>0.228336006402969</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>33</Index>
+    <Name>Eff 1 DelFb</Name>
+    <Symbol>lv2_port_32</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>34</Index>
+    <Name>Eff 1 DelTone</Name>
+    <Symbol>lv2_port_33</Symbol>
+    <Value>0.25</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>35</Index>
+    <Name>Eff 1 DelPol</Name>
+    <Symbol>lv2_port_34</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>36</Index>
+    <Name>Eff 1 Param 6</Name>
+    <Symbol>lv2_port_35</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>37</Index>
+    <Name>Eff 1 Param 7</Name>
+    <Symbol>lv2_port_36</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>38</Index>
+    <Name>Eff 1 Param 8</Name>
+    <Symbol>lv2_port_37</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>39</Index>
+    <Name>Eff 2 Switch</Name>
+    <Symbol>lv2_port_38</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>40</Index>
+    <Name>Eff 2 PEQ1F</Name>
+    <Symbol>lv2_port_39</Symbol>
+    <Value>0.270072042942047</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>41</Index>
+    <Name>Eff 2 PEQ1G</Name>
+    <Symbol>lv2_port_40</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>42</Index>
+    <Name>Eff 2 PEQ1Q</Name>
+    <Symbol>lv2_port_41</Symbol>
+    <Value>0.461273968219757</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>43</Index>
+    <Name>Eff 2 PEQ2F</Name>
+    <Symbol>lv2_port_42</Symbol>
+    <Value>0.50994598865509</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>44</Index>
+    <Name>Eff 2 PEQ2G</Name>
+    <Symbol>lv2_port_43</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>45</Index>
+    <Name>Eff 2 PEQ2Q</Name>
+    <Symbol>lv2_port_44</Symbol>
+    <Value>0.424741983413696</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>46</Index>
+    <Name>Eff 2 PEQ3F</Name>
+    <Symbol>lv2_port_45</Symbol>
+    <Value>0.764918982982635</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>47</Index>
+    <Name>Eff 2 PEQ3G</Name>
+    <Symbol>lv2_port_46</Symbol>
+    <Value>0.579999983310699</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>48</Index>
+    <Name>Eff 3 Switch</Name>
+    <Symbol>lv2_port_47</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>49</Index>
+    <Name>Eff 3 PEQ1F</Name>
+    <Symbol>lv2_port_48</Symbol>
+    <Value>0.145162001252174</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>50</Index>
+    <Name>Eff 3 PEQ1G</Name>
+    <Symbol>lv2_port_49</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>51</Index>
+    <Name>Eff 3 PEQ1Q</Name>
+    <Symbol>lv2_port_50</Symbol>
+    <Value>0.499999970197678</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>52</Index>
+    <Name>Eff 3 PEQ2F</Name>
+    <Symbol>lv2_port_51</Symbol>
+    <Value>0.764918982982635</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>53</Index>
+    <Name>Eff 3 PEQ2G</Name>
+    <Symbol>lv2_port_52</Symbol>
+    <Value>0.579999983310699</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>54</Index>
+    <Name>Eff 3 PEQ2Q</Name>
+    <Symbol>lv2_port_53</Symbol>
+    <Value>0.369279980659485</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>55</Index>
+    <Name>Eff 3 PEQ3F</Name>
+    <Symbol>lv2_port_54</Symbol>
+    <Value>0.903613984584808</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>56</Index>
+    <Name>Eff 3 PEQ3G</Name>
+    <Symbol>lv2_port_55</Symbol>
+    <Value>0.560000002384186</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>57</Index>
+    <Name>Reverb Switch</Name>
+    <Symbol>lv2_port_56</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>58</Index>
+    <Name>Reverb Duration</Name>
+    <Symbol>lv2_port_57</Symbol>
+    <Value>0.295953005552292</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>59</Index>
+    <Name>Reverb Mix</Name>
+    <Symbol>lv2_port_58</Symbol>
+    <Value>0.509999990463257</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>60</Index>
+    <Name>Room Dimensions</Name>
+    <Symbol>lv2_port_59</Symbol>
+    <Value>0.288888961076736</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>61</Index>
+    <Name>Reverb Pre-delay</Name>
+    <Symbol>lv2_port_60</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>62</Index>
+    <Name>Reverb Early Reflections</Name>
+    <Symbol>lv2_port_61</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>63</Index>
+    <Name>Reverb Tone</Name>
+    <Symbol>lv2_port_62</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>64</Index>
+    <Name>Limiter Switch</Name>
+    <Symbol>lv2_port_63</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>65</Index>
+    <Name>Limiter Sharpness</Name>
+    <Symbol>lv2_port_64</Symbol>
+    <Value>0.5</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>66</Index>
+    <Name>Limiter Threshold</Name>
+    <Symbol>lv2_port_65</Symbol>
+    <Value>0.519999980926514</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>67</Index>
+    <Name>Limiter Gain</Name>
+    <Symbol>lv2_port_66</Symbol>
+    <Value>0.833333015441895</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>68</Index>
+    <Name>Damper Noise</Name>
+    <Symbol>lv2_port_67</Symbol>
+    <Value>0.499999970197678</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>69</Index>
+    <Name>Pedal Noise</Name>
+    <Symbol>lv2_port_68</Symbol>
+    <Value>0.454862028360367</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>70</Index>
+    <Name>Key Release Noise</Name>
+    <Symbol>lv2_port_69</Symbol>
+    <Value>0.454862028360367</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>71</Index>
+    <Name>Output Mode</Name>
+    <Symbol>lv2_port_70</Symbol>
+    <Value>0.666666686534882</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>72</Index>
+    <Name>Mute</Name>
+    <Symbol>lv2_port_71</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>73</Index>
+    <Name>Clavinet Low Mic</Name>
+    <Symbol>lv2_port_72</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>74</Index>
+    <Name>Clavinet High Mic</Name>
+    <Symbol>lv2_port_73</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>75</Index>
+    <Name>Equalizer Switch</Name>
+    <Symbol>lv2_port_74</Symbol>
+    <Value>1</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>76</Index>
+    <Name>Aftertouch</Name>
+    <Symbol>lv2_port_75</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>77</Index>
+    <Name>Condition Seed</Name>
+    <Symbol>lv2_port_76</Symbol>
+    <Value>0.123312331736088</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>78</Index>
+    <Name>Post Effect Gain</Name>
+    <Symbol>lv2_port_77</Symbol>
+    <Value>0.583333015441895</Value>
+   </Parameter>
+
+   <Parameter>
+    <Index>79</Index>
+    <Name>Mozart Rail</Name>
+    <Symbol>lv2_port_78</Symbol>
+    <Value>0</Value>
+   </Parameter>
+
+   <CustomData>
+    <Type>http://lv2plug.in/ns/ext/atom#Chunk</Type>
+    <Key>urn:juce:stateBinary</Key>
+    <Value>
+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
+    </Value>
+   </CustomData>
+  </Data>
+ </Plugin>
+
+ <Patchbay>
+  <Connection>
+   <Source>Pianoteq 6 STAGE:Audio Output 1</Source>
+   <Target>Audio Output:Left</Target>
+  </Connection>
+  <Connection>
+   <Source>Pianoteq 6 STAGE:Audio Output 2</Source>
+   <Target>Audio Output:Right</Target>
+  </Connection>
+  <Connection>
+   <Source>Midi Input:Capture 1</Source>
+   <Target>Pianoteq 6 STAGE:events-in</Target>
+  </Connection>
+ </Patchbay>
+
+ <ExternalPatchbay>
+  <Connection>
+   <Source>system:capture_1</Source>
+   <Target>PulseAudio JACK Source:front-left</Target>
+  </Connection>
+  <Connection>
+   <Source>system:capture_2</Source>
+   <Target>PulseAudio JACK Source:front-right</Target>
+  </Connection>
+  <Connection>
+   <Source>PulseAudio JACK Sink:front-left</Source>
+   <Target>system:playback_1</Target>
+  </Connection>
+  <Connection>
+   <Source>PulseAudio JACK Sink:front-right</Source>
+   <Target>system:playback_2</Target>
+  </Connection>
+ </ExternalPatchbay>
+</CARLA-PROJECT>

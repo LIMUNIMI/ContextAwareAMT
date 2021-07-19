@@ -1,6 +1,7 @@
 import pickle
 import time
 from typing import Tuple
+from pathlib import Path
 
 import essentia.standard as esst
 import numpy as np
@@ -127,8 +128,8 @@ def make_template(scale_path: Tuple[str, str],
         # release basis
         if basis_frames[2] > 0:
             end = min(note_end + basis_frames[2], end_audio)
-            template[:, pitch, basis+1] += audio[:, note_end:end].sum(axis=1)
-            counter[pitch, basis+1] += end - note_end
+            template[:, pitch, basis + 1] += audio[:, note_end:end].sum(axis=1)
+            counter[pitch, basis + 1] += end - note_end
 
     # normalizing template
     idx = np.nonzero(counter)
@@ -150,11 +151,12 @@ def make_template(scale_path: Tuple[str, str],
 
 def main():
 
-    template = make_template(scale_path=s.SCALE_PATH,
-                             spec=s.SPEC,
-                             basis=s.BASIS,
-                             basis_frames=(s.ATTACK, s.BASIS_L, s.RELEASE),
-                             retuning=s.RETUNING)
+    template = make_template(
+        scale_path=[Path(s.SCALE_DIR) / i for i in s.SCALE_PATH],
+        spec=s.SPEC,
+        basis=s.BASIS,
+        basis_frames=(s.ATTACK, s.BASIS_L, s.RELEASE),
+        retuning=s.RETUNING)
 
     # plot template
     fig = go.Figure(data=go.Heatmap(z=template[0]))

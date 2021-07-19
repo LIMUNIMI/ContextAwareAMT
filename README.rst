@@ -51,9 +51,8 @@ Datasets
 1. Preprocess
 -------------
 
-#. Create the MIDI file for the initial template: ``python run.py -sc``
-#. Synthesize the midi scale and name it ``pianoteq_scales.mp3`` (TODO: resynthesize using pycarla)
-#. Compute the initial template and save it to file: ``python run.py --template``
+#. Create the MIDI file for the template, synthesize and 
+   compute the template: ``python run.py -sc``
 #. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r``
 #. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r``
 #. You can restrict to each single context by using option ``-c``

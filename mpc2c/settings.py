@@ -11,6 +11,7 @@ PEDALING_DATA_PATH = '/datasets/mpc2c/resynth/pedaling/'
 RESYNTH_DATA_PATH = '/datasets/mpc2c/resynth/'
 METADATASET_PATH = './metadataset.json'
 SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
+SCALE_DIR = './to_be_synthesized'
 CARLA_PROJ = './carla_proj'
 TEMPLATE_PATH = 'nmf_template.pkl'
 IMAGES_PATH = './images/'
@@ -57,6 +58,14 @@ EPS_RANGE = 0
 EPS_ACTIVATIONS = 0
 
 # MAKE_TEMPLATE
+#: number of velocity layers in the scale
+N_VELOCITY_LAYERS = 20
+#: different note durantion
+NOTE_DURATION = [0.1, 1.5]
+#: silence between the notes
+NOTE_SILENCE = [0, 1, -0.04]
+#: a carla project to synthesize the scale
+SCALE_PROJ = 'scale.carxp'
 #: how many basis use in total (except the last one)
 BASIS = 18
 #: the number of frames for the attack
@@ -129,6 +138,6 @@ PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 1e-6
 
 #: If compiling code with cython in pure-python mode
-BUILD = True
+BUILD = False
 #: If cleaning cython files before building
-CLEAN = False
+CLEAN = True

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from mpc2c import create_midi_scale, data_management, evaluate, make_template
+from mpc2c import create_template, data_management, evaluate
 from mpc2c import settings as s
 from mpc2c import training
 from mpc2c.asmd_resynth import split_resynth
@@ -17,17 +17,11 @@ build.build()
 def parse_args():
     parser = argparse.ArgumentParser(description="CLI for running experiments")
     parser.add_argument(
-        "--template",
-        action="store_true",
-        help=
-        "Create the initial template from `pianoteq_scales.mp3` and `scales.mid`"
-    )
-    parser.add_argument(
         "-sc",
         "--scale",
         action="store_true",
         help=
-        "Create the midi file that must be synthesized for creating the template."
+        "Create the midi file containing the scales for the template; syntehsize it and make the template."
     )
     parser.add_argument(
         "-d",
@@ -135,10 +129,8 @@ def main():
         raise NotImplementedError(
             "Not yet implemented transcription from files")
 
-    if args.template:
-        make_template.main()
     if args.scale:
-        create_midi_scale.main()
+        create_template.main()
     if args.datasets:
 
         split_resynth(s.DATASETS,
