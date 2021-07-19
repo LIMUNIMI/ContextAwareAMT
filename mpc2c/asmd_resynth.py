@@ -199,7 +199,9 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                 if audio_path.exists() and audio_path.stat().st_size > 0:
                     if correctly_synthesized(j, d):
                         backup.add_song(j)
-                        print(f"{audio_path} already exists")
+                        print(
+                            f"song `{j}` was already synthesized but not in the BackupManager"
+                        )
                         continue
                 audio_path.parent.mkdir(parents=True, exist_ok=True)
                 if group != "orig":
@@ -335,7 +337,8 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     # split the dataset in contexts and save the new definition
     new_def_fname = output_path / "new_dataset.json"
     if not os.path.exists(new_def_fname):
-        new_def = group_split(datasets, contexts, context_splits, cluster_choice)
+        new_def = group_split(datasets, contexts, context_splits,
+                              cluster_choice)
 
         # create output_path if it doesn't exist and save the new_def
         output_path.mkdir(parents=True, exist_ok=True)
