@@ -14,7 +14,7 @@ from .essentiaspec import Spectrometer, peaks_enhance
 def make_template(scale_path: Tuple[str, str],
                   spec: Spectrometer,
                   basis: int,
-                  basis_frames: Tuple[int, int],
+                  basis_frames: Tuple[int, int, int],
                   retuning: bool = False,
                   peaks_enhancing=False) -> Tuple[np.ndarray, int, int]:
     """
@@ -31,13 +31,12 @@ def make_template(scale_path: Tuple[str, str],
     `spec` : Spectrometer
         The object used for computing the spectrograms
     `basis` : int
-        number of basis, including one for the attack. One more basis are used
-        to take into account parts of the note that continue after the
-        specified number of basis.
-    `basis_frames` : Tuple[int, int]
-        how many frames to use for each basis, namely for the attack and for
-        the other basis; you can use this argument to prevent attack and/or
-        other basis by using 0 frames for each field.
+        number of basis for internal note times. One more base is used for the
+        attack. One more base is used to account for the release after the offset.
+    `basis_frames` : Tuple[int, int, int]
+        how many frames to use for each basis, namely for the attack, for
+        the other basis and, for the release; you can use this argument to
+        prevent attack and/or other basis by using 0 frames for each field.
     `retuning` : bool
         If True, spectrograms are retuned to 440 Hz
     `peaks_enhancing` : bool
@@ -49,7 +48,7 @@ def make_template(scale_path: Tuple[str, str],
     -------
 
     np.ndarray :
-        The template with shape (bins, 128 * (basis[0] + basis[1])
+        The template with shape (bins, 128 * sum(basis_frames))
     """
     sr = spec.sample_rate
     hop_size = spec.hop_size
@@ -67,9 +66,10 @@ def make_template(scale_path: Tuple[str, str],
     ttt = time.time()
     audio = spec.spectrogram(audio, retuning=retuning)
     print(f"Needed time: {time.time() - ttt: .2f}s")
+    end_audio = audio.shape[1]
 
-    template = np.zeros((audio.shape[0], 128, basis + 1))
-    counter = np.zeros((128, basis + 1))
+    template = np.zeros((audio.shape[0], 128, basis + 2))
+    counter = np.zeros((128, basis + 2))
 
     maxpitch = 0
     minpitch = 128
@@ -95,33 +95,40 @@ def make_template(scale_path: Tuple[str, str],
             counter[pitch, 0] += (end - start)
             start = end
 
-        # other basis except the last one
+        # other basis except the offset
         if basis_frames[1] > 0:
-            end = min(start + basis * basis_frames[1], note_end)
+            should_end = start + (basis - 1) * basis_frames[1]
+            end = min(should_end, note_end)
             # padding is needed to account for the case in which a note has not
             # all the basis
-            pad_width = ((0, 0), (0,
-                                  start + basis * basis_frames[1] - note_end))
+            pad_width = ((0, 0), (0, should_end - note_end))
             if pad_width[1][1] > 0:
                 note_basis = np.pad(audio[:, start:end],
                                     pad_width,
                                     constant_values=0)
+                # number of basis filled completely
                 full_basis = (end - start) // basis_frames[1]
                 counter[pitch, 1:full_basis + 1] += basis_frames[1]
                 half_basis = (end - start) % basis_frames[1]
-                counter[pitch, 1:full_basis + 2] += half_basis
+                counter[pitch, full_basis + 2] += half_basis
             else:
                 note_basis = audio[:, start:end]
-                counter[pitch, 1:basis + 1] += basis_frames[1]
+                counter[pitch, 1:basis] += basis_frames[1]
 
-            template[:, pitch, 1:basis + 1] += note_basis.reshape(
-                -1, basis, basis_frames[1]).sum(axis=2)
+            template[:, pitch, 1:basis] += note_basis.reshape(
+                -1, basis - 1, basis_frames[1]).sum(axis=2)
             start = end
 
-        # last basis
+        # offset basis
         if note_end > start:
-            template[:, pitch, -1] += audio[:, start:note_end].sum(axis=1)
-            counter[pitch, -1] += note_end - start
+            template[:, pitch, basis] += audio[:, start:note_end].sum(axis=1)
+            counter[pitch, basis] += note_end - start
+
+        # release basis
+        if basis_frames[2] > 0:
+            end = min(note_end + basis_frames[2], end_audio)
+            template[:, pitch, basis+1] += audio[:, note_end:end].sum(axis=1)
+            counter[pitch, basis+1] += end - note_end
 
     # normalizing template
     idx = np.nonzero(counter)

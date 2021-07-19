@@ -141,6 +141,7 @@ def make_pianoroll(mat,
                    only_offsets=False,
                    basis=1,
                    attack=1,
+                   release=1,
                    basis_l=1,
                    eps=1e-15,
                    eps_range=0):
@@ -152,14 +153,18 @@ def make_pianoroll(mat,
 
     if `only_onsets` is true, only the attack is used and the other part of the
     notes are discarded (useful for aligning with amt). Similarly
-    `only_offsets`
+    `only_offsets`; however, `only_offsets` doesn't take into account the
+    release (which comes after the onset).
 
-    `basis` is the number of basis for the nmf; `attack` is the attack
-    duration, all other basis will be long `basis_l` column except the last one
-    that will last till the end if needed
+    `basis` is the number of basis for the nmf, representing the internal note
+    state. Additional basis are `attack` and `release`. `attack` is the attack
+    duration, `release` is the release duration (after the note offset); all
+    other basis will be long `basis_l` columns except the last basis before the
+    offset that will last till the end if needed; after that, the release basis
+    is added.
 
-    `eps_range` defines how to much is note is enlarged before onset and after
-    offset in seconds, while `eps` defines the value to use for enlargement
+    `eps_range` defines how many columns each note is enlarged before onset and
+    after release, while `eps` defines the value to use for enlargement
 
     Note that pitch 0 is not used and pitch 128 cannot be added if MIDI pitches
     in [1, 128] are used (as in asmd)
@@ -167,7 +172,7 @@ def make_pianoroll(mat,
 
     L = int(np.max(mat[:, 2]) / res) + 1
 
-    pr = np.zeros((128, basis, L))
+    pr = np.zeros((128, basis + 2, L))
 
     eps_range = int(eps_range / res)
 
@@ -183,11 +188,13 @@ def make_pianoroll(mat,
             vel = 1
 
         if only_offsets:
-            pr[pitch, basis - 1, end - 1] = vel
+            pr[pitch, basis, end - 1] = vel
             continue
 
         # the attack basis
         pr[pitch, 0, start:start + attack] = vel
+        if only_onsets:
+            continue
 
         # the eps_range before onset
         if eps_range > 0:
@@ -198,28 +205,35 @@ def make_pianoroll(mat,
 
         # all the other basis
         END = False
-        for b in range(1, basis):
+        offset = start
+        for b in range(basis - 1):
             for k in range(basis_l):
-                t = start + (b - 1) * basis_l + k
-                if t < end:
-                    pr[pitch, b, t] = vel
+                offset = start + b * basis_l + k
+                if offset < end:
+                    pr[pitch, b + 1, offset] = vel
                 else:
                     END = True
                     break
             if END:
                 break
 
-        # the ending part
-        if not only_onsets:
-            if start + (basis - 1) * basis_l < end:
-                pr[pitch, basis - 1, start + (basis - 1) * basis_l:end] = vel
-                # the eps_range after the offset
-                if eps_range > 0:
-                    end_eps = min(L, end + eps_range)
-                    pr[pitch, basis - 1, end:end_eps] = eps
+        # the offset part
+        if offset < end:
+            pr[pitch, basis, offset:end] = vel
+
+        # the release
+        if release > 0:
+            end_release = min(L, end + release)
+            pr[pitch, basis + 1, end:end_release] = vel
+        # the eps range after the offset and after release
+        if eps_range > 0:
+            end_eps = min(L, end + eps_range)
+            pr[pitch, basis, end:end_eps] = eps
+            end_eps = min(L, end_release + eps_range)
+            pr[pitch, basis + 1, end_release:end_eps] = eps
 
     # collapse pitch and basis dimension
-    pr = pr.reshape((128 * basis, -1), order='C')
+    pr = pr.reshape((128 * (basis + 2), -1), order='C')
     return pr
 
 
