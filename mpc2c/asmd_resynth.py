@@ -97,24 +97,26 @@ def synthesize_song(midi_path: str, audio_path: str,
     `final_decay` is the time that is waited before of stopping the recording
     (e.g. if there is a long reverb)
 
-    Return `True` if timeout was reachd while recording (probably some frame
+    Return `True` if timeout was reached while recording (probably some frame
     was lost!)
     """
-    recorder = pycarla.AudioRecorder(blocksize=server.client.blocksize)
-    player = pycarla.MIDIPlayer()
-    print("Playing and recording " + midi_path + "...")
-    midifile = mido.MidiFile(midi_path)
-    print("Total duration: ", midifile.length)
-    server.toggle_freewheel()
-    recorder.start(midifile.length + final_decay)
-    player.synthesize_midi_file(midifile, sync=True, progress=False)
-    timeout = recorder.wait(midifile.length + final_decay + 1)
-    server.toggle_freewheel()
-    print()
-    if np.all(recorder.recorded == 0):
-        raise RuntimeWarning("Recorded file is empty!")
-    recorder.save_recorded(audio_path)
-    del player, recorder
+    with pycarla.AudioRecorder() as recorder, pycarla.MIDIPlayer() as player:
+        print("Playing and recording " + midi_path + "...")
+        midifile = mido.MidiFile(midi_path)
+        print("Total duration: ", midifile.length)
+        recorder.start(midifile.length + final_decay,
+                       condition=player.ready.is_set)
+        player.synthesize_midi_file(midifile,
+                                    sync=False,
+                                    condition=player.ready.is_set)
+        server.toggle_freewheel()
+        player.wait()
+        timeout = recorder.wait()
+        server.toggle_freewheel()
+        print()
+        if np.all(recorder.recorded == 0):
+            raise RuntimeWarning("Recorded file is empty!")
+        recorder.save_recorded(audio_path)
     return timeout
 
 
@@ -178,7 +180,7 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             # for each context
             # load the preset in Carla
             if group != "orig":
-                # if this is a new context, start Carla
+                # if this is a new context, start Carla and jack
                 server = pycarla.JackServer([
                     '-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256', '-X',
                     'seq'
@@ -223,11 +225,11 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             # saving this group as synthesized
             backup.add_group(i)
             if group != "orig":
-                # if this is a new context, close Carla
+                # if this is a new context, close Carla and jack
                 carla.kill()
     except Exception as e:
         print("Exception occured while processing group " + group)
-        print(e)
+        print("    ", e)
         if group != "orig":
             print(
                 "There was an error while synthesizing, restarting the procedure"
@@ -247,7 +249,7 @@ def resynthesize(audio_path, carla, midi_path, server, final_decay):
         carla.restart()
     timeout = synthesize_song(str(midi_path), str(audio_path), server,
                               final_decay)
-    time.sleep(8)
+    time.sleep(2)
     return timeout
 
 

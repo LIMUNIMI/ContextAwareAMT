@@ -78,27 +78,34 @@ def synth_scale():
                               server,
                               min_wait=4)
         carla.start()
-        recorder = pycarla.AudioRecorder(blocksize=server.client.blocksize)
+        recorder = pycarla.AudioRecorder()
         player = pycarla.MIDIPlayer()
         print("Playing and recording " + str(MIDI_PATH) + "...")
         midifile = mido.MidiFile(MIDI_PATH)
+        recorder.start(midifile.length + 1, condition=player.ready.is_set)
+        player.synthesize_midi_file(midifile,
+                                    sync=False,
+                                    condition=recorder.ready.is_set)
+        # note: the following MUST come after having activated recorder (why
+        # not player?)
         server.toggle_freewheel()
-        recorder.start(midifile.length + 4)
-        player.synthesize_midi_file(midifile, sync=True, progress=False)
-        recorder.wait(midifile.length + 5)
+        player.wait()
+        recorder.wait()
         server.toggle_freewheel()
         if np.all(recorder.recorded == 0):
             raise RuntimeWarning("Recorded file is empty!")
         recorder.save_recorded(AUDIO_PATH)
     except Exception as e:
         print(e)
-        carla.kill_carla()
-        server.wait()
+        carla.kill()
 
 
 def main():
-    make_midi()
-    synth_scale()
+    import os
+    if not os.path.exists(MIDI_PATH):
+        make_midi()
+    if not os.path.exists(AUDIO_PATH):
+        synth_scale()
     make_template.main()
 
 
