@@ -136,7 +136,7 @@ def make_template(scale_path: Tuple[str, str],
     template[:, idx[0], idx[1]] /= counter[idx]
 
     # collapsing basis and pitch dimension
-    template = template.reshape((-1, 128 * (basis + 1)), order='C')
+    template = template.reshape((-1, 128 * (basis + 2)), order='C')
 
     if peaks_enhancing:
         # normalize to max
@@ -152,7 +152,7 @@ def make_template(scale_path: Tuple[str, str],
 def main():
 
     template = make_template(
-        scale_path=[Path(s.SCALE_DIR) / i for i in s.SCALE_PATH],
+        scale_path=[str(Path(s.SCALE_DIR) / i) for i in s.SCALE_PATH],
         spec=s.SPEC,
         basis=s.BASIS,
         basis_frames=(s.ATTACK, s.BASIS_L, s.RELEASE),
