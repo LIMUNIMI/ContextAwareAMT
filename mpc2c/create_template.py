@@ -48,9 +48,8 @@ def make_midi():
     from . import settings as s
     notes = []
     start = 1
-    step = 127 // s.N_VELOCITY_LAYERS
-    countour = (127 % s.N_VELOCITY_LAYERS) // 2
-    for i, v in enumerate(range(countour, 127 - countour - 1, step), start=1):
+    width = (s.MAX_VEL - s.MIN_VEL) // s.N_VELOCITY_LAYERS
+    for i, v in enumerate(range(s.MIN_VEL + width // 2, s.MAX_VEL, width), start=1):
         print("Creating velocity layer ", i, ": ", v)
         for dur in s.NOTE_DURATION:
             for silence in s.NOTE_SILENCE:
@@ -82,16 +81,12 @@ def synth_scale():
         player = pycarla.MIDIPlayer()
         print("Playing and recording " + str(MIDI_PATH) + "...")
         midifile = mido.MidiFile(MIDI_PATH)
-        recorder.start(midifile.length + 1, condition=player.ready.is_set)
+        recorder.start(midifile.length + 1, condition=player.is_ready)
         player.synthesize_midi_file(midifile,
                                     sync=False,
-                                    condition=recorder.ready.is_set)
-        # note: the following MUST come after having activated recorder (why
-        # not player?)
-        server.toggle_freewheel()
-        player.wait()
-        recorder.wait()
-        server.toggle_freewheel()
+                                    condition=recorder.is_ready)
+        player.wait(in_fw=True, out_fw=False)
+        recorder.wait(in_fw=True, out_fw=False)
         if np.all(recorder.recorded == 0):
             raise RuntimeWarning("Recorded file is empty!")
         recorder.save_recorded(AUDIO_PATH)

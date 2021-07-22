@@ -7,7 +7,6 @@ from pathlib import Path
 from tqdm import tqdm
 
 import mido
-import jack
 import numpy as np
 
 from .asmd.asmd import asmd, dataset_utils
@@ -112,12 +111,12 @@ def synthesize_song(midi_path: str, audio_path: str,
                                     sync=False,
                                     condition=recorder.is_ready)
         player.wait(in_fw=True, out_fw=False)
-        timeout = recorder.wait(in_fw=True, out_fw=False)
+        success = recorder.wait(in_fw=True, out_fw=False)
         print()
         if np.all(recorder.recorded == 0):
             raise RuntimeWarning("Recorded file is empty!")
         recorder.save_recorded(audio_path)
-    return timeout
+    return success
 
 
 class BackupManager():
@@ -210,11 +209,10 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                     # if this is a new context, resynthesize...
                     midi_path = (old_install_dir /
                                  d.paths[j][0][0]).with_suffix('.midi')
-                    timeout = False
-                    while not correctly_synthesized(j, d) or timeout:
+                    success = True
+                    while not correctly_synthesized(j, d) or not success:
                         # delete file if it exists (only python >= 3.8)
-                        timeout = resynthesize(audio_path, carla, midi_path,
-                                               final_decay)
+                        success = resynthesize(audio_path, carla, midi_path, final_decay)
                 else:
                     old_audio_path = str(old_install_dir / d.paths[j][0][0])
                     print(f"Orig context, {old_audio_path} > {audio_path}")
@@ -247,9 +245,9 @@ def resynthesize(audio_path, carla, midi_path, final_decay):
     if not carla.exists():
         print("Carla doesn't exists... restarting everything")
         carla.restart()
-    timeout = synthesize_song(str(midi_path), str(audio_path), final_decay)
+    success = synthesize_song(str(midi_path), str(audio_path), final_decay)
     time.sleep(2)
-    return timeout
+    return success
 
 
 def get_contexts(carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:

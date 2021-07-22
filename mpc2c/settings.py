@@ -10,7 +10,7 @@ VELOCITY_DATA_PATH = '/datasets/mpc2c/resynth/velocity/'
 PEDALING_DATA_PATH = '/datasets/mpc2c/resynth/pedaling/'
 RESYNTH_DATA_PATH = '/datasets/mpc2c/resynth/'
 METADATASET_PATH = './metadataset.json'
-SCALE_PATH = ['scales.mid', 'pianoteq_scales.mp3']
+SCALE_PATH = ['scales.mid', 'pianoteq_scales.flac']
 SCALE_DIR = './to_be_synthesized'
 CARLA_PROJ = './carla_proj'
 TEMPLATE_PATH = 'nmf_template.pkl'
@@ -60,6 +60,8 @@ EPS_ACTIVATIONS = 0
 # MAKE_TEMPLATE
 #: number of velocity layers in the scale
 N_VELOCITY_LAYERS = 20
+MIN_VEL = 10
+MAX_VEL = 120
 #: different note durantion
 NOTE_DURATION = [0.1, 1.5]
 #: silence between the notes
