@@ -7,6 +7,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 import mido
+import jack
 import numpy as np
 
 from .asmd.asmd import asmd, dataset_utils
@@ -90,7 +91,7 @@ def group_split(datasets: t.List[str],
 
 
 def synthesize_song(midi_path: str, audio_path: str,
-                    server: pycarla.JackServer, final_decay: float) -> bool:
+                    final_decay: float) -> bool:
     """
     Given a path to a midi file, synthesize it and returns the numpy array
 
@@ -101,18 +102,17 @@ def synthesize_song(midi_path: str, audio_path: str,
     was lost!)
     """
     with pycarla.AudioRecorder() as recorder, pycarla.MIDIPlayer() as player:
+        # activating clients need to be done without freewheeling
         print("Playing and recording " + midi_path + "...")
         midifile = mido.MidiFile(midi_path)
         print("Total duration: ", midifile.length)
         recorder.start(midifile.length + final_decay,
-                       condition=player.ready.is_set)
+                       condition=player.is_ready)
         player.synthesize_midi_file(midifile,
                                     sync=False,
-                                    condition=player.ready.is_set)
-        server.toggle_freewheel()
-        player.wait()
-        timeout = recorder.wait()
-        server.toggle_freewheel()
+                                    condition=recorder.is_ready)
+        player.wait(in_fw=True, out_fw=False)
+        timeout = recorder.wait(in_fw=True, out_fw=False)
         print()
         if np.all(recorder.recorded == 0):
             raise RuntimeWarning("Recorded file is empty!")
@@ -214,7 +214,7 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                     while not correctly_synthesized(j, d) or timeout:
                         # delete file if it exists (only python >= 3.8)
                         timeout = resynthesize(audio_path, carla, midi_path,
-                                               server, final_decay)
+                                               final_decay)
                 else:
                     old_audio_path = str(old_install_dir / d.paths[j][0][0])
                     print(f"Orig context, {old_audio_path} > {audio_path}")
@@ -240,15 +240,14 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
         return True
 
 
-def resynthesize(audio_path, carla, midi_path, server, final_decay):
+def resynthesize(audio_path, carla, midi_path, final_decay):
     # delete file if it exists (only python >= 3.8)
     audio_path.unlink(missing_ok=True)
     # check that Carla is still alive..
     if not carla.exists():
         print("Carla doesn't exists... restarting everything")
         carla.restart()
-    timeout = synthesize_song(str(midi_path), str(audio_path), server,
-                              final_decay)
+    timeout = synthesize_song(str(midi_path), str(audio_path), final_decay)
     time.sleep(2)
     return timeout
 
