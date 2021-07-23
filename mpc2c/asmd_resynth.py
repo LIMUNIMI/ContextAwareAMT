@@ -110,13 +110,13 @@ def synthesize_song(midi_path: str, audio_path: str,
         player.synthesize_midi_file(midifile,
                                     sync=False,
                                     condition=recorder.is_ready)
-        player.wait(in_fw=True, out_fw=False)
-        success = recorder.wait(in_fw=True, out_fw=False)
+        success1 = player.wait(in_fw=True, out_fw=False)
+        success2 = recorder.wait(in_fw=True, out_fw=False)
         print()
         if np.all(recorder.recorded == 0):
             raise RuntimeWarning("Recorded file is empty!")
         recorder.save_recorded(audio_path)
-    return success
+    return success1 and success2
 
 
 class BackupManager():
@@ -180,12 +180,11 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
             # load the preset in Carla
             if group != "orig":
                 # if this is a new context, start Carla and jack
-                server = pycarla.JackServer([
+                carla = pycarla.Carla(proj, [
                     '-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256', '-X',
                     'seq'
-                ])
-                server.start()
-                carla = pycarla.Carla(proj, server, min_wait=8)
+                ],
+                                      min_wait=8)
                 carla.start()
 
             # get the songs with this context
@@ -212,7 +211,8 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
                     success = True
                     while not correctly_synthesized(j, d) or not success:
                         # delete file if it exists (only python >= 3.8)
-                        success = resynthesize(audio_path, carla, midi_path, final_decay)
+                        success = resynthesize(audio_path, carla, midi_path,
+                                               final_decay)
                 else:
                     old_audio_path = str(old_install_dir / d.paths[j][0][0])
                     print(f"Orig context, {old_audio_path} > {audio_path}")
@@ -247,7 +247,7 @@ def resynthesize(audio_path, carla, midi_path, final_decay):
         carla.restart()
     success = synthesize_song(str(midi_path), str(audio_path), final_decay)
     time.sleep(2)
-    return success
+    return success and not carla.error
 
 
 def get_contexts(carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:

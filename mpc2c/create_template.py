@@ -49,7 +49,8 @@ def make_midi():
     notes = []
     start = 1
     width = (s.MAX_VEL - s.MIN_VEL) // s.N_VELOCITY_LAYERS
-    for i, v in enumerate(range(s.MIN_VEL + width // 2, s.MAX_VEL, width), start=1):
+    for i, v in enumerate(range(s.MIN_VEL + width // 2, s.MAX_VEL, width),
+                          start=1):
         print("Creating velocity layer ", i, ": ", v)
         for dur in s.NOTE_DURATION:
             for silence in s.NOTE_SILENCE:
@@ -69,13 +70,11 @@ def make_midi():
 
 
 def synth_scale():
-    server = pycarla.JackServer(
-        ['-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256', '-X', 'seq'])
-    server.start()
     try:
-        carla = pycarla.Carla(Path(s.SCALE_DIR) / s.SCALE_PROJ,
-                              server,
-                              min_wait=4)
+        carla = pycarla.Carla(
+            Path(s.SCALE_DIR) / s.SCALE_PROJ,
+            ['-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256', '-X', 'seq'],
+            min_wait=4)
         carla.start()
         recorder = pycarla.AudioRecorder()
         player = pycarla.MIDIPlayer()
@@ -85,7 +84,7 @@ def synth_scale():
         player.synthesize_midi_file(midifile,
                                     sync=False,
                                     condition=recorder.is_ready)
-        player.wait(in_fw=True, out_fw=False)
+        player.wait(in_fw=True, out_fw=True)
         recorder.wait(in_fw=True, out_fw=False)
         if np.all(recorder.recorded == 0):
             raise RuntimeWarning("Recorded file is empty!")
