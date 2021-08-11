@@ -30,16 +30,15 @@ HOP_SIZE = 512
 NJOBS = 4
 # number of mfcc
 BINS = 13
-SPEC = essentiaspec.Spectrometer(
-    FRAME_SIZE,
-    SR,
-    'hann',
-    hop=HOP_SIZE,
-    transform=essentiaspec.Transform.PowerSpectrum,
-    proctransform=essentiaspec.ProcTransform.NONE)
+SPEC = essentiaspec.Spectrometer(FRAME_SIZE,
+                                 SR,
+                                 'hann',
+                                 hop=HOP_SIZE,
+                                 transform=essentiaspec.Transform.Spectrum,
+                                 proctransform=essentiaspec.ProcTransform.NONE)
 MFCC = essentiaspec.ProcTransform.MFCC(SR,
                                        FRAME_SIZE // 2 + 1,
-                                       logType='dbpow')
+                                       logType='dbamp')
 RETUNING = False
 
 # NMF
@@ -68,14 +67,21 @@ NOTE_DURATION = [0.1, 1.5]
 NOTE_SILENCE = [0, 1, -0.04]
 #: a carla project to synthesize the scale
 SCALE_PROJ = 'scale.carxp'
-#: how many basis use in total (except the last one)
-BASIS = 18
-#: the number of frames for the attack
-ATTACK = 1
-#: the number of frames for the onset
-RELEASE = 2
-#: the number of frames for the other basis
-BASIS_L = 1
+#: how many basis use in total (except the first and release)
+BASIS_FRAMES = {
+    #: the number of basis for the attack
+    'attack_b': 1,
+    #: the number of basis for the release
+    'release_b': 15,
+    #: the number of basis for the release
+    'inner_b': 14,
+    #: the number of frames for the attack basis
+    'attack_f': 1,
+    #: the number of frames for the release basis
+    'release_f': 1,
+    #: the number of frames for the inner basis
+    'inner_f': 2,
+}
 
 #: on of "pad" or "stretch": the strategy used to have midi and audio with the
 #: same length; just use "pad" for Maestro

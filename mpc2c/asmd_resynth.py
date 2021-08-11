@@ -241,10 +241,6 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
 def resynthesize(audio_path, carla, midi_path, final_decay):
     # delete file if it exists (only python >= 3.8)
     audio_path.unlink(missing_ok=True)
-    # check that Carla is still alive..
-    if not carla.exists():
-        print("Carla doesn't exists... restarting everything")
-        carla.restart()
     success = synthesize_song(str(midi_path), str(audio_path), final_decay)
     time.sleep(2)
     return success and not carla.error

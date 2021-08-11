@@ -1,6 +1,22 @@
-import essentia.standard as esst
+import essentia.standard as esst  # type: ignore
 import numpy as np
-import pretty_midi as pm
+import pretty_midi as pm  # type: ignore
+
+
+def amp2db(arr):
+    """
+    Convert an array to -dBFS
+
+    You need to take care that all values are > 0  (usually, > 1e-31 or 1e-15)
+    """
+    return -20 * np.log10(arr) / np.log10(np.finfo('float64').max)
+
+
+def db2amp(arr):
+    """
+    Convert an array to amplitude from -dBFS
+    """
+    return 10**(-arr * np.log10(np.finfo('float64').max) / 20)
 
 
 def pad(arr1, arr2):
