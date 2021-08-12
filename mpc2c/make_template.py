@@ -71,6 +71,7 @@ def make_template(scale_path: List[str],
     retuning = 440 if retuning else 0  # type: ignore
     ttt = time.time()
     audio = spec.spectrogram(audio, retuning=retuning)  # type: ignore
+    print("Converting amp to -dbFS")
     audio /= 1e4 * audio.sum()
     audio[audio < 1e-15] = 1e-15
     audio = amp2db(audio)
@@ -87,7 +88,7 @@ def make_template(scale_path: List[str],
     minpitch = 128
     pitch = 0
 
-    def fill_base(first_base, start, note_end, fpb, nbasis):
+    def fill_base(first_base, start, end, fpb, nbasis):
         """
         fills a base into the template and the counter, given the starting
         base, the excerpt starting and ending frames, the number of frames per
@@ -95,10 +96,10 @@ def make_template(scale_path: List[str],
 
         returns the last frame that has not been processed
         """
-        end = min(start + nbasis * fpb, note_end)
-        for i in range(end - start):
+        _end = min(start + nbasis * fpb, end)
+        for i in range(_end - start):
             # adding one frame at a time
-            if start + i > end:
+            if start + i > _end:
                 break
             base = first_base + i // fpb
             template[:, pitch, base] += audio[:, start + i]
@@ -134,8 +135,8 @@ def make_template(scale_path: List[str],
 
         # release basis
         if release_b > 0:
-            note_end += release_f * release_b + 1
-            fill_base(attack_b + inner_b, start, note_end, release_f,
+            end = min(note_end + release_f * release_b, audio.shape[1])
+            fill_base(attack_b + inner_b, start, end, release_f,
                       release_b)
 
     # normalizing template
