@@ -2,6 +2,7 @@
 
 import os
 from copy import deepcopy
+from pathlib import Path
 from pprint import pprint
 
 import torch.nn.functional as F
@@ -92,11 +93,10 @@ def train(hpar, mode, copy_checkpoint=''):
                           tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
 
     # loaders
-    loaders = []
-    for context in get_contexts():
-        trainloader, validloader = data_management.multiple_splits_one_context(
-            ['train', 'validation'], context, False)
-        loaders.append((trainloader, validloader))
+    trainloader = data_management.get_loader(
+            ['train'], False, get_contexts(s.CARLA_PROJ))
+    validloader = data_management.get_loader(
+            ['validation'], False, get_contexts(s.CARLA_PROJ))
 
     # building model
     if mode == 'velocity':

@@ -7,7 +7,7 @@ import torch
 from mpc2c import create_template, data_management, evaluate
 from mpc2c import settings as s
 from mpc2c import training
-from mpc2c.asmd_resynth import split_resynth
+from mpc2c.asmd_resynth import split_resynth, get_contexts
 from mpc2c.mytorchutils import hyperopt
 from mpc2c import build
 
@@ -56,15 +56,6 @@ def parse_args():
                         "--redump",
                         action="store_true",
                         help="Pre-process the full dataset and dumps it")
-    parser.add_argument(
-        "-c",
-        "--context",
-        action="store",
-        type=str,
-        default=None,
-        help=
-        "Limit the action to only the specified context (e.g. `-c pianoteq0`, `-c salamander1`, `-c orig`)"
-    )
     parser.add_argument(
         "-pt",
         "--checkpoint",
@@ -210,12 +201,14 @@ def main():
                            copy_checkpoint=fname)
 
     if args.redump:
-        data_management.multiple_splits_one_context(
-            ['train', 'validation', 'test'],
-            contexts=args.context,
-            redump=True,
-            mode=mode,
-            nmf_params=nmf_params)
+        contexts = get_contexts(s.CARLA_PROJ)
+        for split in ['train', 'validation', 'test']:
+            data_management.get_loader(
+                split,
+                redump=True,
+                contexts=contexts,
+                mode=mode,
+                nmf_params=nmf_params)
 
     if args.evaluate or args.csv_file:
         compare = args.compare

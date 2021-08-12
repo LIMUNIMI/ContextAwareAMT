@@ -14,7 +14,6 @@ from scipy.stats import wilcoxon
 
 from . import settings as s
 from .asmd_resynth import get_contexts
-from .data_management import multiple_splits_one_context
 from .mytorchutils import make_loss_func, test
 from .training import build_performer_model
 
@@ -139,6 +138,7 @@ def eval_model_context(
         model: torch.nn.Module, context: str, mode: str,
         song_level: bool) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
+    # TODO: test all contexts at once...
     testloader = multiple_splits_one_context(['test'],
                                              context,
                                              mode,

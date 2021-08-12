@@ -1,6 +1,8 @@
+from itertools import cycle
+
 import essentia as es # type: ignore
 from pathlib import Path
-from torch.utils.data import DataLoader # type: ignore
+from torch.utils.data import DataLoader, Sampler # type: ignore
 
 from . import nmf
 from . import settings as s
@@ -21,9 +23,29 @@ class AEDataset(DatasetDump):
 
     def __getitem__(self, i):
         """
-        Returns 4 data: input, target label, target reconstruction, context
+        Returns 4 data: input, target label, target reconstruction
         """
         input, label = super().__getitem__(i)
+        # TODO
+
+    def get_samples_with_context(self, c):
+        # TODO
+        pass
+
+
+class AEBatchSampler(Sampler):
+
+    def __init__(self, batch_size, ae_dataset, contexts):
+        super().__init__()
+        self.batch_size = batch_size
+        self.ae_dataset = ae_dataset
+        self.contexts = cycle(contexts)
+
+    def __len__(self):
+        return len(self.ae_dataset) // self.batch_size
+
+    def __iter__(self):
+        pass
         # TODO
 
 
@@ -82,7 +104,7 @@ def process_velocities(i, dataset, nmf_params):
     return minispecs, velocities
 
 
-def get_loader(groups, redump, mode=None, nmf_params=None):
+def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
     """
     `nmf_params` and `mode` are needed only if `redump` is True
     """
@@ -96,9 +118,11 @@ def get_loader(groups, redump, mode=None, nmf_params=None):
     if mode == 'velocity':
         process_fn = process_velocities
         data_path = s.VELOCITY_DATA_PATH
+        batch_size = s.VEL_BATCH_SIZE
     elif mode == 'pedaling':
         process_fn = process_pedaling
         data_path = s.PEDALING_DATA_PATH
+        batch_size = s.PED_BATCH_SIZE
     else:
         raise RuntimeError(
             f"mode {mode} not known: available are `velocity` and `pedaling`")
@@ -110,27 +134,14 @@ def get_loader(groups, redump, mode=None, nmf_params=None):
     if not dumped:
         dataset.dump(process_fn, nmf_params, n_jobs=s.NJOBS, max_nbytes=None)
 
-    # select the groups and subsample dataset
+    # select the groups, subsample dataset, and shuffle it
     dataset.apply_func(dataset_utils.filter, groups=groups)
     dataset.apply_func(lambda *x, **y: dataset_utils.choice(*x, **y)[0],
                        p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
                        random_state=1992)
 
     return DataLoader(dataset,
-                      batch_size=1,
+                      batch_sampler=AEBatchSampler(batch_size, dataset, contexts),
                       num_workers=s.NJOBS,
                       pin_memory=True,
                       collate_fn=ae_collate)
-
-
-def multiple_splits_one_context(splits, *args, contexts=None, **kwargs):
-    ret = []
-    for context in contexts or get_contexts(Path(s.CARLA_PROJ)):
-        for split in splits:
-            ret.append(
-                get_loader(
-                    [split, context] if context is not None else [split],
-                    *args, **kwargs))
-    if len(ret) == 1:
-        ret = ret[0]
-    return ret

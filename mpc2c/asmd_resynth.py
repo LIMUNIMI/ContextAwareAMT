@@ -246,14 +246,16 @@ def resynthesize(audio_path, carla, midi_path, final_decay):
     return success and not carla.error
 
 
-def get_contexts(carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:
+def get_contexts(carla_proj: t.Union[Path, str]) -> t.Dict[str, t.Optional[Path]]:
     """
     Loads contexts and Carla project files from the provided directory
 
     Returns a dictionary which maps context names to the corresponding carla
     project file.
     """
-    glob = list(carla_proj.glob("**/*.carxp"))
+    if type(carla_proj) is str:
+        carla_proj = Path(carla_proj)
+    glob = list(carla_proj.glob("**/*.carxp")) # type: ignore
 
     # take the name of the contexts
     contexts: t.Dict[str, t.Optional[Path]] = {}
