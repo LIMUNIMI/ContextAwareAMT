@@ -1,8 +1,9 @@
+from typing import List
 from itertools import cycle
 
-import essentia as es # type: ignore
-from pathlib import Path
-from torch.utils.data import DataLoader, Sampler # type: ignore
+import numpy as np
+import essentia as es  # type: ignore
+from torch.utils.data import DataLoader, Sampler  # type: ignore
 
 from . import nmf
 from . import settings as s
@@ -13,45 +14,97 @@ from .mytorchutils import DatasetDump
 
 
 class AEDataset(DatasetDump):
-    def __init__(self, generic, *args, **kwargs):
+    def __init__(self, contexts: List[str], *args, **kwargs):
         """
         if `generic`, then data are generated for generic independence,
         otherwise for specific indipendence
         """
         super().__init__(*args, **kwargs)
-        self.generic = generic
+        self.contexts = set(contexts)
+        # keep track of which samples among those dumped were used
+        self.used = np.zeros(sum(self.lengths), dtype=np.bool8)
 
-    def __getitem__(self, i):
+    def next_item_context(self, c):
         """
-        Returns 4 data: input, target label, target reconstruction
-        """
-        input, label = super().__getitem__(i)
-        # TODO
+        Returns 4 data: input, target label, target reconstruction (same and different context)
 
-    def get_samples_with_context(self, c):
-        # TODO
-        pass
+        the input is of context `c`
+
+        raise `StopIteration` when finished
+        """
+        # computing:
+        # 1. dataset with the same context
+        same = self.get_context(c)
+        # 2.  dataset with different contexts
+        different = same.complement()  # type: ignore
+        # find the first sample not used in `same` and in `different`
+        # both `same`, `different` and this dataset were filtered from the same
+        # dumped dataset, so the `original` index is the same
+
+        # looking for the first sample in `same` not used yet (original index)
+        input = -1
+        for s in same.included:  # type: ignore
+            if not self.used[s]:
+                self.used[s] = True
+                input = s
+                break
+
+        if input == -1:
+            raise StopIteration
+
+        # take a random sample from `different`
+        diff_target = np.random.randint(len(different))
+        # take a random sample from `same`
+        same_target = np.random.randint(len(same))  # type: ignore
+
+        return {
+            "x": same.get_input(input),  # type: ignore
+            "y": same.get_target(input),  # type: ignore
+            "ae_same": same.get_input(same_target),  # type: ignore
+            "ae_diff": different.get_input(diff_target)
+        }
+
+    def get_context(self, c: str):
+        return self.apply_func(dataset_utils.filter, self, groups=[c])
+
+    def complement(self):
+        return self._apply_func(dataset_utils.complement, self)
 
 
 class AEBatchSampler(Sampler):
-
-    def __init__(self, batch_size, ae_dataset, contexts):
+    def __init__(self, batch_size: int, ae_dataset: AEDataset):
+        """
+        Makes batches so that each one has a different context
+        """
         super().__init__()
         self.batch_size = batch_size
         self.ae_dataset = ae_dataset
-        self.contexts = cycle(contexts)
+        self.contexts = cycle(ae_dataset.contexts)
 
     def __len__(self):
         return len(self.ae_dataset) // self.batch_size
 
     def __iter__(self):
-        pass
-        # TODO
+        c = next(self.contexts)
+        batch = []
+        for _ in range(self.batch_size):
+            try:
+                batch.append(self.ae_dataset.next_item_context(c))
+            except StopIteration:
+                break
+        if len(batch) == 0:
+            raise StopIteration
+        return batch
 
 
 def ae_collate(batch):
+    """
+    `batch` is what is returned by `AEBatchSampler.__iter__`: a list of tuples
+    where each tuple is what returned by `AEDataset.next_item_context`
+    """
+
+    # do we need it? if samples have the same size, not
     pass
-    # TODO
 
 
 def transform_func(arr: es.array):
@@ -61,7 +114,7 @@ def transform_func(arr: es.array):
     """
     out = []
     for col in range(arr.shape[1]):
-        out.append(s.MFCC(arr[:, col]))
+        out.append(s.MFCC(utils.db2amp(arr[:, col])))
 
     return es.array(out).T
 
@@ -108,8 +161,6 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
     """
     `nmf_params` and `mode` are needed only if `redump` is True
     """
-    # create a dataset always at the song_level
-    # dump the whole dataset
     if redump:
         dumped = False
     else:
@@ -128,6 +179,7 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
             f"mode {mode} not known: available are `velocity` and `pedaling`")
 
     dataset = AEDataset(
+        list(get_contexts(s.CARLA_PROJ).keys()),
         asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
                      metadataset_path=s.METADATASET_PATH), data_path, dumped)
 
@@ -135,13 +187,14 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
         dataset.dump(process_fn, nmf_params, n_jobs=s.NJOBS, max_nbytes=None)
 
     # select the groups, subsample dataset, and shuffle it
-    dataset.apply_func(dataset_utils.filter, groups=groups)
-    dataset.apply_func(lambda *x, **y: dataset_utils.choice(*x, **y)[0],
-                       p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
-                       random_state=1992)
+    dataset = dataset.apply_func(dataset_utils.filter, groups=groups)
+    dataset = dataset.apply_func( # type: ignore
+        lambda *x, **y: dataset_utils.choice(*x, **y)[0],  # type: ignore
+        p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
+        random_state=1992)
 
     return DataLoader(dataset,
-                      batch_sampler=AEBatchSampler(batch_size, dataset, contexts),
+                      batch_sampler=AEBatchSampler(batch_size, dataset),
                       num_workers=s.NJOBS,
-                      pin_memory=True,
-                      collate_fn=ae_collate)
+                      pin_memory=True)
+    # collate_fn=ae_collate)
