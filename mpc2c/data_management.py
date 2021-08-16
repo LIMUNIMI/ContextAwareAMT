@@ -1,5 +1,6 @@
 from typing import List
 from itertools import cycle
+from random import choice
 
 import numpy as np
 import essentia as es  # type: ignore
@@ -52,16 +53,19 @@ class AEDataset(DatasetDump):
         if input == -1:
             raise StopIteration
 
-        # take a random sample from `different`
-        diff_target = np.random.randint(len(different))
-        # take a random sample from `same`
-        same_target = np.random.randint(len(same))  # type: ignore
+        x = same.get_input(input)
+        y = same.get_target(input)
+
+        # take a random sample from `different` with the same label
+        diff_target = choice(different.inverted[y])
+        # take a random sample from `same` with the same label
+        same_target = choice(same.inverted[y])
 
         return {
-            "x": same.get_input(input),  # type: ignore
-            "y": same.get_target(input),  # type: ignore
-            "ae_same": same.get_input(same_target),  # type: ignore
-            "ae_diff": different.get_input(diff_target)
+            "x": x,
+            "y": y,
+            "ae_same": same.get_input(*same_target),
+            "ae_diff": different.get_input(*diff_target)
         }
 
     def get_context(self, c: str):
