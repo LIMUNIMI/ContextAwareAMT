@@ -3,15 +3,16 @@ from types import SimpleNamespace
 import numpy as np
 
 from . import settings as s
-from .utils import find_start_stop, make_pianoroll, pad, stretch_pianoroll
+from .utils import find_start_stop, make_pianoroll, pad, stretch_pianoroll, amp2db
 
 
-def NMF(V,
+def NMF(
+        V,
         W,
         H,
-        B=10,
+        # B=10,
+        # params=None,
         num_iter=10,
-        params=None,
         cost_func='Music',
         fixH=False,
         fixW=False):
@@ -41,7 +42,7 @@ def NMF(V,
           'EucDdist' for Euclidean Distance
           'KLDiv' for Kullback Leibler Divergence
           'ISDiv' for Itakura Saito Divergence
-          'Music' for score-informed music applications [3]
+          # 'Music' for score-informed music applications [3]
 
     num_iter : int
         Number of iterations the algorithm will run.
@@ -55,16 +56,16 @@ def NMF(V,
     fixW : bool
         If True, W is not updated
 
-    params : dict
-        parameters for `Music` updates with these names:
-            a1, a2, a3, b1, b2, Mh, Mw
+    # params : dict
+    #     parameters for `Music` updates with these names:
+    #         a1, a2, a3, b1, b2, Mh, Mw
 
-        `Mh` and `Mw` *MUST* be provided, the others can miss and in that case
-        the following are used [3]:
-            a1, a2, a3, b1, b2 = 0, 1e3, 1, 1e2, 0
+    #     `Mh` and `Mw` *MUST* be provided, the others can miss and in that case
+    #     the following are used [3]:
+    #         a1, a2, a3, b1, b2 = 0, 1e3, 1, 1e2, 0
 
-    B : int
-        the number of basis for template
+    # B : int
+    #     the number of basis for template (only needed for the `Music` distance)
     """
     # normalize to unit sum
     V /= V.sum()
@@ -78,20 +79,20 @@ def NMF(V,
     # get important params
     K, M = V.shape
     L = num_iter
-    if cost_func == 'Music':
-        # default ones
-        if "Mh" not in params or "Mw" not in params:
-            raise RuntimeError("Mh and Mw *MUST* be provided")
-        params = {
-            "a1": params.get("a1") or 10,
-            "a2": params.get("a2") or 10,
-            "a3": params.get("a3") or 0,
-            "b1": params.get("b1") or 0,
-            "b2": params.get("b2") or 0,
-            "Mh": params["Mh"],
-            "Mw": params["Mw"]
-        }
-        p = SimpleNamespace(**params)
+    # if cost_func == 'Music':
+    #     # default ones
+    #     if "Mh" not in params or "Mw" not in params:
+    #         raise RuntimeError("Mh and Mw *MUST* be provided")
+    #     params = {
+    #         "a1": params.get("a1") or 10,
+    #         "a2": params.get("a2") or 10,
+    #         "a3": params.get("a3") or 0,
+    #         "b1": params.get("b1") or 0,
+    #         "b2": params.get("b2") or 0,
+    #         "Mh": params["Mh"],
+    #         "Mw": params["Mw"]
+    #     }
+    #     p = SimpleNamespace(**params)
 
     # create helper matrix of all ones
     onesMatrix = np.ones((K, M))
@@ -127,25 +128,25 @@ def NMF(V,
             if not fixH:
                 H *= (W.T @ (Lambda**-2 * V)) / (W.T @ (Lambda**-1) + s.EPS)
 
-        elif cost_func == 'Music':
-            # update rules for music score-informed applications
+        # elif cost_func == 'Music':
+        #     # update rules for music score-informed applications
 
-            if not fixW:
-                W_indicator = np.zeros_like(W)
-                W_indicator[:, ::B] += W[:, ::B]
-                numW = (V / Lambda) @ H.T
-                numW[1:] += 2 * p.b1 * W_indicator[1:]
-                numW[:-1] += 2 * p.b1 * W_indicator[:-1] + p.b2 * p.Mw[:-1]
+        #     if not fixW:
+        #         W_indicator = np.zeros_like(W)
+        #         W_indicator[:, ::B] += W[:, ::B]
+        #         numW = (V / Lambda) @ H.T
+        #         numW[1:] += 2 * p.b1 * W_indicator[1:]
+        #         numW[:-1] += 2 * p.b1 * W_indicator[:-1] + p.b2 * p.Mw[:-1]
 
-                W *= numW / (onesMatrix @ H.T + s.EPS + p.b2 +
-                             4 * p.b1 * W_indicator)
+        #         W *= numW / (onesMatrix @ H.T + s.EPS + p.b2 +
+        #                      4 * p.b1 * W_indicator)
 
-            if not fixH:
-                numH = W.T @ (V / Lambda) + p.a1 * p.Mh
-                numH[:, B:] += p.a2 * H[:, B:]
-                numH[:, :-B] += H[:, :-B]
-                H *= numH / (W.T @ onesMatrix + s.EPS + p.a1 + p.a3 +
-                             4 * p.a2 * H)
+        #     if not fixH:
+        #         numH = W.T @ (V / Lambda) + p.a1 * p.Mh
+        #         numH[:, B:] += p.a2 * H[:, B:]
+        #         numH[:, :-B] += H[:, :-B]
+        #         H *= numH / (W.T @ onesMatrix + s.EPS + p.a1 + p.a3 +
+        #                      4 * p.a2 * H)
 
         else:
             raise ValueError('Unknown cost function')
@@ -169,10 +170,12 @@ class NMFTools:
                  initW,
                  minpitch,
                  maxpitch,
+                 basis_frames=s.BASIS_FRAMES,
                  spec=s.SPEC,
                  realign=False,
                  cost_func=s.NMF_COST_FUNC):
-        self.basis = s.BASIS + 2
+        self.basis = basis_frames['attack_b'] +\
+                                   basis_frames['release_b'] + basis_frames['inner_b']
         self.initW = initW[:, minpitch * self.basis:(maxpitch + 1) *
                            self.basis].astype(np.float32)
         self.minpitch = minpitch
@@ -190,17 +193,15 @@ class NMFTools:
         start, stop = find_start_stop(audio, sample_rate=self.sr)
         audio = audio[start:stop]
         self.initV = self.spec.spectrogram(audio, 440 if s.RETUNING else 0)
+        self.initV = amp2db(self.initV)
 
         # computing resolution of the pianoroll (seconds per column)
         self.res = len(audio) / self.sr / self.initV.shape[1]
         self.initH = make_pianoroll(score,
+                                    basis_frames=s.BASIS_FRAMES,
                                     res=self.res,
                                     velocities=False,
                                     only_onsets=False,
-                                    only_offsets=False,
-                                    basis=s.BASIS,
-                                    attack=s.ATTACK,
-                                    release=s.RELEASE,
                                     eps=s.EPS_ACTIVATIONS,
                                     eps_range=s.EPS_RANGE).astype(np.float32)
 
@@ -246,7 +247,6 @@ class NMFTools:
         NMF(self.V,
             self.W,
             self.H,
-            B=self.basis,
             num_iter=5,
             cost_func=self.cost_func,
             fixH=False,

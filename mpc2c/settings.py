@@ -73,7 +73,7 @@ BASIS_FRAMES = {
     'attack_b': 1,
     #: the number of basis for the release
     'release_b': 15,
-    #: the number of basis for the release
+    #: the number of basis for the inner
     'inner_b': 14,
     #: the number of frames for the attack basis
     'attack_f': 1,

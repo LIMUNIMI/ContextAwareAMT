@@ -72,8 +72,6 @@ def make_template(scale_path: List[str],
     ttt = time.time()
     audio = spec.spectrogram(audio, retuning=retuning)  # type: ignore
     print("Converting amp to -dbFS")
-    audio /= 1e4 * audio.sum()
-    audio[audio < 1e-15] = 1e-15
     audio = amp2db(audio)
 
     # go.Figure(data=go.Heatmap(z=audio)).show()

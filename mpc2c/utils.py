@@ -3,12 +3,16 @@ import numpy as np
 import pretty_midi as pm  # type: ignore
 
 
-def amp2db(arr):
+def amp2db(arr, clean=True):
     """
     Convert an array to -dBFS
 
-    You need to take care that all values are > 0  (usually, > 1e-31 or 1e-15)
+    If `clean` is False, you need to take care that all values are > 0
+    (usually, > 1e-31 or 1e-15), otherwise, `arr` is normalized to sum and clipped
     """
+    if clean:
+        arr /= 1e4 * arr.sum()
+        arr[arr < 1e-15] = 1e-15
     return -20 * np.log10(arr) / np.log10(np.finfo('float64').max)
 
 
@@ -151,14 +155,10 @@ def midipath2mat(path):
 
 
 def make_pianoroll(mat,
+                   basis_frames,
                    res=0.25,
                    velocities=True,
                    only_onsets=False,
-                   only_offsets=False,
-                   basis=1,
-                   attack=1,
-                   release=1,
-                   basis_l=1,
                    eps=1e-15,
                    eps_range=0):
     """
@@ -168,16 +168,24 @@ def make_pianoroll(mat,
     turn this off use `velocities=False`
 
     if `only_onsets` is true, only the attack is used and the other part of the
-    notes are discarded (useful for aligning with amt). Similarly
-    `only_offsets`; however, `only_offsets` doesn't take into account the
-    release (which comes after the onset).
+    notes are discarded (useful for aligning with amt).
 
-    `basis` is the number of basis for the nmf, representing the internal note
-    state. Additional basis are `attack` and `release`. `attack` is the attack
-    duration, `release` is the release duration (after the note offset); all
-    other basis will be long `basis_l` columns except the last basis before the
-    offset that will last till the end if needed; after that, the release basis
-    is added.
+    `basis_frames` is a dictionary similar to the following:
+        #: how many basis use in total (except the first and release)
+        BASIS_FRAMES = {
+            #: the number of basis for the attack
+            'attack_b': 1,
+            #: the number of basis for the release
+            'release_b': 15,
+            #: the number of basis for the inner
+            'inner_b': 14,
+            #: the number of frames for the attack basis
+            'attack_f': 1,
+            #: the number of frames for the release basis
+            'release_f': 1,
+            #: the number of frames for the inner basis
+            'inner_f': 2,
+        }
 
     `eps_range` defines how many columns each note is enlarged before onset and
     after release, while `eps` defines the value to use for enlargement
@@ -188,9 +196,34 @@ def make_pianoroll(mat,
 
     L = int(np.max(mat[:, 2]) / res) + 1
 
-    pr = np.zeros((128, basis + 2, L))
+    attack_b, release_b, inner_b =\
+        basis_frames['attack_b'], basis_frames['release_b'], basis_frames['inner_b']
+    attack_f, release_f, inner_f =\
+        basis_frames['attack_f'], basis_frames['release_f'], basis_frames['inner_f']
+    nbasis = attack_b + release_b + inner_b
+
+    pr = np.zeros((128, nbasis, L))
 
     eps_range = int(eps_range / res)
+
+    def fill_base(pitch, start, end, first_base, fpb, nbasis):
+        """
+        Fill a `nbases` from `first_base` for pitch `pitch` from frame `start`
+        to `end`, using `fpb` frames per base.
+        If `end` would be before the number of basis specified, the procedure
+        is interrupted and the note if filled up to the last frame.
+        Returns the frst non-filled frame
+        """
+        _end = min(start + nbasis * fpb, end)
+        for b in range(first_base, first_base + nbasis):
+            if start + fpb > _end:
+                if start < _end:
+                    pr[pitch, b, start:_end] = vel
+                    return _end
+                break
+            pr[pitch, b, start:start + fpb] = vel
+            start += fpb
+        return start
 
     for i in range(mat.shape[0]):
         note = mat[i]
@@ -203,53 +236,36 @@ def make_pianoroll(mat,
         else:
             vel = 1
 
-        if only_offsets:
-            pr[pitch, basis, end - 1] = vel
-            continue
-
-        # the attack basis
-        pr[pitch, 0, start:start + attack] = vel
-        if only_onsets:
-            continue
-
         # the eps_range before onset
         if eps_range > 0:
             start_eps = max(0, start - eps_range)
             pr[pitch, 0, start_eps:start] = eps
 
-        start += attack
+        # the attack basis
+        start = fill_base(pitch, start, end, 0, attack_f, attack_b)
+        if only_onsets:
+            continue
 
-        # all the other basis
-        END = False
-        offset = start
-        for b in range(basis - 1):
-            for k in range(basis_l):
-                offset = start + b * basis_l + k
-                if offset < end:
-                    pr[pitch, b + 1, offset] = vel
-                else:
-                    END = True
-                    break
-            if END:
-                break
+        # the inner basis
+        start = fill_base(pitch, start, end, attack_b, inner_f, inner_b)
 
-        # the offset part
-        if offset < end:
-            pr[pitch, basis, offset:end] = vel
+        # other basis until the offset
+        while start < end:
+            start = fill_base(pitch, start, end, attack_b + inner_b - 1, 1, 1)
 
         # the release
-        if release > 0:
-            end_release = min(L, end + release)
-            pr[pitch, basis + 1, end:end_release] = vel
+        release_end = min(end + release_f * release_b, pr.shape[1])
+        fill_base(pitch, end, release_end, attack_b + inner_b, release_f, release_b)
+
         # the eps range after the offset and after release
         if eps_range > 0:
             end_eps = min(L, end + eps_range)
-            pr[pitch, basis, end:end_eps] = eps
-            end_eps = min(L, end_release + eps_range)
-            pr[pitch, basis + 1, end_release:end_eps] = eps
+            pr[pitch, attack_b + inner_b - 1, end:end_eps] = eps
+            end_eps = min(L, release_end + eps_range)
+            pr[pitch, nbasis - 1, release_end:end_eps] = eps
 
     # collapse pitch and basis dimension
-    pr = pr.reshape((128 * (basis + 2), -1), order='C')
+    pr = pr.reshape((128 * nbasis, -1), order='C')
     return pr
 
 
