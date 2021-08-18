@@ -9,7 +9,6 @@ from torch.utils.data import DataLoader, Sampler  # type: ignore
 from . import nmf
 from . import settings as s
 from . import utils
-from .asmd_resynth import get_contexts
 from .asmd.asmd import asmd, dataset_utils
 from .mytorchutils import DatasetDump
 
@@ -62,6 +61,7 @@ class AEDataset(DatasetDump):
         same_target = choice(same.inverted[y])
 
         return {
+            "c": c,
             "x": x,
             "y": y,
             "ae_same": same.get_input(*same_target),
@@ -184,7 +184,7 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
             f"mode {mode} not known: available are `velocity` and `pedaling`")
 
     dataset = AEDataset(
-        list(get_contexts(s.CARLA_PROJ).keys()),
+        contexts,
         asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
                      metadataset_path=s.METADATASET_PATH), data_path, dumped)
 
@@ -193,7 +193,7 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
 
     # select the groups, subsample dataset, and shuffle it
     dataset = dataset.apply_func(dataset_utils.filter, groups=groups)
-    dataset = dataset.apply_func( # type: ignore
+    dataset = dataset.apply_func(  # type: ignore
         lambda *x, **y: dataset_utils.choice(*x, **y)[0],  # type: ignore
         p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
         random_state=1992)

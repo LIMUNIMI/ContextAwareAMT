@@ -201,7 +201,7 @@ def main():
                            copy_checkpoint=fname)
 
     if args.redump:
-        contexts = get_contexts(s.CARLA_PROJ)
+        contexts = list(get_contexts(s.CARLA_PROJ).keys())
         for split in ['train', 'validation', 'test']:
             data_management.get_loader(
                 split,

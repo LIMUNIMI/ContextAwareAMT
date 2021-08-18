@@ -107,7 +107,7 @@ PED_HYPERPARAMS = {
     "kernel_0": 4,
     "middle_activation": nn.Tanh  # or AbsLayer?
 }
-VEL_BATCH_SIZE = 5
+VEL_BATCH_SIZE = 100
 PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8
@@ -119,14 +119,6 @@ WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1
 LR_K = 5
-
-# Transfer-learning
-PED_STEP = [0, 3, 6]
-VEL_STEP = [0, 6, 9]
-TRANSFER_WD = 0
-TRANSFER_DROPOUT = 0.1
-TRANSFER_VEL_BATCH_SIZE = 50
-TRANSFER_LR_K = 0.1
 
 # SKOPT
 PED_SKSPACE = [
@@ -143,7 +135,7 @@ PED_SKSPACE = [
 VEL_SKSPACE = PED_SKSPACE + [space.Integer(3, 10, name='kernel_1')]
 SKITERATIONS = (0, 40)
 PLOT_GRAPHS = True
-COMPLEXITY_PENALIZER = 1e-6
+COMPLEXITY_PENALIZER = 0 # 1e-6
 
 #: If compiling code with cython in pure-python mode
 BUILD = False

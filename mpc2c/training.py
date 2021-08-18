@@ -5,11 +5,11 @@ from copy import deepcopy
 from pathlib import Path
 from pprint import pprint
 
-import torch.nn.functional as F
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from pytorch_lightning.loggers import MLFlowLogger
+import torch.nn.functional as F  # type: ignore
+from pytorch_lightning import Trainer  # type: ignore
+from pytorch_lightning.callbacks import ModelCheckpoint  # type: ignore
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping  # type: ignore
+from pytorch_lightning.loggers import MLFlowLogger  # type: ignore
 
 from . import data_management, feature_extraction
 from . import settings as s
@@ -48,8 +48,12 @@ def model_test(model_build_func, test_sample):
     return constraint
 
 
+def reconstruction_loss(pred, same, diff):
+    return F.l1_loss(pred, same) - F.l1_loss(pred, diff)
+
+
 def build_autoencoder(hpar, dropout):
-    m = feature_extraction.AutoEncoder(loss_fn=F.l1_loss,
+    m = feature_extraction.AutoEncoder(loss_fn=reconstruction_loss,
                                        input_size=(s.BINS, s.MINI_SPEC_SIZE),
                                        max_layers=s.MAX_LAYERS,
                                        dropout=dropout,
@@ -80,6 +84,57 @@ def build_performer_model(hpar, avg_pred):
     return m
 
 
+def my_train(mode,
+             copy_checkpoint,
+             logger,
+             model,
+             trainloader,
+             validloader,
+             ae_train=True,
+             perfm_train=True):
+    """
+    Creates callbacks, train and freeze the part that raised an early-stop.
+    Return the best loss of that one and 0 for the other.
+    """
+    checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}",
+                                       filename='{epoch}-{ae_loss:.2f}',
+                                       monitor='perfm_loss',
+                                       save_top_k=1,
+                                       mode='min',
+                                       save_weights_only=True)
+    callbacks = [checkpoint_saver]
+    if ae_train:
+        ae_stopper = EarlyStopping(monitor='ae_val_loss',
+                                   min_delta=s.EARLY_RANGE,
+                                   patience=s.EARLY_STOP)
+        callbacks.append(ae_stopper)
+    if perfm_train:
+        perfm_stopper = EarlyStopping(monitor='perfm_val_loss',
+                                      min_delta=s.EARLY_RANGE,
+                                      patience=s.EARLY_STOP)
+        callbacks.append(perfm_stopper)
+    if copy_checkpoint:
+        callbacks.append(best_checkpoint_saver(copy_checkpoint))
+
+    trainer = Trainer(callbacks=callbacks,
+                      precision=s.PRECISION,
+                      max_epochs=s.EPOCHS,
+                      logger=logger,
+                      gpus=s.GPUS)
+    trainer.fit(model, trainloader, validloader)
+    if ae_stopper.stopped_epoch > 0:  # type: ignore
+        model.autoencoder.freeze()
+        ae_loss = ae_stopper.best_score  # type: ignore
+    else:
+        ae_loss = 0
+    if perfm_stopper.stopped_epoch > 0:  # type: ignore
+        model.performer.freeze()
+        perfm_loss = perfm_stopper.best_score  # type: ignore
+    else:
+        perfm_loss = 0
+    return ae_loss, perfm_loss
+
+
 def train(hpar, mode, copy_checkpoint=''):
     """
     1. Builds a model given `hpar` and `mode`
@@ -93,10 +148,9 @@ def train(hpar, mode, copy_checkpoint=''):
                           tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
 
     # loaders
-    trainloader = data_management.get_loader(
-            ['train'], False, get_contexts(s.CARLA_PROJ))
-    validloader = data_management.get_loader(
-            ['validation'], False, get_contexts(s.CARLA_PROJ))
+    contexts = list(get_contexts(s.CARLA_PROJ).keys())
+    trainloader = data_management.get_loader(['train'], False, contexts)
+    validloader = data_management.get_loader(['validation'], False, contexts)
 
     # building model
     if mode == 'velocity':
@@ -105,8 +159,11 @@ def train(hpar, mode, copy_checkpoint=''):
     elif mode == 'pedaling':
         ae_hpar = get_pedaling_hpar(hpar)
         axes = [-1]
+    else:
+        raise RuntimeError(f"mode {mode} not known!")
 
     # dummy model (baseline)
+    # TODO: check the following function!
     dummy_avg = compute_average(trainloader.dataset,
                                 *axes,
                                 n_jobs=-1,
@@ -124,12 +181,8 @@ def train(hpar, mode, copy_checkpoint=''):
     # lr = lr_k / len(trainloader)
     lr = 1
 
-    models = [
-        feature_extraction.EncoderDecoderPerformer(autoencoder,
-                                                   deepcopy(performer), lr,
-                                                   s.WD)
-        for i in range(len(loaders))
-    ]
+    model = feature_extraction.EncoderDecoderPerformer(autoencoder, performer,
+                                                       contexts, lr, s.WD)
 
     # logging initial stuffs
     logger.log_metrics({
@@ -139,48 +192,30 @@ def train(hpar, mode, copy_checkpoint=''):
     })
 
     # training
-    # TODO: monitored loss should be something else...
     # this loss is also the same used for hyper-parameters tuning
-    early_stopper = EarlyStopping(monitor='perfm_loss',
-                                  min_delta=s.EARLY_RANGE,
-                                  patience=s.EARLY_STOP)
+    ae_loss, perfm_loss = my_train(mode, copy_checkpoint, logger, model,
+                                   trainloader, validloader)
+    # if training was stopped by `early-stopping`, freeze that part and finish
+    # to train the other one
+    if ae_loss != 0 or perfm_loss != 0:
+        _ae_loss, _perfm_loss = my_train(mode,
+                                       copy_checkpoint,
+                                       logger,
+                                       model,
+                                       trainloader,
+                                       validloader,
+                                       ae_train=ae_loss == 0,
+                                       perfm_train=perfm_loss == 0)
+        ae_loss = max(ae_loss, _ae_loss)
+        perfm_loss = max(perfm_loss, _perfm_loss)
 
-    checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}",
-                                       filename='{epoch}-{ae_loss:.2f}',
-                                       monitor='perfm_loss',
-                                       save_top_k=1,
-                                       mode='min',
-                                       save_weights_only=True)
-    callbacks = [early_stopper, checkpoint_saver]
-    if copy_checkpoint:
-        callbacks.append(best_checkpoint_saver(copy_checkpoint))
-
-    trainer = Trainer(callbacks=callbacks,
-                      precision=s.PRECISION,
-                      max_epochs=s.EPOCHS,
-                      logger=logger,
-                      gpus=s.GPUS)
-    my_train(trainer, models, loaders)
-
-    complexity_loss = count_params(models[0]) * s.COMPLEXITY_PENALIZER
-    loss = early_stopper.best_score + complexity_loss
+    complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
+    loss = (ae_loss + perfm_loss) * complexity_loss
     logger.log_metrics({
-        "best_validation_loss": float(early_stopper.best_score),
+        "best_ae_loss": float(ae_loss),
+        "best_perfm_loss": float(perfm_loss),
         "total_loss": float(loss)
     })
 
+    # this is the loss used by hyper-parameters optimization
     return loss
-
-
-def my_train(trainer, models, loaders):
-
-    L = len(models)
-    for epoch in range(s.EPOCHS):
-
-        # TODO: check that it runs this function at each loop and that logging
-        # works correctly
-        __import__('ipdb').set_trace()
-        trainer.fit(models[epoch % L], *loaders[epoch % L], max_epochs=1)
-        if trainer.should_stop:
-            # early stop...
-            break

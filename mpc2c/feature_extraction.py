@@ -1,6 +1,7 @@
 import math
 import time
 from typing import List, Any
+from copy import copy
 
 import plotly.express as px
 import torch  # type: ignore
@@ -145,7 +146,7 @@ class Decoder(nn.Module):
 
 
 class AutoEncoder(LightningModule):
-    def __init__(self, loss_fn, *args):
+    def __init__(self, loss_fn, **kwargs):
         """
         encoder-decoder module
 
@@ -156,7 +157,7 @@ class AutoEncoder(LightningModule):
         """
 
         super().__init__()
-        self.encoder = Encoder(*args)
+        self.encoder = Encoder(**kwargs)
         self.decoder = Decoder(self.encoder)
         self.loss_fn = loss_fn
 
@@ -245,27 +246,31 @@ class EncoderDecoderPerformer(LightningModule):
     An iterative transfer-learning LightningModule for
     autoencoder-performer architecture
     """
-    def __init__(self, autoencoder, performer, lr=1, wd=0):
+    def __init__(self, autoencoder, performer, contexts, lr=1, wd=0):
         super().__init__()
         self.autoencoder = autoencoder
-        self.perfomer = performer
+        self.perfomers = {c: copy(performer) for c in contexts}
         self.lr = lr
         self.wd = wd
+        self.active = 0 # 0 -> both, 1 -> autoencoder only, 2 -> performers only
 
     def training_step(self, batch, batch_idx):
 
         ae_out = self.autoencoder.training_step(batch, batch_idx)
-        self.autoencoder.freeze()
-        perfm_out = self.performer.training_step(
+        if self.active < 2:
+            self.autoencoder.freeze()
+        perfm_out = self.performers[batch['c']].training_step(
             {
                 'x': ae_out['latent'],
                 'y': batch['y']
             }, batch_idx)
-        self.autoencoder.unfreeze()
+        if self.active < 2:
+            self.autoencoder.unfreeze()
 
         self.losslog('ae_train_loss', ae_out['loss'])
         self.losslog('perfm_train_loss', perfm_out['loss'])
         return {
+            'loss': ae_out['loss'] + perfm_out['loss'],
             'ae_train_loss': ae_out['loss'],
             'perfm_train_loss': perfm_out['loss'],
         }
@@ -273,7 +278,7 @@ class EncoderDecoderPerformer(LightningModule):
     def validation_step(self, batch, batch_idx):
 
         ae_out = self.autoencoder.validation_step(batch, batch_idx)
-        perfm_out = self.performer.validation_step(
+        perfm_out = self.performers[batch['c']].validation_step(
             {
                 'x': ae_out['latent'],
                 'y': batch['y']
@@ -292,6 +297,7 @@ class EncoderDecoderPerformer(LightningModule):
         self.losslog('perfm_val_loss', perfm_out['loss'])
         self.losslog('dummy_loss', perfm_out['dummy_loss'])
         return {
+            'loss': ae_out['loss'] + perfm_out['loss'],
             'ae_val_loss': ae_out['loss'],
             'perfm_val_loss': perfm_out['loss'],
             'dummy_loss': perfm_out['dummy_loss']
