@@ -45,7 +45,7 @@ class Encoder(nn.Module):
             * dilation : tuple[int]
             * lstm_hidden_size: int [x in 2^x]
             * lstm_layers: int
-            * middle_features: int [x in k*(2^x)]
+            * encoder_features: int [x in k*(2^x)]
             * middle_activation: int
             * output_features: int [x in k*2^x]
 
@@ -124,8 +124,8 @@ class Decoder(nn.Module):
         self.stack = nn.Sequential(*stack)
 
         # building inverse LSTM
-        if hasattr('lstm', encoder):
-            self.lstm = nn.LSTM(encoder.lstm.hidden_features,
+        if hasattr(encoder, 'lstm'):
+            self.lstm = nn.LSTM(encoder.lstm.hidden_size,
                                 encoder.lstm.input_size,
                                 encoder.lstm.num_layers,
                                 batch_first=True)

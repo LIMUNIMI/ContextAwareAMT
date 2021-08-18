@@ -129,12 +129,17 @@ def main():
 
     if args.pedaling:
         mode = 'pedaling'
+        hpar = s.PED_HYPERPARAMS
     elif args.velocity:
         mode = 'velocity'
+        hpar = s.VEL_HYPERPARAMS
 
     nmf_params = load_nmf_params()
     if args.skopt:
         s.PLOT_LOSSES = False
+
+        def objective(x):
+            return training.train(x, mode, generic=args.generic)
 
         if args.pedaling:
             s.DATASET_LEN = 0.1
@@ -142,9 +147,6 @@ def main():
             space_constraint = training.model_test(
                 training.build_pedaling_model, torch.rand(1, s.BINS, 100))
             checkpoint_path = "ped_skopt.pt"
-
-            def objective(x):
-                return training.skopt_objective(x, 'pedaling')
 
         elif args.velocity:
             s.DATASET_LEN = 0.03
@@ -154,9 +156,6 @@ def main():
                 torch.rand(1, s.BINS, s.MINI_SPEC_SIZE))
             checkpoint_path = "vel_skopt.pt"
 
-            def objective(x):
-                return training.skopt_objective(x, 'velocity')
-
         hyperopt(space,
                  checkpoint_path,
                  s.SKITERATIONS,
@@ -165,33 +164,12 @@ def main():
                  plot_graphs=True)
 
     if args.train:
-        if args.pedaling:
-            hpar = s.PED_HYPERPARAMS
-            if args.checkpoint:
-                steps = s.PED_STEP
-            else:
-                steps = [None]
 
-        elif args.velocity:
-            if args.checkpoint:
-                # each step is a different size of transferred/freezed layers
-                steps = s.VEL_STEP
-            else:
-                # in this case the steps will only be used for the filename
-                steps = [None]
-
-        for step in steps:
-            print("----------------")
-            print(f"Training by freezing/transferring {step} layers")
-            fname = 'models/' + args.context + '_' + mode[:3] + '_' + str(
-                step) + '.pt'
-            training.train(hpar,
-                           mode,
-                           step,
-                           context=args.context,
-                           state_dict=checkpoint,
-                           copy_checkpoint=fname,
-                           indipendence=args.generic)
+        print("----------------")
+        training.train(hpar,
+                       mode,
+                       copy_checkpoint=Path("models") / f"{mode}.pt",
+                       generic=args.generic)
 
     if args.redump:
         contexts = list(get_contexts(s.CARLA_PROJ).keys())

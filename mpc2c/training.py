@@ -74,15 +74,15 @@ def get_pedaling_hpar(hpar):
 
 
 def get_velocity_hpar(hpar):
-    return (1, (hpar['kernel_0'], 1), (1, 1), (1, 1), hpar['lstm_hidden_size'],
+    return (1, (hpar['kernel_0'], hpar['kernel_1']), (1, 1), (1, 1), hpar['lstm_hidden_size'],
             hpar['lstm_layers'], hpar['encoder_features'],
             hpar['middle_activation'], hpar['latent_features'])
 
 
 def build_performer_model(hpar, avg_pred):
     m = feature_extraction.Performer(
-        (hpar['performer_layers'], 1, hpar['latent_features'],
-         hpar['performer_features'], hpar['middle_activation']), F.l1_loss,
+        (hpar['performer_features'], hpar['performer_layers'],
+         hpar['latent_features'], hpar['middle_activation'], 1), F.l1_loss,
         avg_pred)
 
     return m
@@ -153,8 +153,8 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
 
     # loaders
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
-    trainloader = data_management.get_loader(['train'], False, contexts)
-    validloader = data_management.get_loader(['validation'], False, contexts)
+    trainloader = data_management.get_loader(['train'], False, contexts, mode)
+    validloader = data_management.get_loader(['validation'], False, contexts, mode)
 
     # building model
     if mode == 'velocity':
@@ -168,10 +168,11 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
 
     # dummy model (baseline)
     # TODO: check the following function!
-    dummy_avg = compute_average(trainloader.dataset,
-                                *axes,
-                                n_jobs=-1,
-                                backend='threading').to(s.DEVICE)
+    # dummy_avg = compute_average(trainloader.dataset,
+    #                             *axes,
+    #                             n_jobs=-1,
+    #                             backend='threading').to(s.DEVICE)
+    dummy_avg = 0.5
 
     autoencoder = build_autoencoder(ae_hpar, s.TRAIN_DROPOUT, generic)
     performer = build_performer_model(hpar, dummy_avg)

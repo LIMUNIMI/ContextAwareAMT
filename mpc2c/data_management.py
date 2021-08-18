@@ -32,6 +32,8 @@ class AEDataset(DatasetDump):
 
         raise `StopIteration` when finished
         """
+        __import__('ipdb').set_trace()
+        # TODO: get_context and comlement modify the other datasets too
         # computing:
         # 1. dataset with the same context
         same = self.get_context(c)
@@ -69,10 +71,10 @@ class AEDataset(DatasetDump):
         }
 
     def get_context(self, c: str):
-        return self.apply_func(dataset_utils.filter, self, groups=[c])
+        return self.apply_func(dataset_utils.filter, groups=[c])
 
     def complement(self):
-        return self._apply_func(dataset_utils.complement, self)
+        return self.apply_func(dataset_utils.complement)
 
 
 class AEBatchSampler(Sampler):

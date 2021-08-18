@@ -95,11 +95,15 @@ EPOCHS = 500
 VEL_HYPERPARAMS = {
     'lstm_layers': 1,
     'lstm_hidden_size': 7,
-    'middle_features': 0,
-    "kernel_0": 3,
-    "kernel_1": 6,
-    "middle_activation": nn.ReLU
+    'encoder_features': 0,
+    "kernel_0": 5,
+    "kernel_1": 5,
+    "middle_activation": nn.ReLU,
+    'latent_features': 0,
+    'performer_features': 7,
+    'performer_layers': 3
 }
+# TODO: redo pedaling
 PED_HYPERPARAMS = {
     'lstm_layers': 1,
     'lstm_hidden_size': 5,
@@ -121,6 +125,7 @@ DATASET_LEN = 1
 LR_K = 5
 
 # SKOPT
+# TODO: SKSPACE!
 PED_SKSPACE = [
     space.Integer(0, 4, name='lstm_layers'),
     space.Integer(0, 7, name='lstm_hidden_size'),
