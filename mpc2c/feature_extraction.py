@@ -1,10 +1,11 @@
 import math
 import time
+from typing import List, Any
 
 import plotly.express as px
-import torch
-from pytorch_lightning import LightningModule
-from torch import nn
+import torch  # type: ignore
+from torch import nn  # type: ignore
+from pytorch_lightning import LightningModule  # type: ignore
 
 
 def conv_output_size(size, dilation, kernel, stride):
@@ -147,6 +148,11 @@ class AutoEncoder(LightningModule):
     def __init__(self, loss_fn, *args):
         """
         encoder-decoder module
+
+        the loss must accept 3 values: 
+            * prediction
+            * same target
+            * different target
         """
 
         super().__init__()
@@ -156,19 +162,17 @@ class AutoEncoder(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        input, target = batch
-        latent = self.encoder(input)
+        latent = self.encoder(batch['x'])
         out = self.decoder(latent)
-        loss = self.loss_fn(out, target)
+        loss = self.loss_fn(out, batch['ae_same'], batch['ae_diff'])
 
         return {'loss': loss, 'latent': latent}
 
     def validation_step(self, batch, batch_idx):
 
-        input, target = batch
-        latent = self.encoder(input)
+        latent = self.encoder(batch['x'])
         out = self.decoder(latent)
-        loss = self.loss_fn(out, target)
+        loss = self.loss_fn(out, batch['ae_same'], batch['ae_diff'])
 
         return {'loss': loss, 'latent': latent, 'out': out}
 
@@ -222,18 +226,16 @@ class Performer(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        input, target = batch
-        out = self.forward(input)
-        loss = self.loss_fn(out, target)
+        out = self.forward(batch['x'])
+        loss = self.loss_fn(out, batch['y'])
 
         return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):
 
-        input, target = batch
-        out = self.forward(input)
-        loss = self.loss_fn(out, target)
-        dummy_loss = self.loss_fn(self.dummy_avg, target)
+        out = self.forward(batch['x'])
+        loss = self.loss_fn(out, batch['x'])
+        dummy_loss = self.loss_fn(self.dummy_avg, batch['x'])
 
         return {'loss': loss, 'dummy_loss': dummy_loss}
 
@@ -251,12 +253,14 @@ class EncoderDecoderPerformer(LightningModule):
         self.wd = wd
 
     def training_step(self, batch, batch_idx):
-        input, targets = batch
-        ae_target, perfm_target = targets
 
-        ae_out = self.autoencoder.training_step(input)
+        ae_out = self.autoencoder.training_step(batch, batch_idx)
         self.autoencoder.freeze()
-        perfm_out = self.performer.training_step(ae_out['latent'])
+        perfm_out = self.performer.training_step(
+            {
+                'x': ae_out['latent'],
+                'y': batch['y']
+            }, batch_idx)
         self.autoencoder.unfreeze()
 
         self.losslog('ae_train_loss', ae_out['loss'])
@@ -267,19 +271,21 @@ class EncoderDecoderPerformer(LightningModule):
         }
 
     def validation_step(self, batch, batch_idx):
-        input, targets = batch
-        ae_target, perfm_target = targets
 
-        ae_out = self.autoencoder.validation_step(input)
-        perfm_out = self.performer.validation_step(ae_out['latent'])
+        ae_out = self.autoencoder.validation_step(batch, batch_idx)
+        perfm_out = self.performer.validation_step(
+            {
+                'x': ae_out['latent'],
+                'y': batch['y']
+            }, batch_idx)
 
         # log an image of reconstruction
         if batch_idx == 0:
             self.logger.experiment.log_figure(
-                px.heatmap(ae_out['out'][0].cpu().numpy()),
+                px.heatmap(ae_out['out'][0].cpu().numpy()),  # type: ignore
                 'out0' + str(time.time()) + '.html')
             self.logger.experiment.log_figure(
-                px.heatmap(input[0].cpu().numpy()),
+                px.heatmap(batch['x'][0].cpu().numpy()),  # type: ignore
                 'inp0' + str(time.time()) + '.html')
 
         self.losslog('ae_val_loss', ae_out['loss'])
@@ -300,11 +306,13 @@ class EncoderDecoderPerformer(LightningModule):
                  logger=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adadelta(self.parameters(), lr=self.lr, weight_decay=self.wd)
+        return torch.optim.Adadelta(self.parameters(),
+                                    lr=self.lr,
+                                    weight_decay=self.wd)
 
 
 def make_stack(output_features, max_layers, conv_in_size, middle_features,
-               middle_activation):
+               middle_activation, dilation, kernel_size, stride):
     """
     Returns a convolutional stack which accepts `conv_in_size` and outputs a
     `output_features x 1 x 1` tensor
@@ -336,6 +344,8 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
                 s = (stride[0], 1)
                 d = (dilation[0], 1)
                 next_conv_in_size = (next_conv_in_size[0], conv_in_size[1])
+            else:
+                k, s, d = kernel_size, stride, dilation
 
             if next_conv_in_size[0] == 1 and next_conv_in_size[1] == 1:
                 # if this is the last layer
@@ -357,18 +367,17 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
                 if conv_out_features > 1 else nn.Identity(),
                 middle_activation()
             ]
-            return True, next_conv_in_size, module
+            return next_conv_in_size, module
         else:
-            return False, conv_in_size, None
+            return conv_in_size, None
 
     # start adding blocks until we can
-    stack = []
+    stack: List[Any] = []
     input_features = output_features
-    added = True
-    for i in range(max_layers):
-        added, conv_in_size, new_module = add_module(input_features,
-                                                     conv_in_size)
-        if not added:
+    for _ in range(max_layers):
+        conv_in_size, new_module = add_module(input_features, conv_in_size,
+                                              dilation, kernel_size, stride)
+        if new_module is None:
             break
         input_features = middle_features
         stack += new_module
@@ -414,7 +423,6 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
 
 
 class AbsLayer(nn.Module):
-
     def __init__(self):
         super().__init__()
 
