@@ -43,13 +43,13 @@ RETUNING = False
 
 # NMF
 #: epsilon value used inside the nmf to prevent divisons by 0
-EPS = 1.0**-52
+EPS = 1e-32
 #: width of mini spectrograms: the number of frames after the onset; if the
 #: note lasts longer than this value, it is trimmed, if it lasts less it is
 #: padded with `PADDING_VALUE`
 MINI_SPEC_SIZE = 30
 #: value used for padding mini specs when their width is < MINI_SPEC_SIZE
-PADDING_VALUE = 0
+PADDING_VALUE = 1
 #: cost function used in the NMF
 NMF_COST_FUNC = 'EucDist'
 EPS_RANGE = 0
@@ -64,7 +64,7 @@ MAX_VEL = 120
 #: different note durantion
 NOTE_DURATION = [0.1, 1.5]
 #: silence between the notes
-NOTE_SILENCE = [0, 1, -0.04]
+NOTE_SILENCE = [0.5, 1.5]
 #: a carla project to synthesize the scale
 SCALE_PROJ = 'scale.carxp'
 #: how many basis use in total (except the first and release)

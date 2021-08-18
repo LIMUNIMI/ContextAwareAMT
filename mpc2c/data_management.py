@@ -80,7 +80,7 @@ class AEBatchSampler(Sampler):
         """
         Makes batches so that each one has a different context
         """
-        super().__init__()
+        super().__init__(ae_dataset)
         self.batch_size = batch_size
         self.ae_dataset = ae_dataset
         self.contexts = cycle(ae_dataset.contexts)
@@ -111,14 +111,15 @@ def ae_collate(batch):
     pass
 
 
-def transform_func(arr: es.array):
+def transform_func(dbarr: es.array):
     """
     Takes a 2d array in float32 and computes the first 13 MFCC, on each column
     resulting in a new 2darray with 13 columns
     """
     out = []
-    for col in range(arr.shape[1]):
-        out.append(s.MFCC(utils.db2amp(arr[:, col])))
+    for col in range(dbarr.shape[1]):
+        amp = utils.db2amp(dbarr[:, col])
+        out.append(s.MFCC(amp / (amp.sum() + s.EPS) * amp.size))
 
     return es.array(out).T
 

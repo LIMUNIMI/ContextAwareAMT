@@ -171,7 +171,7 @@ def make_pianoroll(mat,
     notes are discarded (useful for aligning with amt).
 
     `basis_frames` is a dictionary similar to the following:
-        #: how many basis use in total (except the first and release)
+
         BASIS_FRAMES = {
             #: the number of basis for the attack
             'attack_b': 1,
@@ -209,21 +209,24 @@ def make_pianoroll(mat,
     def fill_base(pitch, start, end, first_base, fpb, nbasis):
         """
         Fill a `nbases` from `first_base` for pitch `pitch` from frame `start`
-        to `end`, using `fpb` frames per base.
+        to `end` excluded, using `fpb` frames per base.
         If `end` would be before the number of basis specified, the procedure
-        is interrupted and the note if filled up to the last frame.
-        Returns the frst non-filled frame
+        is interrupted and the note is filled up to the last frame.
+        Returns the first non-filled frame
         """
         _end = min(start + nbasis * fpb, end)
         for b in range(first_base, first_base + nbasis):
-            if start + fpb > _end:
+            if start + fpb >= _end:
                 if start < _end:
                     pr[pitch, b, start:_end] = vel
-                    return _end
+                # if start >= end, then start == _end (start > _end is impossible)
                 break
-            pr[pitch, b, start:start + fpb] = vel
-            start += fpb
-        return start
+            else:
+                pr[pitch, b, start:start + fpb] = vel
+                start += fpb
+        # if the for loopended without reaching `break`, then
+        # start == start + fpb * nbasis == _end
+        return _end
 
     for i in range(mat.shape[0]):
         note = mat[i]
@@ -254,7 +257,7 @@ def make_pianoroll(mat,
             start = fill_base(pitch, start, end, attack_b + inner_b - 1, 1, 1)
 
         # the release
-        release_end = min(end + release_f * release_b, pr.shape[1])
+        release_end = min(end + release_f * release_b, pr.shape[2])
         fill_base(pitch, end, release_end, attack_b + inner_b, release_f, release_b)
 
         # the eps range after the offset and after release

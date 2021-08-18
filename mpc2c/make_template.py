@@ -102,7 +102,7 @@ def make_template(scale_path: List[str],
             base = first_base + i // fpb
             template[:, pitch, base] += audio[:, start + i]
             counter[pitch, base] += 1
-        return end
+        return _end
 
     print("Computing template")
     ttt = time.time()
@@ -176,7 +176,7 @@ def main():
             mlflow.log_figure(fig, str(int(time.time())) + '.html')
     except Exception:
         import visdom  # type: ignore
-        visdom.Visdom().plotlyplot(fig)
+        visdom.Visdom().heatmap(template[0])
 
     # saving template
     pickle.dump(template, open(s.TEMPLATE_PATH, 'wb'))
