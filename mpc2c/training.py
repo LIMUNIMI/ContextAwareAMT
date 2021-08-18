@@ -52,8 +52,12 @@ def reconstruction_loss(pred, same, diff):
     return F.l1_loss(pred, same) - F.l1_loss(pred, diff)
 
 
-def build_autoencoder(hpar, dropout):
-    m = feature_extraction.AutoEncoder(loss_fn=reconstruction_loss,
+def build_autoencoder(hpar, dropout, generic=False):
+    if generic:
+        loss_fn = lambda pred, _, diff: F.l1_loss(pred, diff)
+    else:
+        loss_fn = reconstruction_loss
+    m = feature_extraction.AutoEncoder(loss_fn=loss_fn,
                                        input_size=(s.BINS, s.MINI_SPEC_SIZE),
                                        max_layers=s.MAX_LAYERS,
                                        dropout=dropout,
@@ -135,7 +139,7 @@ def my_train(mode,
     return ae_loss, perfm_loss
 
 
-def train(hpar, mode, copy_checkpoint=''):
+def train(hpar, mode, copy_checkpoint='', generic=False):
     """
     1. Builds a model given `hpar` and `mode`
     2. Train the model
@@ -169,7 +173,7 @@ def train(hpar, mode, copy_checkpoint=''):
                                 n_jobs=-1,
                                 backend='threading').to(s.DEVICE)
 
-    autoencoder = build_autoencoder(ae_hpar, s.TRAIN_DROPOUT)
+    autoencoder = build_autoencoder(ae_hpar, s.TRAIN_DROPOUT, generic)
     performer = build_performer_model(hpar, dummy_avg)
 
     print(performer)

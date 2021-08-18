@@ -46,6 +46,12 @@ def parse_args():
                         action="store_true",
                         help="Train a model.")
     parser.add_argument(
+        "-g",
+        "--generic",
+        action="store_true",
+        help="Use generic indipendence instead of specific indipendence")
+
+    parser.add_argument(
         "-sk",
         "--skopt",
         action="store_true",
@@ -83,16 +89,6 @@ def parse_args():
         "Only valid if `--evaluate` is used. Using this option, you can name your models starting with the context on which they were trained (e.g. `pianoteq0_vel.pt`); in this way, one more plot is created, representing the `orig` model compared to the other models on their specific context."
     )
     parser.add_argument(
-        "-i",
-        "--input",
-        action="store",
-        type=str,
-        default=None,
-        nargs=2,
-        help=
-        "Expects two inputs, namely a path to MIDI file and a path to audio file."
-    )
-    parser.add_argument(
         "-cf",
         "--csv-file",
         action="store",
@@ -115,10 +111,6 @@ def load_nmf_params():
 def main():
 
     args = parse_args()
-
-    if args.input:
-        raise NotImplementedError(
-            "Not yet implemented transcription from files")
 
     if args.scale:
         create_template.main()
@@ -198,7 +190,8 @@ def main():
                            step,
                            context=args.context,
                            state_dict=checkpoint,
-                           copy_checkpoint=fname)
+                           copy_checkpoint=fname,
+                           indipendence=args.generic)
 
     if args.redump:
         contexts = list(get_contexts(s.CARLA_PROJ).keys())
