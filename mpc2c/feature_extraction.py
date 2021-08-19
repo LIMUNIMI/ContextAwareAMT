@@ -262,6 +262,7 @@ class EncoderDecoderPerformer(LightningModule):
         ae_out = self.autoencoder.training_step(batch, batch_idx)
         if self.active < 2:
             self.autoencoder.freeze()
+        # TODO: problem: group the batch by context!
         perfm_out = self.performers[batch['c'][0]].training_step(
             {
                 'x': ae_out['latent'],
