@@ -111,7 +111,7 @@ PED_HYPERPARAMS = {
     "kernel_0": 4,
     "middle_activation": nn.Tanh  # or AbsLayer?
 }
-VEL_BATCH_SIZE = 100
+VEL_BATCH_SIZE = 50
 PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8

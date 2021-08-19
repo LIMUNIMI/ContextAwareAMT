@@ -32,35 +32,43 @@ class AEDataset(DatasetDump):
 
         raise `StopIteration` when finished
         """
-        __import__('ipdb').set_trace()
-        # TODO: get_context and comlement modify the other datasets too
         # computing:
         # 1. dataset with the same context
-        same = self.get_context(c)
-        # 2.  dataset with different contexts
-        different = same.complement()  # type: ignore
+        same = self.set_operation(dataset_utils.filter, groups=[c])
+        # 2.  dataset with different contexts (contains data not in this split too)
+        different = same.set_operation(dataset_utils.complement)  # type: ignore
+        # 3.  dataset with different contexts (only in this split)
+        different = self.set_operation(dataset_utils.intersect, different.dataset)  # type: ignore
+        # the part above takes 1 second each (due to the creation of `inverted`
+        # object, totalling 3 seconds)
+
         # find the first sample not used in `same` and in `different`
         # both `same`, `different` and this dataset were filtered from the same
         # dumped dataset, so the `original` index is the same
 
         # looking for the first sample in `same` not used yet (original index)
-        input = -1
-        for s in same.included:  # type: ignore
-            if not self.used[s]:
-                self.used[s] = True
-                input = s
-                break
+        samples_included = np.zeros_like(self.used)
+        for i in np.nonzero(same.included)[0]:
+            k = sum(same.lengths[:i])
+            samples_included[k:k*same.lengths[i]] = True
 
-        if input == -1:
+        not_used = ~self.used # not used samples referred to the whole dataset
+        not_used[~samples_included] = False # removing samples not included
+        if np.all(not_used == False):
             raise StopIteration
 
+        # the first sample not used
+        input = np.argmax(not_used)
+        self.used[input] = True
+        
         x = same.get_input(input)
         y = same.get_target(input)
 
         # take a random sample from `different` with the same label
-        diff_target = choice(different.inverted[y])
+        bin = self.get_bin(y)
+        diff_target = choice(different.inverted[bin])
         # take a random sample from `same` with the same label
-        same_target = choice(same.inverted[y])
+        same_target = choice(same.inverted[bin])
 
         return {
             "c": c,
@@ -69,12 +77,6 @@ class AEDataset(DatasetDump):
             "ae_same": same.get_input(*same_target),
             "ae_diff": different.get_input(*diff_target)
         }
-
-    def get_context(self, c: str):
-        return self.apply_func(dataset_utils.filter, groups=[c])
-
-    def complement(self):
-        return self.apply_func(dataset_utils.complement)
 
 
 class AEBatchSampler(Sampler):
@@ -194,8 +196,8 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
         dataset.dump(process_fn, nmf_params, n_jobs=s.NJOBS, max_nbytes=None)
 
     # select the groups, subsample dataset, and shuffle it
-    dataset = dataset.apply_func(dataset_utils.filter, groups=groups)
-    dataset = dataset.apply_func(  # type: ignore
+    dataset = dataset.set_operation(dataset_utils.filter, groups=groups)
+    dataset = dataset.set_operation(  # type: ignore
         lambda *x, **y: dataset_utils.choice(*x, **y)[0],  # type: ignore
         p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
         random_state=1992)
