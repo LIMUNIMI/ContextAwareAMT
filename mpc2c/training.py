@@ -50,7 +50,7 @@ def model_test(model_build_func, test_sample):
 
 
 def reconstruction_loss(pred, same, diff):
-    return F.l1_loss(pred, same) - F.l1_loss(pred, diff)
+    return max(0, 1 + F.l1_loss(pred, same) - F.l1_loss(pred, diff))
 
 
 def build_autoencoder(hpar, dropout, generic=False):
