@@ -36,13 +36,16 @@ class AEDataset(DatasetDump):
         # 1. dataset with the same context
         same = self.set_operation(dataset_utils.filter, groups=[c])
         # 2.  dataset with different contexts (contains data not in this split too)
-        different = same.set_operation(dataset_utils.complement)  # type: ignore
+        different = same.set_operation(
+            dataset_utils.complement)  # type: ignore
         # 3.  dataset with different contexts (only in this split)
-        different = self.set_operation(dataset_utils.intersect, different.dataset)  # type: ignore
+        different = self.set_operation(dataset_utils.intersect,
+                                       different.dataset)  # type: ignore
         # the part above takes 1 second each (due to the creation of `inverted`
         # object, totalling 3 seconds)
 
         # find the first sample not used in `same` and in `different`
+
         # both `same`, `different` and this dataset were filtered from the same
         # dumped dataset, so the `original` index is the same
 
@@ -50,19 +53,19 @@ class AEDataset(DatasetDump):
         samples_included = np.zeros_like(self.used)
         for i in np.nonzero(same.included)[0]:
             k = sum(same.lengths[:i])
-            samples_included[k:k*same.lengths[i]] = True
+            samples_included[k:k * same.lengths[i]] = True
 
-        not_used = ~self.used # not used samples referred to the whole dataset
-        not_used[~samples_included] = False # removing samples not included
+        not_used = ~self.used  # not used samples referred to the whole dataset
+        not_used[~samples_included] = False  # removing samples not included
         if np.all(not_used == False):
             raise StopIteration
 
         # the first sample not used
         input = np.argmax(not_used)
         self.used[input] = True
-        
-        x = same.get_input(input)
-        y = same.get_target(input)
+
+        x = same.get_input(input, filtered=False)
+        y = same.get_target(input, filtered=False)
 
         # take a random sample from `different` with the same label
         bin = self.get_bin(y)
@@ -77,6 +80,9 @@ class AEDataset(DatasetDump):
             "ae_same": same.get_input(*same_target),
             "ae_diff": different.get_input(*diff_target)
         }
+
+    def __getitem__(self, d):
+        return d
 
 
 class AEBatchSampler(Sampler):
@@ -93,6 +99,9 @@ class AEBatchSampler(Sampler):
         return len(self.ae_dataset) // self.batch_size
 
     def __iter__(self):
+        return self
+
+    def __next__(self):
         c = next(self.contexts)
         batch = []
         for _ in range(self.batch_size):
