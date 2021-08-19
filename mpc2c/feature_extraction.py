@@ -51,10 +51,6 @@ class Encoder(nn.Module):
 
         * `input_size` is a tuple[int] containing the number of rows (features)
         and columns (frames)
-
-        * input shape is 3D: (batches, input_size[0], input_size[1])
-
-        * output shape is (batches, output_features, 1, 1)
         """
 
         super().__init__()
@@ -66,7 +62,8 @@ class Encoder(nn.Module):
             output_features = hyperparams
 
         middle_features = k * (2**middle_features)
-        output_features = k * (2**output_features)
+        self.output_features = k * (2**output_features)
+        self.middle_activation = middle_activation()
 
         if lstm_layers > 0:
             conv_in_size = (lstm_hidden_size, input_size[1])
@@ -79,7 +76,7 @@ class Encoder(nn.Module):
             conv_in_size = input_size
 
         # make the stack
-        self.stack = make_stack(output_features, max_layers, conv_in_size,
+        self.stack = make_stack(self.output_features, max_layers, conv_in_size,
                                 middle_features, middle_activation, dilation,
                                 kernel_size, stride)
 
@@ -94,8 +91,9 @@ class Encoder(nn.Module):
         x = self.dropout(x)
 
         # unsqueeze the channels dimension
-        x = x.unsqueeze(1).expand(x.shape[0], self.output_features, x.shape[1],
-                                  x.shape[2])
+        x = x.unsqueeze(1).expand(x.shape[0], 1, x.shape[1], x.shape[2])
+        # x = x.unsqueeze(1).expand(x.shape[0], self.output_features, x.shape[1],
+        #                           x.shape[2])
         # apply the stack
         x = self.stack(x)
 
@@ -111,16 +109,22 @@ class Decoder(nn.Module):
         super().__init__()
         # building deconvolutional stack
         stack = []
-        for layer in encoder.stack:
+        for layer in encoder.stack[::-1]:
             if type(layer) == nn.Conv2d:
                 stack.append(
                     nn.ConvTranspose2d(layer.out_channels,
                                        layer.in_channels,
                                        kernel_size=layer.kernel_size,
                                        stride=layer.stride,
-                                       bias=layer.bias,
+                                       bias=layer.bias is None,
                                        groups=layer.groups,
                                        dilation=layer.dilation))
+                stack.append(
+                    nn.InstanceNorm2d(layer.in_channels,
+                                      affine=True,
+                                      track_running_stats=True)
+                    if layer.in_channels > 1 else nn.Identity())
+                stack.append(encoder.middle_activation)
         self.stack = nn.Sequential(*stack)
 
         # building inverse LSTM
@@ -131,9 +135,8 @@ class Decoder(nn.Module):
                                 batch_first=True)
 
     def forward(self, x):
-        # TODO: chack shapes
-        __import__('ipdb').set_trace()
         x = self.stack(x)
+        x = x[:, 0, ...]
 
         if hasattr(self, 'lstm'):
             # put the frames before of the features (see nn.LSTM)
@@ -201,7 +204,7 @@ class Performer(LightningModule):
 
         self.avg_pred = avg_pred
         self.loss_fn = loss_fn
-        input_features, num_layers, middle_features,\
+        middle_features, num_layers, input_features,\
             middle_activation, k = hparams
 
         middle_features = k * (2**middle_features)
@@ -211,15 +214,15 @@ class Performer(LightningModule):
         for i in range(num_layers - 2):
             stack.append(nn.Linear(middle_features, middle_features))
             stack.append(
-                nn.InstanceNorm1d(middle_features,
-                                  affine=True,
-                                  track_running_stats=True))
+                nn.BatchNorm1d(middle_features,
+                               affine=True,
+                               track_running_stats=True))
             stack.append(middle_activation())
         self.stack = nn.Sequential(
             nn.Linear(input_features, middle_features),
-            nn.InstanceNorm1d(middle_features,
-                              affine=True,
-                              track_running_stats=True), middle_activation(),
+            nn.BatchNorm1d(middle_features,
+                           affine=True,
+                           track_running_stats=True), middle_activation(),
             *stack, nn.Linear(middle_features, 1), nn.Sigmoid())
 
     def forward(self, x):
@@ -235,8 +238,8 @@ class Performer(LightningModule):
     def validation_step(self, batch, batch_idx):
 
         out = self.forward(batch['x'])
-        loss = self.loss_fn(out, batch['x'])
-        dummy_loss = self.loss_fn(self.dummy_avg, batch['x'])
+        loss = self.loss_fn(out, batch['y'])
+        dummy_loss = self.loss_fn(out, self.avg_pred)
 
         return {'loss': loss, 'dummy_loss': dummy_loss}
 
@@ -249,17 +252,17 @@ class EncoderDecoderPerformer(LightningModule):
     def __init__(self, autoencoder, performer, contexts, lr=1, wd=0):
         super().__init__()
         self.autoencoder = autoencoder
-        self.perfomers = {c: copy(performer) for c in contexts}
+        self.performers = nn.ModuleDict({c: copy(performer) for c in contexts})
         self.lr = lr
         self.wd = wd
-        self.active = 0 # 0 -> both, 1 -> autoencoder only, 2 -> performers only
+        self.active = 0  # 0 -> both, 1 -> autoencoder only, 2 -> performers only
 
     def training_step(self, batch, batch_idx):
 
         ae_out = self.autoencoder.training_step(batch, batch_idx)
         if self.active < 2:
             self.autoencoder.freeze()
-        perfm_out = self.performers[batch['c']].training_step(
+        perfm_out = self.performers[batch['c'][0]].training_step(
             {
                 'x': ae_out['latent'],
                 'y': batch['y']
@@ -278,20 +281,20 @@ class EncoderDecoderPerformer(LightningModule):
     def validation_step(self, batch, batch_idx):
 
         ae_out = self.autoencoder.validation_step(batch, batch_idx)
-        perfm_out = self.performers[batch['c']].validation_step(
+        perfm_out = self.performers[batch['c'][0]].validation_step(
             {
                 'x': ae_out['latent'],
                 'y': batch['y']
             }, batch_idx)
 
         # log an image of reconstruction
-        if batch_idx == 0:
-            self.logger.experiment.log_figure(
-                px.heatmap(ae_out['out'][0].cpu().numpy()),  # type: ignore
-                'out0' + str(time.time()) + '.html')
-            self.logger.experiment.log_figure(
-                px.heatmap(batch['x'][0].cpu().numpy()),  # type: ignore
-                'inp0' + str(time.time()) + '.html')
+        # if batch_idx == 0:
+        #     self.logger.experiment.log_figure(
+        #         px.imshow(ae_out['out'][0].cpu().numpy()),
+        #         'out0' + str(time.time()) + '.html')
+        #     self.logger.experiment.log_figure(
+        #         px.imshow(batch['x'][0].cpu().numpy()),
+        #         'inp0' + str(time.time()) + '.html')
 
         self.losslog('ae_val_loss', ae_out['loss'])
         self.losslog('perfm_val_loss', perfm_out['loss'])
@@ -366,7 +369,7 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
                           stride=s,
                           padding=0,
                           dilation=d,
-                          groups=output_features,
+                          groups=1,
                           bias=False),
                 nn.InstanceNorm2d(
                     conv_out_features, affine=True, track_running_stats=True)
@@ -379,7 +382,8 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
 
     # start adding blocks until we can
     stack: List[Any] = []
-    input_features = output_features
+    input_features = 1
+    # input_features = output_features
     for _ in range(max_layers):
         conv_in_size, new_module = add_module(input_features, conv_in_size,
                                               dilation, kernel_size, stride)
@@ -402,7 +406,7 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
                       stride=1,
                       dilation=1,
                       padding=0,
-                      groups=output_features,
+                      groups=1,
                       bias=False),
             nn.InstanceNorm2d(
                 output_features, affine=True, track_running_stats=True)
@@ -413,7 +417,7 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
         stack.append(
             nn.Conv2d(output_features,
                       output_features,
-                      groups=output_features,
+                      groups=1,
                       kernel_size=1))
 
         stack.append(middle_activation())
@@ -422,7 +426,7 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
         stack.append(
             nn.Conv2d(output_features,
                       output_features,
-                      groups=output_features,
+                      groups=1,
                       kernel_size=1))
         stack.append(middle_activation())
     return nn.Sequential(*stack)

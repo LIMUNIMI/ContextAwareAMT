@@ -6,6 +6,7 @@ from pathlib import Path
 from pprint import pprint
 
 import torch.nn.functional as F  # type: ignore
+import torch # type: ignore
 from pytorch_lightning import Trainer  # type: ignore
 from pytorch_lightning.callbacks import ModelCheckpoint  # type: ignore
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping  # type: ignore
@@ -172,7 +173,7 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     #                             *axes,
     #                             n_jobs=-1,
     #                             backend='threading').to(s.DEVICE)
-    dummy_avg = 0.5
+    dummy_avg = torch.tensor(0.5).cuda()
 
     autoencoder = build_autoencoder(ae_hpar, s.TRAIN_DROPOUT, generic)
     performer = build_performer_model(hpar, dummy_avg)

@@ -93,13 +93,13 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    'lstm_layers': 1,
+    'lstm_layers': 2,
     'lstm_hidden_size': 7,
-    'encoder_features': 0,
-    "kernel_0": 5,
-    "kernel_1": 5,
+    'encoder_features': 5,
+    "kernel_0": 3,
+    "kernel_1": 3,
     "middle_activation": nn.ReLU,
-    'latent_features': 0,
+    'latent_features': 3,
     'performer_features': 7,
     'performer_layers': 3
 }
@@ -111,7 +111,7 @@ PED_HYPERPARAMS = {
     "kernel_0": 4,
     "middle_activation": nn.Tanh  # or AbsLayer?
 }
-VEL_BATCH_SIZE = 50
+VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8
