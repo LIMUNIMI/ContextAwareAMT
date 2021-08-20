@@ -160,10 +160,10 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     # building model
     if mode == 'velocity':
         ae_hpar = get_velocity_hpar(hpar)
-        axes = []
+        # axes = []
     elif mode == 'pedaling':
         ae_hpar = get_pedaling_hpar(hpar)
-        axes = [-1]
+        # axes = [-1]
     else:
         raise RuntimeError(f"mode {mode} not known!")
 

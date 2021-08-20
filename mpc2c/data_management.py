@@ -2,6 +2,7 @@ import pickle
 from typing import List
 from itertools import cycle
 from random import choice
+from time import time
 
 import numpy as np
 import essentia as es  # type: ignore
@@ -13,6 +14,8 @@ from . import utils
 from .asmd.asmd import asmd, dataset_utils
 from .mytorchutils import DatasetDump
 
+# import heartrate
+# heartrate.trace(port=8080)
 
 class AEDataset(DatasetDump):
     def __init__(self, contexts: List[str], *args, **kwargs):
@@ -49,10 +52,9 @@ class AEDataset(DatasetDump):
         # computing:
         c = self.sample_contexts[idx]
         # 1. dataset with the same context
-        same = self.set_operation(dataset_utils.filter, groups=[c])
+        same = self.set_operation(dataset_utils.filter, groups=[self.contexts[c]])
         # 2.  dataset with different contexts (contains data not in this split too)
-        different = same.set_operation(
-            dataset_utils.complement)  # type: ignore
+        different = same.set_operation(dataset_utils.complement)  # type: ignore
         # 3.  dataset with different contexts (only in this split)
         different = self.set_operation(dataset_utils.intersect,
                                        different.dataset)  # type: ignore
@@ -72,13 +74,15 @@ class AEDataset(DatasetDump):
         diff_target = choice(different.inverted[bin])
         # take a random sample from `same` with the same label
         same_target = choice(same.inverted[bin])
+        ae_same = same.get_input(*same_target)
+        ae_diff = different.get_input(*diff_target)
 
         return {
             "c": str(c),
             "x": x,
             "y": y,
-            "ae_same": same.get_input(*same_target),
-            "ae_diff": different.get_input(*diff_target)
+            "ae_same": ae_same,
+            "ae_diff": ae_diff
         }
 
 
@@ -207,6 +211,7 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
         p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
         random_state=1992)
 
+    dataset[0]
     return DataLoader(dataset,
                       batch_sampler=AEBatchSampler(batch_size, dataset),
                       num_workers=s.NJOBS,
