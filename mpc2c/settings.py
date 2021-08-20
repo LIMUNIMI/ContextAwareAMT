@@ -27,7 +27,7 @@ SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
-NJOBS = 10
+NJOBS = 4
 # number of mfcc
 BINS = 13
 SPEC = essentiaspec.Spectrometer(FRAME_SIZE,
@@ -111,7 +111,7 @@ PED_HYPERPARAMS = {
     "kernel_0": 4,
     "middle_activation": nn.Tanh  # or AbsLayer?
 }
-VEL_BATCH_SIZE = 10
+VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8
@@ -121,7 +121,7 @@ DTYPE = torch.float32
 PRECISION = 32
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
-DATASET_LEN = 0.5
+DATASET_LEN = 1
 LR_K = 5
 
 # SKOPT

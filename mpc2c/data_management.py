@@ -24,7 +24,7 @@ class AEDataset(DatasetDump):
         # keep track of which samples among those dumped were used
         self.used = np.zeros(sum(self.lengths), dtype=np.bool8)
 
-    def __getitem__(self, idx):
+    def next_item_context(self, c):
         """
         Returns 4 data: input, target label, target reconstruction (same and different context)
 
@@ -32,11 +32,6 @@ class AEDataset(DatasetDump):
 
         raise `StopIteration` when finished
         """
-
-        # get context of idx
-        song, _ = self._get_song_indices(idx, filtered=True)
-        c = next(iter(set(self.songs[song]['groups']) & self.contexts))
-
         # computing:
         # 1. dataset with the same context
         same = self.set_operation(dataset_utils.filter, groups=[c])
@@ -54,8 +49,23 @@ class AEDataset(DatasetDump):
         # both `same`, `different` and this dataset were filtered from the same
         # dumped dataset, so the `original` index is the same
 
-        x = same.get_input(idx, filtered=False)
-        y = same.get_target(idx, filtered=False)
+        # looking for the first sample in `same` not used yet (original index)
+        samples_included = np.zeros_like(self.used)
+        for i in np.nonzero(same.included)[0]:
+            k = sum(same.lengths[:i])
+            samples_included[k:k * same.lengths[i]] = True
+
+        not_used = ~self.used  # not used samples referred to the whole dataset
+        not_used[~samples_included] = False  # removing samples not included
+        if np.all(not_used == False):
+            raise StopIteration
+
+        # the first sample not used
+        input = np.argmax(not_used)
+        self.used[input] = True
+
+        x = same.get_input(input, filtered=False)
+        y = same.get_target(input, filtered=False)
 
         # take a random sample from `different` with the same label
         bin = self.get_bin(y)
@@ -70,6 +80,38 @@ class AEDataset(DatasetDump):
             "ae_same": same.get_input(*same_target),
             "ae_diff": different.get_input(*diff_target)
         }
+
+    def __getitem__(self, d):
+        return d
+
+
+class AEBatchSampler(Sampler):
+    def __init__(self, batch_size: int, ae_dataset: AEDataset):
+        """
+        Makes batches so that each one has a different context
+        """
+        super().__init__(ae_dataset)
+        self.batch_size = batch_size
+        self.ae_dataset = ae_dataset
+        self.contexts = cycle(ae_dataset.contexts)
+
+    def __len__(self):
+        return len(self.ae_dataset) // self.batch_size
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        c = next(self.contexts)
+        batch = []
+        for _ in range(self.batch_size):
+            try:
+                batch.append(self.ae_dataset.next_item_context(c))
+            except StopIteration:
+                break
+        if len(batch) == 0:
+            raise StopIteration
+        return batch
 
 
 def ae_collate(batch):
@@ -170,7 +212,7 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
         random_state=1992)
 
     return DataLoader(dataset,
-                      batch_size=batch_size,
+                      batch_sampler=AEBatchSampler(batch_size, dataset),
                       num_workers=s.NJOBS,
                       pin_memory=True)
     # collate_fn=ae_collate)
