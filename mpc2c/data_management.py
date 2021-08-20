@@ -2,11 +2,11 @@ import pickle
 from typing import List
 from itertools import cycle
 from random import choice
-from time import time
 
 import numpy as np
 import essentia as es  # type: ignore
 from torch.utils.data import DataLoader, Sampler  # type: ignore
+from tqdm import trange
 
 from . import nmf
 from . import settings as s
@@ -16,6 +16,7 @@ from .mytorchutils import DatasetDump
 
 # import heartrate
 # heartrate.trace(port=8080)
+
 
 class AEDataset(DatasetDump):
     def __init__(self, contexts: List[str], *args, **kwargs):
@@ -30,15 +31,31 @@ class AEDataset(DatasetDump):
         # keep track of the context of each sample
         fname = self.root / 'sample_contexts.pkl'
         if fname.exists():
-            self.sample_contexts = pickle.load(open(fname, 'rb')).astype(np.int64)
+            self.sample_contexts = pickle.load(open(fname,
+                                                    'rb')).astype(np.int64)
         else:
-            self.sample_contexts = np.zeros(self.not_used.shape[0], dtype=np.int64)
-            for idx in range(self.sample_contexts.shape[0]):
-                # get context of idx
-                song, _ = self._get_song_indices(idx, filtered=True)
-                context = self.songs[song]['groups'][-1]
-                self.sample_contexts[idx] = self.contexts.index(context)
+            self.sample_contexts = np.zeros(self.not_used.shape[0],
+                                            dtype=np.int64)
+            print("Pre-computing sample contexts (this is done once and cached to file...)")
+            k = 0
+            for i in trange(len(self.lengths)):
+                L = self.lengths[i]
+                context = self.songs[i]['groups'][-1]
+                self.sample_contexts[k:k+L] = self.contexts.index(context)
+                k += L
             pickle.dump(self.sample_contexts, open(fname, 'wb'))
+
+    def set_operation(self, *args, **kwargs):
+        """
+        Need to extend the `DatasetDump`'s method because we need to update `not_used`
+        """
+        out = super().set_operation(*args, **kwargs)
+        k = 0
+        for i in range(len(out.lengths)):
+            L = out.lengths[i]
+            out.not_used[k:k+L] = out.included[i]
+            k += L
+        return out
 
     def __getitem__(self, idx):
         """
@@ -52,30 +69,27 @@ class AEDataset(DatasetDump):
         # computing:
         c = self.sample_contexts[idx]
         # 1. dataset with the same context
-        same = self.set_operation(dataset_utils.filter, groups=[self.contexts[c]])
+        same = self.set_operation(dataset_utils.filter,
+                                  groups=[self.contexts[c]])
         # 2.  dataset with different contexts (contains data not in this split too)
-        different = same.set_operation(dataset_utils.complement)  # type: ignore
+        different = same.set_operation(
+            dataset_utils.complement)  # type: ignore
         # 3.  dataset with different contexts (only in this split)
         different = self.set_operation(dataset_utils.intersect,
                                        different.dataset)  # type: ignore
-        # the part above takes 1 second each (due to the creation of `inverted`
-        # object, totalling 3 seconds)
+        # the part above takes 0.1 second each (due to the creation of `inverted`
+        # object, totalling 0.3 seconds)
 
-        # find the first sample not used in `same` and in `different`
-
-        # both `same`, `different` and this dataset were filtered from the same
-        # dumped dataset, so the `original` index is the same
-
-        x = same.get_input(idx, filtered=False)
-        y = same.get_target(idx, filtered=False)
+        x = self.get_input(idx, filtered=True)
+        y = self.get_target(idx, filtered=True)
 
         # take a random sample from `different` with the same label
         bin = self.get_bin(y)
         diff_target = choice(different.inverted[bin])
         # take a random sample from `same` with the same label
         same_target = choice(same.inverted[bin])
-        ae_same = same.get_input(*same_target)
-        ae_diff = different.get_input(*diff_target)
+        ae_same = same.get_input(*same_target, filtered=True)
+        ae_diff = different.get_input(*diff_target, filtered=True)
 
         return {
             "c": str(c),
@@ -106,8 +120,10 @@ class AEBatchSampler(Sampler):
         c = self.ae_dataset.contexts.index(next(self.contexts))
         # find the first `self.batch_size` samples not used and having context `c`
         batch = np.argwhere(
-            np.logical_and(self.ae_dataset.not_used,
-                           (self.ae_dataset.sample_contexts == c)))[:self.batch_size, 0]
+            np.logical_and(
+                self.ae_dataset.not_used,
+                (self.ae_dataset.sample_contexts == c)))
+        batch = batch[:self.batch_size, 0]
         if batch.shape[0] == 0:
             raise StopIteration
         self.ae_dataset.not_used[batch] = False
@@ -206,11 +222,11 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
 
     # select the groups, subsample dataset, and shuffle it
     dataset = dataset.set_operation(dataset_utils.filter, groups=groups)
-    dataset = dataset.set_operation(  # type: ignore
-        lambda *x, **y: dataset_utils.choice(*x, **y)[0],  # type: ignore
-        p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
-        random_state=1992)
-
+    L = dataset.not_used.sum()
+    chosen = np.random.default_rng(1992).choice(np.where(dataset.not_used),
+                                       int(L * (1 - s.DATASET_LEN)),
+                                       replace=False)
+    dataset.not_used[chosen] = False
     dataset[0]
     return DataLoader(dataset,
                       batch_sampler=AEBatchSampler(batch_size, dataset),

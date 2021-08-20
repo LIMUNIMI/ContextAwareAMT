@@ -27,7 +27,7 @@ SR = 22050
 FRAME_SIZE = 2048
 HOP_SIZE = 512
 #: number of jobs used
-NJOBS = 4
+NJOBS = 10
 # number of mfcc
 BINS = 13
 SPEC = essentiaspec.Spectrometer(FRAME_SIZE,
@@ -111,7 +111,7 @@ PED_HYPERPARAMS = {
     "kernel_0": 4,
     "middle_activation": nn.Tanh  # or AbsLayer?
 }
-VEL_BATCH_SIZE = 100
+VEL_BATCH_SIZE = 5
 PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8
