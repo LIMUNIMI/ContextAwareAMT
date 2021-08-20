@@ -188,7 +188,7 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     lr = 1
 
     model = feature_extraction.EncoderDecoderPerformer(autoencoder, performer,
-                                                       contexts, lr, s.WD)
+                                                       len(contexts), lr, s.WD)
 
     # logging initial stuffs
     logger.log_metrics({

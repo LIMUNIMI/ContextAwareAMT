@@ -1,3 +1,4 @@
+import pickle
 from typing import List
 from itertools import cycle
 from random import choice
@@ -20,11 +21,23 @@ class AEDataset(DatasetDump):
         otherwise for specific indipendence
         """
         super().__init__(*args, **kwargs)
-        self.contexts = set(contexts)
+        self.contexts = contexts
         # keep track of which samples among those dumped were used
-        self.used = np.zeros(sum(self.lengths), dtype=np.bool8)
+        self.not_used = np.ones(sum(self.lengths), dtype=np.bool8)
+        # keep track of the context of each sample
+        fname = self.root / 'sample_contexts.pkl'
+        if fname.exists():
+            self.sample_contexts = pickle.load(open(fname, 'rb')).astype(np.int64)
+        else:
+            self.sample_contexts = np.zeros(self.not_used.shape[0], dtype=np.int64)
+            for idx in range(self.sample_contexts.shape[0]):
+                # get context of idx
+                song, _ = self._get_song_indices(idx, filtered=True)
+                context = self.songs[song]['groups'][-1]
+                self.sample_contexts[idx] = self.contexts.index(context)
+            pickle.dump(self.sample_contexts, open(fname, 'wb'))
 
-    def next_item_context(self, c):
+    def __getitem__(self, idx):
         """
         Returns 4 data: input, target label, target reconstruction (same and different context)
 
@@ -32,7 +45,9 @@ class AEDataset(DatasetDump):
 
         raise `StopIteration` when finished
         """
+
         # computing:
+        c = self.sample_contexts[idx]
         # 1. dataset with the same context
         same = self.set_operation(dataset_utils.filter, groups=[c])
         # 2.  dataset with different contexts (contains data not in this split too)
@@ -49,23 +64,8 @@ class AEDataset(DatasetDump):
         # both `same`, `different` and this dataset were filtered from the same
         # dumped dataset, so the `original` index is the same
 
-        # looking for the first sample in `same` not used yet (original index)
-        samples_included = np.zeros_like(self.used)
-        for i in np.nonzero(same.included)[0]:
-            k = sum(same.lengths[:i])
-            samples_included[k:k * same.lengths[i]] = True
-
-        not_used = ~self.used  # not used samples referred to the whole dataset
-        not_used[~samples_included] = False  # removing samples not included
-        if np.all(not_used == False):
-            raise StopIteration
-
-        # the first sample not used
-        input = np.argmax(not_used)
-        self.used[input] = True
-
-        x = same.get_input(input, filtered=False)
-        y = same.get_target(input, filtered=False)
+        x = same.get_input(idx, filtered=False)
+        y = same.get_target(idx, filtered=False)
 
         # take a random sample from `different` with the same label
         bin = self.get_bin(y)
@@ -74,15 +74,12 @@ class AEDataset(DatasetDump):
         same_target = choice(same.inverted[bin])
 
         return {
-            "c": c,
+            "c": str(c),
             "x": x,
             "y": y,
             "ae_same": same.get_input(*same_target),
             "ae_diff": different.get_input(*diff_target)
         }
-
-    def __getitem__(self, d):
-        return d
 
 
 class AEBatchSampler(Sampler):
@@ -102,15 +99,14 @@ class AEBatchSampler(Sampler):
         return self
 
     def __next__(self):
-        c = next(self.contexts)
-        batch = []
-        for _ in range(self.batch_size):
-            try:
-                batch.append(self.ae_dataset.next_item_context(c))
-            except StopIteration:
-                break
-        if len(batch) == 0:
+        c = self.ae_dataset.contexts.index(next(self.contexts))
+        # find the first `self.batch_size` samples not used and having context `c`
+        batch = np.argwhere(
+            np.logical_and(self.ae_dataset.not_used,
+                           (self.ae_dataset.sample_contexts == c)))[:self.batch_size, 0]
+        if batch.shape[0] == 0:
             raise StopIteration
+        self.ae_dataset.not_used[batch] = False
         return batch
 
 

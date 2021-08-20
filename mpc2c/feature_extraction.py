@@ -249,10 +249,12 @@ class EncoderDecoderPerformer(LightningModule):
     An iterative transfer-learning LightningModule for
     autoencoder-performer architecture
     """
-    def __init__(self, autoencoder, performer, contexts, lr=1, wd=0):
+    def __init__(self, autoencoder, performer, ncontexts, lr=1, wd=0):
         super().__init__()
         self.autoencoder = autoencoder
-        self.performers = nn.ModuleDict({c: copy(performer) for c in contexts})
+        self.performers = nn.ModuleDict(
+            {str(c): copy(performer)
+             for c in range(ncontexts)})
         self.lr = lr
         self.wd = wd
         self.active = 0  # 0 -> both, 1 -> autoencoder only, 2 -> performers only
