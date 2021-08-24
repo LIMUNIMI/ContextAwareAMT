@@ -32,9 +32,17 @@ def model_test(model_build_func, test_sample):
 
         if allowed:
             try:
-                model = model_build_func(hpar, s.TRAIN_DROPOUT)
+                model = model_build_func(hpar)
                 print("model created")
-                model(test_sample.to(s.DEVICE).to(s.DTYPE))
+                model.eval()
+                model.to(s.DEVICE).validation_step(
+                    {
+                        'x': test_sample.to(s.DEVICE).to(s.DTYPE),
+                        'y': torch.tensor(0.5).to(s.DEVICE).to(s.DTYPE),
+                        'ae_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
+                        'ae_same': test_sample.to(s.DEVICE).to(s.DTYPE), 
+                        'c': '0'
+                    }, 0, log=False)
                 print("model tested")
             # except Exception as e:
             #     import traceback
@@ -52,14 +60,21 @@ def model_test(model_build_func, test_sample):
 def reconstruction_loss(pred, same, diff):
     return max(
         torch.tensor(0.0),
-        torch.tensor(1.0) + F.l1_loss(pred, same) - F.l1_loss(pred, diff)).to(pred.device)
+        torch.tensor(1.0) + F.l1_loss(pred, same) - F.l1_loss(pred, diff)).to(
+            pred.device) / 2.0
 
 
-def build_autoencoder(hpar, dropout, generic=False):
+def build_autoencoder(hpar, mode, dropout, generic=False):
     if generic:
         loss_fn = lambda pred, _, diff: F.l1_loss(pred, diff)
     else:
         loss_fn = reconstruction_loss
+
+    if mode == 'velocity':
+        hpar = get_velocity_hpar(hpar)
+    elif mode == 'pedaling':
+        hpar = get_pedaling_hpar(hpar)
+
     m = feature_extraction.AutoEncoder(loss_fn=loss_fn,
                                        input_size=(s.BINS, s.MINI_SPEC_SIZE),
                                        max_layers=s.MAX_LAYERS,
@@ -92,14 +107,21 @@ def build_performer_model(hpar, avg_pred):
     return m
 
 
-def my_train(mode,
-             copy_checkpoint,
-             logger,
-             model,
-             trainloader,
-             validloader,
-             ae_train=True,
-             perfm_train=True):
+def build_model(hpar,
+                mode,
+                contexts,
+                dropout=s.TRAIN_DROPOUT,
+                dummy_avg=torch.tensor(0.5).cuda(),
+                generic=True,
+                lr=s.LR):
+    autoencoder = build_autoencoder(hpar, mode, dropout, generic)
+    performer = build_performer_model(hpar, dummy_avg)
+    model = feature_extraction.EncoderDecoderPerformer(autoencoder, performer,
+                                                       len(contexts), lr, s.WD)
+    return model
+
+
+def my_train(mode, copy_checkpoint, logger, model, trainloader, validloader):
     """
     Creates callbacks, train and freeze the part that raised an early-stop.
     Return the best loss of that one and 0 for the other.
@@ -162,42 +184,23 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
                                              mode)
     print(f"Num batches: {len(trainloader)}, {len(validloader)}")
 
-    # building model
-    if mode == 'velocity':
-        ae_hpar = get_velocity_hpar(hpar)
-        # axes = []
-    elif mode == 'pedaling':
-        ae_hpar = get_pedaling_hpar(hpar)
-        # axes = [-1]
-    else:
-        raise RuntimeError(f"mode {mode} not known!")
-
     # dummy model (baseline)
     # TODO: check the following function!
     # dummy_avg = compute_average(trainloader.dataset,
     #                             *axes,
     #                             n_jobs=-1,
     #                             backend='threading').to(s.DEVICE)
-    dummy_avg = torch.tensor(0.5).cuda()
-
-    autoencoder = build_autoencoder(ae_hpar, s.TRAIN_DROPOUT, generic)
-    performer = build_performer_model(hpar, dummy_avg)
-
-    print(performer)
-    print(autoencoder)
 
     # learning rate
     # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
     #                                                       n_params_free)
     # lr = lr_k / len(trainloader)
-    lr = s.LR
-
-    model = feature_extraction.EncoderDecoderPerformer(autoencoder, performer,
-                                                       len(contexts), lr, s.WD)
+    model = build_model(hpar, mode, contexts, generic=generic)
+    print(model)
 
     # logging initial stuffs
     logger.log_metrics({
-        "initial_lr": lr,
+        "initial_lr": s.LR,
         "train_batches": len(trainloader),
         "valid_batches": len(validloader)
     })

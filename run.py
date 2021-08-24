@@ -136,7 +136,8 @@ def main():
 
     nmf_params = load_nmf_params()
     if args.skopt:
-        s.PLOT_LOSSES = False
+
+        contexts = list(get_contexts(s.CARLA_PROJ).keys())
 
         def objective(x):
             return training.train(x, mode, generic=args.generic)
@@ -144,17 +145,19 @@ def main():
         if args.pedaling:
             s.DATASET_LEN = 0.1
             space = s.PED_SKSPACE
-            space_constraint = training.model_test(
-                training.build_pedaling_model, torch.rand(1, s.BINS, 100))
+            test_sample = torch.rand(1, s.BINS, 100)
             checkpoint_path = "ped_skopt.pt"
 
         elif args.velocity:
-            s.DATASET_LEN = 0.03
+            s.DATASET_LEN = 1e-3
             space = s.VEL_SKSPACE
-            space_constraint = training.model_test(
-                training.build_velocity_model,
-                torch.rand(1, s.BINS, s.MINI_SPEC_SIZE))
+            test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
             checkpoint_path = "vel_skopt.pt"
+        else:
+            raise RuntimeError("Velocity or pedaling must be set")
+
+        space_constraint = training.model_test(
+            lambda x: training.build_model(x, mode, contexts), test_sample)
 
         hyperopt(space,
                  checkpoint_path,
@@ -174,12 +177,11 @@ def main():
     if args.redump:
         contexts = list(get_contexts(s.CARLA_PROJ).keys())
         for split in ['train', 'validation', 'test']:
-            data_management.get_loader(
-                split,
-                redump=True,
-                contexts=contexts,
-                mode=mode,
-                nmf_params=nmf_params)
+            data_management.get_loader(split,
+                                       redump=True,
+                                       contexts=contexts,
+                                       mode=mode,
+                                       nmf_params=nmf_params)
 
     if args.evaluate or args.csv_file:
         compare = args.compare

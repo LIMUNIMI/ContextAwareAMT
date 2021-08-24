@@ -96,8 +96,8 @@ VEL_HYPERPARAMS = {
     'lstm_layers': 0,
     'lstm_hidden_size': 0,
     'encoder_features': 5,
-    "kernel_0": 2,
-    "kernel_1": 2,
+    "kernel_0": 3,
+    "kernel_1": 3,
     "middle_activation": nn.GELU,
     'latent_features': 4,
     'performer_features': 7,
@@ -116,28 +116,27 @@ PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8
 TRAIN_DROPOUT = 0.1
-PLOT_LOSSES = True
 DTYPE = torch.float32
 PRECISION = 32
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
-DATASET_LEN = 0.001
-LR = 0.01
+DATASET_LEN = 1e-3
+LR = 1e-4
 
 # SKOPT
 # TODO: SKSPACE!
 PED_SKSPACE = [
     space.Integer(0, 4, name='lstm_layers'),
-    space.Integer(0, 7, name='lstm_hidden_size'),
+    space.Integer(0, 8, name='lstm_hidden_size'),
+    space.Integer(0, 8, name='encoder_features'),
     space.Integer(0, 7, name='latent_features'),
-    space.Integer(0, 7, name='encoder_features'),
-    space.Integer(3, 6, name='kernel_0'),
-    space.Categorical([nn.ReLU, nn.Identity, AbsLayer, nn.Tanh],
+    space.Integer(2, 20, name='kernel_0'),
+    space.Categorical([nn.GELU, nn.ReLU, nn.Identity, AbsLayer, nn.SELU],
                       name='middle_activation'),
-    space.Integer(3, 6, name='performer_layers'),
-    space.Integer(0, 7, name='performer_features'),
+    space.Integer(0, 8, name='performer_features'),
+    space.Integer(1, 3, name='performer_layers'),
 ]
-VEL_SKSPACE = PED_SKSPACE + [space.Integer(3, 10, name='kernel_1')]
+VEL_SKSPACE = PED_SKSPACE + [space.Integer(2, 20, name='kernel_1')]
 SKITERATIONS = (0, 40)
 PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 0 # 1e-6

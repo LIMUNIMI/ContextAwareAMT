@@ -120,9 +120,9 @@ class Decoder(nn.Module):
                                        bias=layer.bias is None,
                                        groups=layer.groups,
                                        dilation=layer.dilation))
-                if type(block[1]) == nn.InstanceNorm2d:
+                if type(block[1]) == nn.BatchNorm2d:
                     stack.append(
-                        nn.InstanceNorm2d(layer.in_channels,
+                        nn.BatchNorm2d(layer.in_channels,
                                           affine=True,
                                           track_running_stats=True))
                 stack.append(copy(block[-1]))
@@ -284,7 +284,7 @@ class EncoderDecoderPerformer(LightningModule):
             'perfm_train_loss': perfm_out['loss'],
         }
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, log=True):
 
         ae_out = self.autoencoder.validation_step(batch, batch_idx)
         perfm_out = self.performers[batch['c'][0]].validation_step(
@@ -303,10 +303,11 @@ class EncoderDecoderPerformer(LightningModule):
         #         'inp0' + str(time.time()) + '.html')
 
         loss = ae_out['loss'] + perfm_out['loss']
-        self.losslog('val_loss', loss)
-        self.losslog('ae_val_loss', ae_out['loss'])
-        self.losslog('perfm_val_loss', perfm_out['loss'])
-        self.losslog('dummy_loss', perfm_out['dummy_loss'])
+        if log:
+            self.losslog('val_loss', loss)
+            self.losslog('ae_val_loss', ae_out['loss'])
+            self.losslog('perfm_val_loss', perfm_out['loss'])
+            self.losslog('dummy_loss', perfm_out['dummy_loss'])
         return {
             'loss': loss,
             'ae_val_loss': ae_out['loss'],
@@ -380,7 +381,7 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
                               dilation=d,
                               groups=1,
                               bias=False),
-                    nn.InstanceNorm2d(conv_out_features,
+                    nn.BatchNorm2d(conv_out_features,
                                       affine=True,
                                       track_running_stats=True)
                     if conv_out_features > 1 else nn.Identity()
@@ -395,7 +396,7 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
                               dilation=1,
                               groups=1,
                               bias=False),
-                    nn.InstanceNorm2d(conv_out_features,
+                    nn.BatchNorm2d(conv_out_features,
                                       affine=True,
                                       track_running_stats=True)
                     if conv_out_features > 1 else nn.Identity()
