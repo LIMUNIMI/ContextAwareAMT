@@ -109,7 +109,8 @@ class Decoder(nn.Module):
         super().__init__()
         # building deconvolutional stack
         stack = []
-        for layer in encoder.stack[::-1]:
+        for block in encoder.stack[::-1]:
+            layer = block[0]
             if type(layer) == nn.Conv2d:
                 stack.append(
                     nn.ConvTranspose2d(layer.out_channels,
@@ -119,12 +120,12 @@ class Decoder(nn.Module):
                                        bias=layer.bias is None,
                                        groups=layer.groups,
                                        dilation=layer.dilation))
-                stack.append(
-                    nn.InstanceNorm2d(layer.in_channels,
-                                      affine=True,
-                                      track_running_stats=True)
-                    if layer.in_channels > 1 else nn.Identity())
-                stack.append(encoder.middle_activation)
+                if type(block[1]) == nn.InstanceNorm2d:
+                    stack.append(
+                        nn.InstanceNorm2d(layer.in_channels,
+                                          affine=True,
+                                          track_running_stats=True))
+                stack.append(copy(block[-1]))
         self.stack = nn.Sequential(*stack)
 
         # building inverse LSTM
@@ -153,7 +154,7 @@ class AutoEncoder(LightningModule):
         """
         encoder-decoder module
 
-        the loss must accept 3 values: 
+        the loss must accept 3 values:
             * prediction
             * same target
             * different target
@@ -226,7 +227,7 @@ class Performer(LightningModule):
             *stack, nn.Linear(middle_features, 1), nn.Sigmoid())
 
     def forward(self, x):
-        return self.stack(x[:, :, 1, 0])
+        return self.stack(x[:, :, 0, 0])
 
     def training_step(self, batch, batch_idx):
 
@@ -313,7 +314,6 @@ class EncoderDecoderPerformer(LightningModule):
             'dummy_loss': perfm_out['dummy_loss']
         }
 
-
     def losslog(self, name, value):
         self.log(name,
                  value,
@@ -371,18 +371,36 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
                 conv_out_features = middle_features
 
             module = [
-                nn.Conv2d(input_features,
-                          conv_out_features,
-                          kernel_size=k,
-                          stride=s,
-                          padding=0,
-                          dilation=d,
-                          groups=1,
-                          bias=False),
-                nn.InstanceNorm2d(
-                    conv_out_features, affine=True, track_running_stats=True)
-                if conv_out_features > 1 else nn.Identity(),
-                middle_activation()
+                nn.Sequential(
+                    nn.Conv2d(input_features,
+                              conv_out_features,
+                              kernel_size=k,
+                              stride=s,
+                              padding=0,
+                              dilation=d,
+                              groups=1,
+                              bias=False),
+                    nn.InstanceNorm2d(conv_out_features,
+                                      affine=True,
+                                      track_running_stats=True)
+                    if conv_out_features > 1 else nn.Identity()
+                    and conv_out_features != output_features,
+                    middle_activation()),
+                nn.Sequential(
+                    nn.Conv2d(conv_out_features,
+                              conv_out_features,
+                              kernel_size=1,
+                              stride=1,
+                              padding=0,
+                              dilation=1,
+                              groups=1,
+                              bias=False),
+                    nn.InstanceNorm2d(conv_out_features,
+                                      affine=True,
+                                      track_running_stats=True)
+                    if conv_out_features > 1 else nn.Identity()
+                    and conv_out_features != output_features,
+                    middle_activation())
             ]
             return next_conv_in_size, module
         else:
@@ -406,37 +424,26 @@ def make_stack(output_features, max_layers, conv_in_size, middle_features,
         raise RuntimeError(
             "Network hyper-parameters would create a one-layer convnet")
 
+    # the last layer has no normalization because we have size (batches, channels, 1, 1)
     if conv_in_size[0] > 1 or conv_in_size[1] > 1:
-        stack += [
-            nn.Conv2d(input_features,
-                      output_features,
-                      kernel_size=conv_in_size,
-                      stride=1,
-                      dilation=1,
-                      padding=0,
-                      groups=1,
-                      bias=False),
-            nn.InstanceNorm2d(
-                output_features, affine=True, track_running_stats=True)
-            if output_features > 1 else nn.Identity()
-        ]
-        stack.append(middle_activation())
-
         stack.append(
+            nn.Sequential(
+                nn.Conv2d(input_features,
+                          output_features,
+                          kernel_size=conv_in_size,
+                          stride=1,
+                          dilation=1,
+                          padding=0,
+                          groups=1,
+                          bias=False),
+                middle_activation(),
+            ))
+    stack.append(
+        nn.Sequential(
             nn.Conv2d(output_features,
                       output_features,
                       groups=1,
-                      kernel_size=1))
-
-        stack.append(middle_activation())
-    else:
-        # change the last activation so that the outputs are in (0, 1)
-        stack.append(
-            nn.Conv2d(output_features,
-                      output_features,
-                      groups=1,
-                      kernel_size=1))
-        stack.append(middle_activation())
+                      kernel_size=1), middle_activation()))
     return nn.Sequential(*stack)
 
 

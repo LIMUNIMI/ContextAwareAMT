@@ -93,13 +93,13 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    'lstm_layers': 2,
-    'lstm_hidden_size': 7,
+    'lstm_layers': 0,
+    'lstm_hidden_size': 0,
     'encoder_features': 5,
-    "kernel_0": 3,
-    "kernel_1": 3,
-    "middle_activation": nn.ReLU,
-    'latent_features': 3,
+    "kernel_0": 2,
+    "kernel_1": 2,
+    "middle_activation": nn.GELU,
+    'latent_features': 4,
     'performer_features': 7,
     'performer_layers': 3
 }
