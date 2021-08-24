@@ -111,7 +111,7 @@ PED_HYPERPARAMS = {
     "kernel_0": 4,
     "middle_activation": nn.Tanh  # or AbsLayer?
 }
-VEL_BATCH_SIZE = 5
+VEL_BATCH_SIZE = 10
 PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-8
@@ -121,8 +121,8 @@ DTYPE = torch.float32
 PRECISION = 32
 WD = 0
 #: percentage of the dataset to use, use it for debugging or for skopt
-DATASET_LEN = 1
-LR_K = 5
+DATASET_LEN = 0.001
+LR = 0.01
 
 # SKOPT
 # TODO: SKSPACE!

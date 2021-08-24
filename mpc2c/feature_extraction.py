@@ -226,20 +226,20 @@ class Performer(LightningModule):
             *stack, nn.Linear(middle_features, 1), nn.Sigmoid())
 
     def forward(self, x):
-        return self.stack(x[:, :, 0, 0])
+        return self.stack(x[:, :, 1, 0])
 
     def training_step(self, batch, batch_idx):
 
         out = self.forward(batch['x'])
-        loss = self.loss_fn(out, batch['y'])
+        loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
 
         return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):
 
         out = self.forward(batch['x'])
-        loss = self.loss_fn(out, batch['y'])
-        dummy_loss = self.loss_fn(out, self.avg_pred)
+        loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
+        dummy_loss = self.loss_fn(out, self.avg_pred.expand_as(out))
 
         return {'loss': loss, 'dummy_loss': dummy_loss}
 
@@ -272,10 +272,13 @@ class EncoderDecoderPerformer(LightningModule):
         if self.active < 2:
             self.autoencoder.unfreeze()
 
+        loss = ae_out['loss'] + perfm_out['loss']
+
+        self.losslog('train_loss', loss)
         self.losslog('ae_train_loss', ae_out['loss'])
         self.losslog('perfm_train_loss', perfm_out['loss'])
         return {
-            'loss': ae_out['loss'] + perfm_out['loss'],
+            'loss': loss,
             'ae_train_loss': ae_out['loss'],
             'perfm_train_loss': perfm_out['loss'],
         }
@@ -298,15 +301,18 @@ class EncoderDecoderPerformer(LightningModule):
         #         px.imshow(batch['x'][0].cpu().numpy()),
         #         'inp0' + str(time.time()) + '.html')
 
+        loss = ae_out['loss'] + perfm_out['loss']
+        self.losslog('val_loss', loss)
         self.losslog('ae_val_loss', ae_out['loss'])
         self.losslog('perfm_val_loss', perfm_out['loss'])
         self.losslog('dummy_loss', perfm_out['dummy_loss'])
         return {
-            'loss': ae_out['loss'] + perfm_out['loss'],
+            'loss': loss,
             'ae_val_loss': ae_out['loss'],
             'perfm_val_loss': perfm_out['loss'],
             'dummy_loss': perfm_out['dummy_loss']
         }
+
 
     def losslog(self, name, value):
         self.log(name,

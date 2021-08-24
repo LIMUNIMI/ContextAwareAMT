@@ -36,14 +36,32 @@ class AEDataset(DatasetDump):
         else:
             self.sample_contexts = np.zeros(self.not_used.shape[0],
                                             dtype=np.int64)
-            print("Pre-computing sample contexts (this is done once and cached to file...)")
+            print(
+                "Pre-computing sample contexts (this is done once and cached to file...)"
+            )
             k = 0
             for i in trange(len(self.lengths)):
                 L = self.lengths[i]
                 context = self.songs[i]['groups'][-1]
-                self.sample_contexts[k:k+L] = self.contexts.index(context)
+                self.sample_contexts[k:k + L] = self.contexts.index(context)
                 k += L
             pickle.dump(self.sample_contexts, open(fname, 'wb'))
+        self.len = np.count_nonzero(self.not_used)
+
+    def subsample(self, perc):
+        """
+        Seb sample this dataset at the sample-level (not songs-level)
+        """
+        d = np.where(self.not_used)[0]
+        chosen = np.random.default_rng(1992).choice(d,
+                                                    int(d.shape[0] *
+                                                        (1 - perc)),
+                                                    replace=False)
+        self.not_used[chosen] = False
+        self.len = np.count_nonzero(self.not_used)
+
+    def __len__(self):
+        return self.len
 
     def set_operation(self, *args, **kwargs):
         """
@@ -53,11 +71,12 @@ class AEDataset(DatasetDump):
         k = 0
         for i in range(len(out.lengths)):
             L = out.lengths[i]
-            out.not_used[k:k+L] = out.included[i]
+            out.not_used[k:k + L] = out.included[i]
             k += L
+        out.len = np.count_nonzero(out.not_used)
         return out
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx, filtered=False):
         """
         Returns 4 data: input, target label, target reconstruction (same and different context)
 
@@ -80,16 +99,18 @@ class AEDataset(DatasetDump):
         # the part above takes 0.1 second each (due to the creation of `inverted`
         # object, totalling 0.3 seconds)
 
-        x = self.get_input(idx, filtered=True)
-        y = self.get_target(idx, filtered=True)
+        x = self.get_input(idx, filtered=filtered)
+        y = self.get_target(idx, filtered=filtered)
 
         # take a random sample from `different` with the same label
         bin = self.get_bin(y)
         diff_target = choice(different.inverted[bin])
         # take a random sample from `same` with the same label
         same_target = choice(same.inverted[bin])
-        ae_same = same.get_input(*same_target, filtered=True)
-        ae_diff = different.get_input(*diff_target, filtered=True)
+        # we use song indiex and song sample index, so we don't need to specify
+        # if dataset was filtered
+        ae_same = same.get_input(*same_target)
+        ae_diff = different.get_input(*diff_target)
 
         return {
             "c": str(c),
@@ -109,9 +130,11 @@ class AEBatchSampler(Sampler):
         self.batch_size = batch_size
         self.ae_dataset = ae_dataset
         self.contexts = cycle(ae_dataset.contexts)
+        self.len = np.count_nonzero(ae_dataset.not_used)
+        self.not_used_init = self.ae_dataset.not_used.copy()
 
     def __len__(self):
-        return len(self.ae_dataset) // self.batch_size
+        return self.len // self.batch_size + 1
 
     def __iter__(self):
         return self
@@ -120,11 +143,12 @@ class AEBatchSampler(Sampler):
         c = self.ae_dataset.contexts.index(next(self.contexts))
         # find the first `self.batch_size` samples not used and having context `c`
         batch = np.argwhere(
-            np.logical_and(
-                self.ae_dataset.not_used,
-                (self.ae_dataset.sample_contexts == c)))
+            np.logical_and(self.ae_dataset.not_used,
+                           (self.ae_dataset.sample_contexts == c)))
+        # sample indices are referred to the whole dumped dataset
         batch = batch[:self.batch_size, 0]
-        if batch.shape[0] == 0:
+        if batch.shape[0] <= 1:
+            self.ae_dataset.not_used = self.not_used_init.copy()
             raise StopIteration
         self.ae_dataset.not_used[batch] = False
         return batch
@@ -212,22 +236,16 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
         raise RuntimeError(
             f"mode {mode} not known: available are `velocity` and `pedaling`")
 
-    dataset = AEDataset(
-        contexts,
-        asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
-                     metadataset_path=s.METADATASET_PATH), data_path, dumped)
+    asmd_data = asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
+                             metadataset_path=s.METADATASET_PATH)
+    dataset = AEDataset(contexts, asmd_data, data_path, dumped)
 
     if not dumped:
         dataset.dump(process_fn, nmf_params, n_jobs=s.NJOBS, max_nbytes=None)
 
     # select the groups, subsample dataset, and shuffle it
     dataset = dataset.set_operation(dataset_utils.filter, groups=groups)
-    L = dataset.not_used.sum()
-    chosen = np.random.default_rng(1992).choice(np.where(dataset.not_used),
-                                       int(L * (1 - s.DATASET_LEN)),
-                                       replace=False)
-    dataset.not_used[chosen] = False
-    dataset[0]
+    dataset.subsample(s.DATASET_LEN)
     return DataLoader(dataset,
                       batch_sampler=AEBatchSampler(batch_size, dataset),
                       num_workers=s.NJOBS,
