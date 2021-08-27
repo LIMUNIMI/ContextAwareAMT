@@ -93,13 +93,9 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    'lstm_layers': 0,
-    'lstm_hidden_size': 0,
-    'encoder_features': 5,
-    "kernel_0": 3,
-    "kernel_1": 3,
-    "middle_activation": nn.GELU,
-    'latent_features': 4,
+    "ae_k": 4,
+    "activation": nn.GELU(),
+    "kernel": 3,
     'performer_features': 7,
     'performer_layers': 3
 }
@@ -118,21 +114,18 @@ EARLY_RANGE = 1e-8
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
-WD = 0
+WD = 1e-8
+LR = 1e-4
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1e-3
-LR = 1e-4
 
 # SKOPT
 # TODO: SKSPACE!
 PED_SKSPACE = [
-    space.Integer(0, 4, name='lstm_layers'),
-    space.Integer(0, 8, name='lstm_hidden_size'),
-    space.Integer(0, 8, name='encoder_features'),
-    space.Integer(0, 7, name='latent_features'),
-    space.Integer(2, 20, name='kernel_0'),
-    space.Categorical([nn.GELU, nn.ReLU, nn.Identity, AbsLayer, nn.SELU],
-                      name='middle_activation'),
+    space.Integer(0, 10, name='ae_k'),
+    space.Categorical([nn.GELU(), nn.ReLU(), nn.Identity(), AbsLayer(), nn.SELU()],
+                      name='activation'),
+    space.Integer(2, 10, name='kernel'),
     space.Integer(0, 8, name='performer_features'),
     space.Integer(1, 3, name='performer_layers'),
 ]

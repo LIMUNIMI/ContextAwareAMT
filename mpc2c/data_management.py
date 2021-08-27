@@ -249,5 +249,5 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
     return DataLoader(dataset,
                       batch_sampler=AEBatchSampler(batch_size, dataset),
                       num_workers=s.NJOBS,
-                      pin_memory=True)
+                      pin_memory=False)
     # collate_fn=ae_collate)

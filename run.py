@@ -138,6 +138,7 @@ def main():
     if args.skopt:
 
         contexts = list(get_contexts(s.CARLA_PROJ).keys())
+        s.EPOCHS = 50
 
         def objective(x):
             return training.train(x, mode, generic=args.generic)
@@ -157,7 +158,7 @@ def main():
             raise RuntimeError("Velocity or pedaling must be set")
 
         space_constraint = training.model_test(
-            lambda x: training.build_model(x, mode, contexts), test_sample)
+            lambda x: training.build_model(x, contexts), test_sample)
 
         hyperopt(space,
                  checkpoint_path,

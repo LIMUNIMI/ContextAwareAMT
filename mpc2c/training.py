@@ -40,9 +40,11 @@ def model_test(model_build_func, test_sample):
                         'x': test_sample.to(s.DEVICE).to(s.DTYPE),
                         'y': torch.tensor(0.5).to(s.DEVICE).to(s.DTYPE),
                         'ae_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
-                        'ae_same': test_sample.to(s.DEVICE).to(s.DTYPE), 
+                        'ae_same': test_sample.to(s.DEVICE).to(s.DTYPE),
                         'c': '0'
-                    }, 0, log=False)
+                    },
+                    0,
+                    log=False)
                 print("model tested")
             # except Exception as e:
             #     import traceback
@@ -64,60 +66,51 @@ def reconstruction_loss(pred, same, diff):
             pred.device) / 2.0
 
 
-def build_autoencoder(hpar, mode, dropout, generic=False):
+def build_autoencoder(hpar, dropout, generic=False):
     if generic:
         loss_fn = lambda pred, _, diff: F.l1_loss(pred, diff)
     else:
         loss_fn = reconstruction_loss
 
-    if mode == 'velocity':
-        hpar = get_velocity_hpar(hpar)
-    elif mode == 'pedaling':
-        hpar = get_pedaling_hpar(hpar)
+    k, activation, kernel = get_hpar(hpar)
 
-    m = feature_extraction.AutoEncoder(loss_fn=loss_fn,
-                                       input_size=(s.BINS, s.MINI_SPEC_SIZE),
-                                       max_layers=s.MAX_LAYERS,
-                                       dropout=dropout,
-                                       hyperparams=hpar).to(s.DEVICE).to(
-                                           s.DTYPE)
+    m = feature_extraction.AutoEncoder(
+        loss_fn=loss_fn,
+        insize=(
+            s.BINS,
+            s.MINI_SPEC_SIZE),  # mini_spec_size should change for pedaling...
+        dropout=dropout,
+        k=k,
+        activation=activation,
+        kernel=kernel).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
-def get_pedaling_hpar(hpar):
-    return (1, (hpar['kernel_0'], 1), (1, 1), (1, 1), hpar['lstm_hidden_size'],
-            hpar['lstm_layers'], hpar['encoder_features'],
-            hpar['middle_activation'], hpar['latent_features'])
+def get_hpar(hpar):
+    return (hpar['ae_k'], hpar['activation'], hpar['kernel'])
 
 
-def get_velocity_hpar(hpar):
-    return (1, (hpar['kernel_0'],
-                hpar['kernel_1']), (1, 1), (1, 1), hpar['lstm_hidden_size'],
-            hpar['lstm_layers'], hpar['encoder_features'],
-            hpar['middle_activation'], hpar['latent_features'])
-
-
-def build_performer_model(hpar, avg_pred):
+def build_performer_model(hpar, infeatures, avg_pred):
     m = feature_extraction.Performer(
         (hpar['performer_features'], hpar['performer_layers'],
-         hpar['latent_features'], hpar['middle_activation'], 1), F.l1_loss,
+         infeatures, hpar['activation'], 1), F.l1_loss,
         avg_pred)
 
     return m
 
 
 def build_model(hpar,
-                mode,
                 contexts,
                 dropout=s.TRAIN_DROPOUT,
                 dummy_avg=torch.tensor(0.5).cuda(),
                 generic=True,
-                lr=s.LR):
-    autoencoder = build_autoencoder(hpar, mode, dropout, generic)
-    performer = build_performer_model(hpar, dummy_avg)
+                lr=s.LR,
+                wd=s.WD):
+    autoencoder = build_autoencoder(hpar, dropout, generic)
+    performer = build_performer_model(hpar, autoencoder.encoder.outchannels, dummy_avg)
     model = feature_extraction.EncoderDecoderPerformer(autoencoder, performer,
-                                                       len(contexts), lr, s.WD)
+                                                       len(contexts), lr, wd)
     return model
 
 
@@ -195,7 +188,7 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
     #                                                       n_params_free)
     # lr = lr_k / len(trainloader)
-    model = build_model(hpar, mode, contexts, generic=generic)
+    model = build_model(hpar, contexts, generic=generic)
     print(model)
 
     # logging initial stuffs
