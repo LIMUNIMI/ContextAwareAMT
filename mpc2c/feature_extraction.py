@@ -115,7 +115,7 @@ class ResidualStack(nn.Module):
             inchannels = outchannels
 
         stack.append(
-            ResidualBlock(outchannels,
+            ResidualBlock(inchannels,
                           outchannels,
                           activation,
                           reduce=True,
@@ -174,7 +174,6 @@ class Encoder(nn.Module):
         x = x.unsqueeze(1).expand(x.shape[0], 1, x.shape[1], x.shape[2])
 
         # apply the stack
-        __import__('ipdb').set_trace()
         x = self.stack(x)
 
         # output has shape (batches, self.outchannels, 1, 1)
@@ -182,7 +181,8 @@ class Encoder(nn.Module):
 
 
 def get_inverse(layer, activation):
-    if type(layer) == nn.Conv2d:
+    if type(layer) == nn.Sequential:
+        layer = layer[0]
         return nn.Sequential(
             nn.ConvTranspose2d(layer.out_channels,
                                layer.in_channels,
@@ -191,7 +191,7 @@ def get_inverse(layer, activation):
                                bias=layer.bias is None,
                                groups=layer.groups,
                                dilation=layer.dilation),
-            nn.BatchNorm2d(layer.inchannels), activation)
+            nn.BatchNorm2d(layer.in_channels), activation)
     elif type(layer) == ResidualStack:
         return ResidualStack(layer.nblocks, layer.outchannels,
                              layer.inchannels, activation,
@@ -204,7 +204,9 @@ class Decoder(nn.Module):
         super().__init__()
         stack = []
         for l in encoder.stack[::-1]:
-            stack.append(get_inverse(l, encoder.activation))
+            m = get_inverse(l, encoder.activation)
+            if m is not None:
+                stack.append(m)
 
         self.stack = nn.Sequential(*stack)
 

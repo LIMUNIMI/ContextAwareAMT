@@ -7,6 +7,7 @@ from pprint import pprint
 
 import torch.nn.functional as F  # type: ignore
 import torch  # type: ignore
+import torchinfo
 from pytorch_lightning import Trainer  # type: ignore
 from pytorch_lightning.callbacks import ModelCheckpoint  # type: ignore
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping  # type: ignore
@@ -189,7 +190,7 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     #                                                       n_params_free)
     # lr = lr_k / len(trainloader)
     model = build_model(hpar, contexts, generic=generic)
-    print(model)
+    torchinfo.summary(model)
 
     # logging initial stuffs
     logger.log_metrics({
