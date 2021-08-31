@@ -94,28 +94,30 @@ def get_hpar(hpar):
 
 def build_performer_model(hpar, infeatures, avg_pred):
     m = feature_extraction.Performer(
-        (hpar['performer_features'], hpar['performer_layers'],
-         infeatures, hpar['activation'], 1), F.l1_loss,
-        avg_pred)
+        (hpar['performer_features'], hpar['performer_layers'], infeatures,
+         hpar['activation'], 1), F.l1_loss, avg_pred)
 
     return m
 
 
 def build_model(hpar,
-                contexts,
+                mode,
                 dropout=s.TRAIN_DROPOUT,
                 dummy_avg=torch.tensor(0.5).cuda(),
                 generic=True,
                 lr=s.LR,
                 wd=s.WD):
+
+    contexts = list(get_contexts(s.CARLA_PROJ).keys())
     autoencoder = build_autoencoder(hpar, dropout, generic)
-    performer = build_performer_model(hpar, autoencoder.encoder.outchannels, dummy_avg)
+    performer = build_performer_model(hpar, autoencoder.encoder.outchannels,
+                                      dummy_avg)
     model = feature_extraction.EncoderDecoderPerformer(autoencoder, performer,
-                                                       len(contexts), lr, wd)
+                                                       contexts, mode, lr, wd)
     return model
 
 
-def my_train(mode, copy_checkpoint, logger, model, trainloader, validloader):
+def my_train(mode, copy_checkpoint, logger, model):
     """
     Creates callbacks, train and freeze the part that raised an early-stop.
     Return the best loss of that one and 0 for the other.
@@ -144,8 +146,14 @@ def my_train(mode, copy_checkpoint, logger, model, trainloader, validloader):
                       precision=s.PRECISION,
                       max_epochs=s.EPOCHS,
                       logger=logger,
+                      # weights_summary="full",
+                      reload_dataloaders_every_n_epochs=1,
+                      log_every_n_steps=1,
+                      log_gpu_memory=True,
+                      track_grad_norm=2,
+                      overfit_batches=10,
                       gpus=s.GPUS)
-    trainer.fit(model, trainloader, validloader)
+    trainer.fit(model)
     if ae_stopper.stopped_epoch > 0:  # type: ignore
         model.autoencoder.freeze()
         ae_loss = ae_stopper.best_score  # type: ignore
@@ -171,13 +179,6 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     logger = MLFlowLogger(experiment_name=f'{mode}',
                           tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
 
-    # loaders
-    contexts = list(get_contexts(s.CARLA_PROJ).keys())
-    trainloader = data_management.get_loader(['train'], False, contexts, mode)
-    validloader = data_management.get_loader(['validation'], False, contexts,
-                                             mode)
-    print(f"Num batches: {len(trainloader)}, {len(validloader)}")
-
     # dummy model (baseline)
     # TODO: check the following function!
     # dummy_avg = compute_average(trainloader.dataset,
@@ -189,31 +190,19 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
     #                                                       n_params_free)
     # lr = lr_k / len(trainloader)
-    model = build_model(hpar, contexts, generic=generic)
+    model = build_model(hpar, mode, generic=generic)
     torchinfo.summary(model)
-
-    # logging initial stuffs
-    logger.log_metrics({
-        "initial_lr": s.LR,
-        "train_batches": len(trainloader),
-        "valid_batches": len(validloader)
-    })
 
     # training
     # this loss is also the same used for hyper-parameters tuning
-    ae_loss, perfm_loss = my_train(mode, copy_checkpoint, logger, model,
-                                   trainloader, validloader)
+    ae_loss, perfm_loss = my_train(mode, copy_checkpoint, logger, model)
     # if training was stopped by `early-stopping`, freeze that part and finish
     # to train the other one
     if ae_loss != 0 or perfm_loss != 0:
         _ae_loss, _perfm_loss = my_train(mode,
                                          copy_checkpoint,
                                          logger,
-                                         model,
-                                         trainloader,
-                                         validloader,
-                                         ae_train=ae_loss == 0,
-                                         perfm_train=perfm_loss == 0)
+                                         model)
         ae_loss = max(ae_loss, _ae_loss)
         perfm_loss = max(perfm_loss, _perfm_loss)
 

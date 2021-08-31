@@ -7,6 +7,8 @@ import torch  # type: ignore
 from torch import nn  # type: ignore
 from pytorch_lightning import LightningModule  # type: ignore
 
+from . import data_management
+
 
 def get_conv(inchannels, outchannels, kernel, grouped, transposed, **kwargs):
     groups = 1
@@ -41,9 +43,6 @@ class ResidualBlock(nn.Module):
         self.reduce = reduce
         self.transposed = transposed
         self.stack = nn.Sequential(
-            get_conv(inchannels, inchannels, 1, False, transposed),
-            nn.BatchNorm2d(inchannels),
-            activation,
             get_conv(inchannels,
                      outchannels,
                      kernel,
@@ -71,11 +70,13 @@ class ResidualBlock(nn.Module):
         if not self.reduce:
             _x = self.stack(x)
             if not self.proj:
-                return _x + x
+                out = _x + x
             else:
-                return _x + self.proj(x)
+                out = _x + self.proj(x)
         else:
-            return self.stack(x) + self.proj(x)  # type: ignore
+            out = self.stack(x) + self.proj(x)  # type: ignore
+        self.out = out
+        return out
 
     def outsize(self, insize):
         if not self.reduce:
@@ -130,7 +131,14 @@ class ResidualStack(nn.Module):
         return outsize
 
     def forward(self, x):
-        return self.stack(x)
+        self.out = self.stack(x)
+        return self.out
+
+    def get_outputs(self):
+        out = []
+        for block in self.stack[::-1]:
+            out.append(block.out)
+        return out
 
 
 class Encoder(nn.Module):
@@ -174,28 +182,43 @@ class Encoder(nn.Module):
         x = x.unsqueeze(1).expand(x.shape[0], 1, x.shape[1], x.shape[2])
 
         # apply the stack
-        x = self.stack(x)
+        self.out = self.stack(x)
 
         # output has shape (batches, self.outchannels, 1, 1)
-        return x
+        return self.out
+
+    def get_outputs(self):
+        out = []
+        # out.append(self.out)
+        for layer in self.stack[::-1]:
+            if type(layer) == ResidualStack:
+                out += layer.get_outputs()
+        return out
 
 
 def get_inverse(layer, activation):
     if type(layer) == nn.Sequential:
         layer = layer[0]
-        return nn.Sequential(
-            nn.ConvTranspose2d(layer.out_channels,
-                               layer.in_channels,
-                               kernel_size=layer.kernel_size,
-                               stride=layer.stride,
-                               bias=layer.bias is None,
-                               groups=layer.groups,
-                               dilation=layer.dilation),
-            nn.BatchNorm2d(layer.in_channels), activation)
+        return [
+            nn.Sequential(
+                nn.ConvTranspose2d(layer.out_channels,
+                                   layer.in_channels,
+                                   kernel_size=layer.kernel_size,
+                                   stride=layer.stride,
+                                   bias=layer.bias is None,
+                                   groups=layer.groups,
+                                   dilation=layer.dilation),
+                nn.BatchNorm2d(layer.in_channels), activation)
+        ]
+    elif type(layer) == ResidualBlock:
+        return ResidualBlock(layer.outchannels,
+                             layer.inchannels,
+                             layer.activation,
+                             layer.reduce,
+                             layer.kernel[0],
+                             transposed=True)
     elif type(layer) == ResidualStack:
-        return ResidualStack(layer.nblocks, layer.outchannels,
-                             layer.inchannels, activation,
-                             not layer.transposed, layer.kernel)
+        return [get_inverse(l, l.activation) for l in layer.stack[::-1]]
 
 
 class Decoder(nn.Module):
@@ -206,20 +229,25 @@ class Decoder(nn.Module):
         for l in encoder.stack[::-1]:
             m = get_inverse(l, encoder.activation)
             if m is not None:
-                stack.append(m)
+                stack += m
 
         self.stack = nn.Sequential(*stack)
+        self.encoder = encoder
 
     def forward(self, x):
 
-        # apply the stack
-        x = self.stack(x)
+        # apply the stack with u-net
+        outputs = self.encoder.get_outputs()
+        _x = x
+        for i in range(len(outputs)):
+            _x = self.stack[i](_x) + outputs[i]
+        x = self.stack[-1](_x) + x
 
         # remove the channels dimension
         x = x[:, 0, ...]
 
         # output has shape (batches, insize[0], insize[1])
-        return x
+        return x / x.max()
 
 
 class AutoEncoder(LightningModule):
@@ -323,15 +351,17 @@ class EncoderDecoderPerformer(LightningModule):
     An iterative transfer-learning LightningModule for
     autoencoder-performer architecture
     """
-    def __init__(self, autoencoder, performer, ncontexts, lr=1, wd=0):
+    def __init__(self, autoencoder, performer, contexts, mode, lr=1, wd=0):
         super().__init__()
         self.autoencoder = autoencoder
         self.performers = nn.ModuleDict(
             {str(c): copy(performer)
-             for c in range(ncontexts)})
+             for c in range(len(contexts))})
         self.lr = lr
         self.wd = wd
         self.active = 0  # 0 -> both, 1 -> autoencoder only, 2 -> performers only
+        self.mode = mode
+        self.contexts = contexts
 
     def training_step(self, batch, batch_idx):
 
@@ -353,8 +383,8 @@ class EncoderDecoderPerformer(LightningModule):
         self.losslog('perfm_train_loss', perfm_out['loss'])
         return {
             'loss': loss,
-            'ae_train_loss': ae_out['loss'],
-            'perfm_train_loss': perfm_out['loss'],
+            'ae_train_loss': ae_out['loss'].detach(),
+            'perfm_train_loss': perfm_out['loss'].detach(),
         }
 
     def validation_step(self, batch, batch_idx, log=True):
@@ -400,6 +430,14 @@ class EncoderDecoderPerformer(LightningModule):
         return torch.optim.Adadelta(self.parameters(),
                                     lr=self.lr,
                                     weight_decay=self.wd)
+
+    def train_dataloader(self):
+        dataloader = data_management.get_loader(['train'], False, self.contexts, self.mode)
+        return dataloader
+
+    def val_dataloader(self):
+        dataloader = data_management.get_loader(['validation'], False, self.contexts, self.mode)
+        return dataloader
 
 
 class AbsLayer(nn.Module):

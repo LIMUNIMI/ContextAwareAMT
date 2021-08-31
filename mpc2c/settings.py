@@ -3,7 +3,6 @@ from skopt import space
 from torch import nn
 
 from . import essentiaspec
-from .feature_extraction import AbsLayer
 
 # PATHS
 VELOCITY_DATA_PATH = '/datasets/mpc2c/resynth/velocity/'
@@ -93,10 +92,10 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    "ae_k": 4,
-    "activation": nn.GELU(),
+    "ae_k": 0,
+    "activation": nn.ReLU(),
     "kernel": 3,
-    'performer_features': 7,
+    'performer_features': 10,
     'performer_layers': 3
 }
 # TODO: redo pedaling
@@ -114,8 +113,8 @@ EARLY_RANGE = 1e-8
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
-WD = 1e-8
-LR = 1e-4
+WD = 0
+LR = 1e-8
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1e-3
 
@@ -123,7 +122,7 @@ DATASET_LEN = 1e-3
 # TODO: SKSPACE!
 PED_SKSPACE = [
     space.Integer(0, 10, name='ae_k'),
-    space.Categorical([nn.GELU(), nn.ReLU(), nn.Identity(), AbsLayer(), nn.SELU()],
+    space.Categorical([nn.GELU(), nn.ReLU(), nn.Identity(), nn.SELU()],
                       name='activation'),
     space.Integer(2, 10, name='kernel'),
     space.Integer(0, 8, name='performer_features'),

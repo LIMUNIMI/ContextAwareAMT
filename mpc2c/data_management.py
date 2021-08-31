@@ -50,7 +50,7 @@ class AEDataset(DatasetDump):
 
     def subsample(self, perc):
         """
-        Seb sample this dataset at the sample-level (not songs-level)
+        Sub-sample this dataset at the sample-level (not songs-level)
         """
         d = np.where(self.not_used)[0]
         chosen = np.random.default_rng(1992).choice(d,
@@ -68,6 +68,7 @@ class AEDataset(DatasetDump):
         Need to extend the `DatasetDump`'s method because we need to update `not_used`
         """
         out = super().set_operation(*args, **kwargs)
+        out.not_used = self.not_used.copy()
         k = 0
         for i in range(len(out.lengths)):
             L = out.lengths[i]
@@ -99,7 +100,8 @@ class AEDataset(DatasetDump):
         # the part above takes 0.1 second each (due to the creation of `inverted`
         # object, totalling 0.3 seconds)
 
-        x = self.get_input(idx, filtered=filtered)
+        x, _ = self.get_input(idx, filtered=filtered)
+        x /= x.abs().max()
         y = self.get_target(idx, filtered=filtered)
 
         # take a random sample from `different` with the same label
@@ -109,15 +111,17 @@ class AEDataset(DatasetDump):
         same_target = choice(same.inverted[bin])
         # we use song indiex and song sample index, so we don't need to specify
         # if dataset was filtered
-        ae_same = same.get_input(*same_target)
-        ae_diff = different.get_input(*diff_target)
+        ae_same, _ = same.get_input(*same_target)
+        ae_same /= ae_same.abs().max()
+        ae_diff, _ = different.get_input(*diff_target)
+        ae_diff /= ae_diff.abs().max()
 
         return {
             "c": str(c),
             "x": x,
             "y": y,
             "ae_same": ae_same,
-            "ae_diff": ae_diff
+            "ae_diff": ae_diff,
         }
 
 
@@ -147,8 +151,10 @@ class AEBatchSampler(Sampler):
                            (self.ae_dataset.sample_contexts == c)))
         # sample indices are referred to the whole dumped dataset
         batch = batch[:self.batch_size, 0]
-        if batch.shape[0] <= 1:
+        if batch.shape[0] < 1:
+            # not actually used (we reload the dataloader at every epoch)
             self.ae_dataset.not_used = self.not_used_init.copy()
+            self.contexts = cycle(self.ae_dataset.contexts)
             raise StopIteration
         self.ae_dataset.not_used[batch] = False
         return batch
