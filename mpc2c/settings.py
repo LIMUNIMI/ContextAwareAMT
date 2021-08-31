@@ -92,10 +92,10 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    "ae_k": 0,
+    "ae_k": 4,
     "activation": nn.ReLU(),
     "kernel": 3,
-    'performer_features': 10,
+    'performer_features': 3,
     'performer_layers': 3
 }
 # TODO: redo pedaling
@@ -113,8 +113,8 @@ EARLY_RANGE = 1e-8
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
-WD = 0
-LR = 1e-8
+WD = 1e-8
+LR = 1e-4
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1e-3
 

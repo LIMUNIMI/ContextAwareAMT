@@ -169,7 +169,7 @@ class Encoder(nn.Module):
         # add one convolution to reduce the size to 1x1
         stack.append(
             nn.Sequential(nn.Conv2d(outchannels, outchannels, insize),
-                          nn.BatchNorm2d(outchannels), activation))
+                          nn.BatchNorm2d(outchannels), nn.Sigmoid()))
 
         self.stack = nn.Sequential(*stack)
         self.outchannels = outchannels
@@ -268,19 +268,23 @@ class AutoEncoder(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        latent = self.encoder(batch['x'])
-        out = self.decoder(latent)
-        loss = self.loss_fn(out, batch['ae_same'], batch['ae_diff'])
+        latent_x = self.encoder(batch['x'])
+        latent_same = self.encoder(batch['ae_same'])
+        latent_diff = self.encoder(batch['ae_diff'])
+        # out = self.decoder(latent)
+        loss = self.loss_fn(latent_x, latent_same, latent_diff)
 
-        return {'loss': loss, 'latent': latent}
+        return {'loss': loss, 'latent': latent_x}
 
     def validation_step(self, batch, batch_idx):
 
-        latent = self.encoder(batch['x'])
-        out = self.decoder(latent)
-        loss = self.loss_fn(out, batch['ae_same'], batch['ae_diff'])
+        latent_x = self.encoder(batch['x'])
+        latent_same = self.encoder(batch['ae_same'])
+        latent_diff = self.encoder(batch['ae_diff'])
+        # out = self.decoder(latent)
+        loss = self.loss_fn(latent_x, latent_same, latent_diff)
 
-        return {'loss': loss, 'latent': latent, 'out': out}
+        return {'loss': loss, 'latent': latent_x}
 
 
 class Performer(LightningModule):

@@ -60,16 +60,14 @@ def model_test(model_build_func, test_sample):
     return constraint
 
 
-def reconstruction_loss(pred, same, diff):
-    return max(
-        torch.tensor(0.0),
-        torch.tensor(1.0) + F.l1_loss(pred, same) - F.l1_loss(pred, diff)).to(
-            pred.device) / 2.0
+def reconstruction_loss(pred, same_pred, diff_pred):
+    return torch.tensor(1.0) + F.mse_loss(pred, same_pred) - F.mse_loss(pred, diff_pred).to(
+            pred.device)
 
 
 def build_autoencoder(hpar, dropout, generic=False):
     if generic:
-        loss_fn = lambda pred, _, diff: F.l1_loss(pred, diff)
+        loss_fn = lambda pred, _, diff_pred: F.l1_loss(pred, diff_pred)
     else:
         loss_fn = reconstruction_loss
 
