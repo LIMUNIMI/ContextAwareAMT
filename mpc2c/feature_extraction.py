@@ -155,7 +155,7 @@ class Encoder(nn.Module):
         outchannels = 1
         while insize[0] > kernel and insize[1] > kernel:
             inchannels = outchannels
-            outchannels *= 2
+            outchannels *= 4
             nblocks = max(1, int(2**k / outchannels))
             blocks = ResidualStack(nblocks,
                                    inchannels,
@@ -169,7 +169,7 @@ class Encoder(nn.Module):
         # add one convolution to reduce the size to 1x1
         stack.append(
             nn.Sequential(nn.Conv2d(outchannels, outchannels, insize),
-                          nn.BatchNorm2d(outchannels), nn.Sigmoid()))
+                          nn.BatchNorm2d(outchannels), nn.Tanh()))
 
         self.stack = nn.Sequential(*stack)
         self.outchannels = outchannels
@@ -196,74 +196,20 @@ class Encoder(nn.Module):
         return out
 
 
-def get_inverse(layer, activation):
-    if type(layer) == nn.Sequential:
-        layer = layer[0]
-        return [
-            nn.Sequential(
-                nn.ConvTranspose2d(layer.out_channels,
-                                   layer.in_channels,
-                                   kernel_size=layer.kernel_size,
-                                   stride=layer.stride,
-                                   bias=layer.bias is None,
-                                   groups=layer.groups,
-                                   dilation=layer.dilation),
-                nn.BatchNorm2d(layer.in_channels), activation)
-        ]
-    elif type(layer) == ResidualBlock:
-        return ResidualBlock(layer.outchannels,
-                             layer.inchannels,
-                             layer.activation,
-                             layer.reduce,
-                             layer.kernel[0],
-                             transposed=True)
-    elif type(layer) == ResidualStack:
-        return [get_inverse(l, l.activation) for l in layer.stack[::-1]]
-
-
-class Decoder(nn.Module):
-    def __init__(self, encoder):
-
-        super().__init__()
-        stack = []
-        for l in encoder.stack[::-1]:
-            m = get_inverse(l, encoder.activation)
-            if m is not None:
-                stack += m
-
-        self.stack = nn.Sequential(*stack)
-        self.encoder = encoder
-
-    def forward(self, x):
-
-        # apply the stack with u-net
-        outputs = self.encoder.get_outputs()
-        _x = x
-        for i in range(len(outputs)):
-            _x = self.stack[i](_x) + outputs[i]
-        x = self.stack[-1](_x) + x
-
-        # remove the channels dimension
-        x = x[:, 0, ...]
-
-        # output has shape (batches, insize[0], insize[1])
-        return x / x.max()
-
-
-class AutoEncoder(LightningModule):
+class TripletEncoder(LightningModule):
     def __init__(self, loss_fn, **kwargs):
         """
-        encoder-decoder module
+        triplet-encoder module
 
         the loss must accept 3 values:
             * prediction
-            * same target
-            * different target
+            * same target prediction
+            * different target prediction
         """
 
         super().__init__()
         self.encoder = Encoder(**kwargs)
-        self.decoder = Decoder(self.encoder)
+        # self.decoder = Decoder(self.encoder)
         self.loss_fn = loss_fn
 
     def training_step(self, batch, batch_idx):
@@ -350,14 +296,14 @@ class Performer(LightningModule):
         return {'loss': loss, 'dummy_loss': dummy_loss}
 
 
-class EncoderDecoderPerformer(LightningModule):
+class EncoderPerformer(LightningModule):
     """
     An iterative transfer-learning LightningModule for
     autoencoder-performer architecture
     """
-    def __init__(self, autoencoder, performer, contexts, mode, lr=1, wd=0):
+    def __init__(self, tripletencoder, performer, contexts, mode, lr=1, wd=0, moving_counter=100):
         super().__init__()
-        self.autoencoder = autoencoder
+        self.tripletencoder = tripletencoder
         self.performers = nn.ModuleDict(
             {str(c): copy(performer)
              for c in range(len(contexts))})
@@ -366,21 +312,27 @@ class EncoderDecoderPerformer(LightningModule):
         self.active = 0  # 0 -> both, 1 -> autoencoder only, 2 -> performers only
         self.mode = mode
         self.contexts = contexts
+        self.loss_pool = {"ae": [], "perfm": []}
+        self.moving_counter = moving_counter
 
     def training_step(self, batch, batch_idx):
 
-        ae_out = self.autoencoder.training_step(batch, batch_idx)
+        ae_out = self.tripletencoder.training_step(batch, batch_idx)
         if self.active < 2:
-            self.autoencoder.freeze()
+            self.tripletencoder.freeze()
         perfm_out = self.performers[batch['c'][0]].training_step(
             {
                 'x': ae_out['latent'],
                 'y': batch['y']
             }, batch_idx)
         if self.active < 2:
-            self.autoencoder.unfreeze()
+            self.tripletencoder.unfreeze()
 
         loss = ae_out['loss'] + perfm_out['loss']
+
+        lr_scheduler = self.lr_schedulers()
+        if lr_scheduler is not None:
+            lr_scheduler.step()
 
         self.losslog('train_loss', loss)
         self.losslog('ae_train_loss', ae_out['loss'])
@@ -393,7 +345,7 @@ class EncoderDecoderPerformer(LightningModule):
 
     def validation_step(self, batch, batch_idx, log=True):
 
-        ae_out = self.autoencoder.validation_step(batch, batch_idx)
+        ae_out = self.tripletencoder.validation_step(batch, batch_idx)
         perfm_out = self.performers[batch['c'][0]].validation_step(
             {
                 'x': ae_out['latent'],
@@ -410,11 +362,22 @@ class EncoderDecoderPerformer(LightningModule):
         #         'inp0' + str(time.time()) + '.html')
 
         loss = ae_out['loss'] + perfm_out['loss']
+        if self.moving_counter == 0:
+            self.loss_pool["ae"] = self.loss_pool["ae"][1:]
+            self.loss_pool["perfm"] = self.loss_pool["perfm"][1:]
+        else:
+            self.moving_counter -= 1
+
+        self.loss_pool["ae"].append(ae_out["loss"])
+        self.loss_pool["perfm"].append(perfm_out["loss"])
+
         if log:
             self.losslog('val_loss', loss)
             self.losslog('ae_val_loss', ae_out['loss'])
             self.losslog('perfm_val_loss', perfm_out['loss'])
             self.losslog('dummy_loss', perfm_out['dummy_loss'])
+            self.losslog('ae_val_loss_avg', torch.mean(torch.tensor(self.loss_pool["ae"])))
+            self.losslog('perfm_val_loss_avg', torch.mean(torch.tensor(self.loss_pool["perfm"])))
         return {
             'loss': loss,
             'ae_val_loss': ae_out['loss'],
@@ -432,21 +395,26 @@ class EncoderDecoderPerformer(LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adadelta(self.parameters(),
-                                    lr=self.lr,
-                                    weight_decay=self.wd)
+                                    lr=0.01,
+                                    weight_decay=0)
+        # optim = torch.optim.SGD(self.parameters(),
+        #                         momentum=0.9,
+        #                         lr=.1,
+        #                         nesterov=False,
+        #                         weight_decay=0.0)
+        # return {
+        #     "optimizer":
+        #     optim,
+        #     "lr_scheduler":
+        #     torch.optim.lr_scheduler.ExponentialLR(optim, gamma=0.9)
+        # }
 
     def train_dataloader(self):
-        dataloader = data_management.get_loader(['train'], False, self.contexts, self.mode)
+        dataloader = data_management.get_loader(['train'], False,
+                                                self.contexts, self.mode)
         return dataloader
 
     def val_dataloader(self):
-        dataloader = data_management.get_loader(['validation'], False, self.contexts, self.mode)
+        dataloader = data_management.get_loader(['validation'], False,
+                                                self.contexts, self.mode)
         return dataloader
-
-
-class AbsLayer(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        return torch.abs(x)

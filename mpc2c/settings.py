@@ -95,7 +95,7 @@ VEL_HYPERPARAMS = {
     "ae_k": 4,
     "activation": nn.ReLU(),
     "kernel": 3,
-    'performer_features': 3,
+    'performer_features': 7,
     'performer_layers': 3
 }
 # TODO: redo pedaling
@@ -108,13 +108,11 @@ PED_HYPERPARAMS = {
 }
 VEL_BATCH_SIZE = 10
 PED_BATCH_SIZE = 1
-EARLY_STOP = 20
-EARLY_RANGE = 1e-8
+EARLY_STOP = 30
+EARLY_RANGE = 0
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
-WD = 1e-8
-LR = 1e-4
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1e-3
 

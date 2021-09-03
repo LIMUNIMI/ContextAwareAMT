@@ -6,6 +6,7 @@ from pathlib import Path
 from pprint import pprint
 
 import torch.nn.functional as F  # type: ignore
+from torch import nn  # type: ignore
 import torch  # type: ignore
 import torchinfo
 from pytorch_lightning import Trainer  # type: ignore
@@ -61,11 +62,18 @@ def model_test(model_build_func, test_sample):
 
 
 def reconstruction_loss(pred, same_pred, diff_pred):
-    return torch.tensor(1.0) + F.mse_loss(pred, same_pred) - F.mse_loss(pred, diff_pred).to(
-            pred.device)
+    # return F.l1_loss(pred, same_pred) / (F.l1_loss(same_pred, diff_pred) + F.l1_loss(pred, diff_pred))
+    return F.triplet_margin_with_distance_loss(
+        pred,
+        same_pred,
+        diff_pred,
+        distance_function=lambda x, y: 1 - F.cosine_similarity(x, y),
+        margin=1,
+        swap=True,
+        reduction='sum')
 
 
-def build_autoencoder(hpar, dropout, generic=False):
+def build_encoder(hpar, dropout, generic=False):
     if generic:
         loss_fn = lambda pred, _, diff_pred: F.l1_loss(pred, diff_pred)
     else:
@@ -73,7 +81,7 @@ def build_autoencoder(hpar, dropout, generic=False):
 
     k, activation, kernel = get_hpar(hpar)
 
-    m = feature_extraction.AutoEncoder(
+    m = feature_extraction.TripletEncoder(
         loss_fn=loss_fn,
         insize=(
             s.BINS,
@@ -102,24 +110,23 @@ def build_model(hpar,
                 mode,
                 dropout=s.TRAIN_DROPOUT,
                 dummy_avg=torch.tensor(0.5).cuda(),
-                generic=True,
-                lr=s.LR,
-                wd=s.WD):
+                generic=True):
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
-    autoencoder = build_autoencoder(hpar, dropout, generic)
+    autoencoder = build_encoder(hpar, dropout, generic)
     performer = build_performer_model(hpar, autoencoder.encoder.outchannels,
                                       dummy_avg)
-    model = feature_extraction.EncoderDecoderPerformer(autoencoder, performer,
-                                                       contexts, mode, lr, wd)
+    model = feature_extraction.EncoderPerformer(autoencoder, performer,
+                                                contexts, mode)
     return model
 
 
-def my_train(mode, copy_checkpoint, logger, model):
+def my_train(mode, copy_checkpoint, logger, model, ae_train=True, perfm_train=True):
     """
     Creates callbacks, train and freeze the part that raised an early-stop.
     Return the best loss of that one and 0 for the other.
     """
+    # setup callbacks
     checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}",
                                        filename='{epoch}-{ae_loss:.2f}',
                                        monitor='val_loss',
@@ -127,41 +134,46 @@ def my_train(mode, copy_checkpoint, logger, model):
                                        mode='min',
                                        save_weights_only=True)
     callbacks = [checkpoint_saver]
-    # if ae_train:
-    #     ae_stopper = EarlyStopping(monitor='ae_val_loss',
-    #                                min_delta=s.EARLY_RANGE,
-    #                                patience=s.EARLY_STOP)
-    #     callbacks.append(ae_stopper)
-    # if perfm_train:
-    #     perfm_stopper = EarlyStopping(monitor='perfm_val_loss',
-    #                                   min_delta=s.EARLY_RANGE,
-    #                                   patience=s.EARLY_STOP)
-    #     callbacks.append(perfm_stopper)
+    if ae_train:
+        ae_stopper = EarlyStopping(monitor='ae_val_loss_avg',
+                                   min_delta=s.EARLY_RANGE,
+                                   patience=s.EARLY_STOP)
+        callbacks.append(ae_stopper)
+    if perfm_train:
+        perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
+                                      min_delta=s.EARLY_RANGE,
+                                      patience=s.EARLY_STOP)
+        callbacks.append(perfm_stopper)
     if copy_checkpoint:
         callbacks.append(best_checkpoint_saver(copy_checkpoint))
 
-    trainer = Trainer(callbacks=callbacks,
-                      precision=s.PRECISION,
-                      max_epochs=s.EPOCHS,
-                      logger=logger,
-                      # weights_summary="full",
-                      reload_dataloaders_every_n_epochs=1,
-                      log_every_n_steps=1,
-                      log_gpu_memory=True,
-                      track_grad_norm=2,
-                      overfit_batches=10,
-                      gpus=s.GPUS)
+    trainer = Trainer(
+        callbacks=callbacks,
+        precision=s.PRECISION,
+        max_epochs=s.EPOCHS,
+        logger=logger,
+        # weights_summary="full",
+        reload_dataloaders_every_n_epochs=1,
+        log_every_n_steps=1,
+        log_gpu_memory=True,
+        track_grad_norm=2,
+        overfit_batches=10,
+        gpus=s.GPUS)
+
+    # training!
     trainer.fit(model)
+
+    # if early stopping interrupted, then we return the loss, otherwise we return -1
     if ae_stopper.stopped_epoch > 0:  # type: ignore
         model.autoencoder.freeze()
         ae_loss = ae_stopper.best_score  # type: ignore
     else:
-        ae_loss = 0
+        ae_loss = -1
     if perfm_stopper.stopped_epoch > 0:  # type: ignore
         model.performer.freeze()
         perfm_loss = perfm_stopper.best_score  # type: ignore
     else:
-        perfm_loss = 0
+        perfm_loss = -1
     return ae_loss, perfm_loss
 
 
@@ -184,10 +196,6 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     #                             n_jobs=-1,
     #                             backend='threading').to(s.DEVICE)
 
-    # learning rate
-    # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
-    #                                                       n_params_free)
-    # lr = lr_k / len(trainloader)
     model = build_model(hpar, mode, generic=generic)
     torchinfo.summary(model)
 
@@ -195,12 +203,10 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     # this loss is also the same used for hyper-parameters tuning
     ae_loss, perfm_loss = my_train(mode, copy_checkpoint, logger, model)
     # if training was stopped by `early-stopping`, freeze that part and finish
-    # to train the other one
-    if ae_loss != 0 or perfm_loss != 0:
-        _ae_loss, _perfm_loss = my_train(mode,
-                                         copy_checkpoint,
-                                         logger,
-                                         model)
+    # training the other one
+    if (ae_loss == -1) != (perfm_loss == -1):
+        _ae_loss, _perfm_loss = my_train(mode, copy_checkpoint, logger, model,
+                                         ae_loss == -1, perfm_loss == -1)
         ae_loss = max(ae_loss, _ae_loss)
         perfm_loss = max(perfm_loss, _perfm_loss)
 
