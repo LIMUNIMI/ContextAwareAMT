@@ -6,6 +6,8 @@ from copy import copy
 import torch  # type: ignore
 from torch import nn  # type: ignore
 from pytorch_lightning import LightningModule  # type: ignore
+import pandas as pd
+import numpy as np
 
 from . import data_management
 
@@ -301,7 +303,15 @@ class EncoderPerformer(LightningModule):
     An iterative transfer-learning LightningModule for
     autoencoder-performer architecture
     """
-    def __init__(self, tripletencoder, performer, contexts, mode, lr=1, wd=0, moving_counter=100):
+    def __init__(self,
+                 tripletencoder,
+                 performer,
+                 contexts,
+                 mode,
+                 lr=1,
+                 wd=0,
+                 ema_period=20,
+                 ema_alpha=0.5):
         super().__init__()
         self.tripletencoder = tripletencoder
         self.performers = nn.ModuleDict(
@@ -313,7 +323,9 @@ class EncoderPerformer(LightningModule):
         self.mode = mode
         self.contexts = contexts
         self.loss_pool = {"ae": [], "perfm": []}
-        self.moving_counter = moving_counter
+        self.ema_loss_pool = {"ae": [], "perfm": []}
+        self.ema_period = ema_period
+        self.ema_alpha = ema_alpha
 
     def training_step(self, batch, batch_idx):
 
@@ -362,28 +374,29 @@ class EncoderPerformer(LightningModule):
         #         'inp0' + str(time.time()) + '.html')
 
         loss = ae_out['loss'] + perfm_out['loss']
-        if self.moving_counter == 0:
-            self.loss_pool["ae"] = self.loss_pool["ae"][1:]
-            self.loss_pool["perfm"] = self.loss_pool["perfm"][1:]
-        else:
-            self.moving_counter -= 1
-
-        self.loss_pool["ae"].append(ae_out["loss"])
-        self.loss_pool["perfm"].append(perfm_out["loss"])
-
+        self.loss_pool["ae"].append(ae_out["loss"].cpu().numpy().tolist())
+        self.loss_pool["perfm"].append(perfm_out["loss"].cpu().numpy().tolist())
         if log:
             self.losslog('val_loss', loss)
             self.losslog('ae_val_loss', ae_out['loss'])
             self.losslog('perfm_val_loss', perfm_out['loss'])
             self.losslog('dummy_loss', perfm_out['dummy_loss'])
-            self.losslog('ae_val_loss_avg', torch.mean(torch.tensor(self.loss_pool["ae"])))
-            self.losslog('perfm_val_loss_avg', torch.mean(torch.tensor(self.loss_pool["perfm"])))
         return {
             'loss': loss,
             'ae_val_loss': ae_out['loss'],
             'perfm_val_loss': perfm_out['loss'],
             'dummy_loss': perfm_out['dummy_loss']
         }
+
+    def on_validation_epoch_end(self, log=True):
+        # compute loss average and log ema
+        if log:
+            self.ema_loss_pool["ae"].append(np.mean(self.loss_pool["ae"]))
+            self.ema_loss_pool["perfm"].append(np.mean(self.loss_pool["ae"]))
+            ae_ewm = ema(self.ema_loss_pool["ae"], self.ema_period, self.ema_alpha)
+            perfm_ewm = ema(self.ema_loss_pool["perfm"], self.ema_period, self.ema_alpha)
+            self.losslog('ae_val_loss_avg', ae_ewm)
+            self.losslog('perfm_val_loss_avg', perfm_ewm)
 
     def losslog(self, name, value):
         self.log(name,
@@ -394,9 +407,7 @@ class EncoderPerformer(LightningModule):
                  logger=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adadelta(self.parameters(),
-                                    lr=1,
-                                    weight_decay=0)
+        return torch.optim.Adadelta(self.parameters(), lr=1, weight_decay=0)
         # optim = torch.optim.SGD(self.parameters(),
         #                         momentum=0.9,
         #                         lr=.1,
@@ -417,4 +428,11 @@ class EncoderPerformer(LightningModule):
     def val_dataloader(self):
         dataloader = data_management.get_loader(['validation'], False,
                                                 self.contexts, self.mode)
+        self.val_batches = len(dataloader)
         return dataloader
+
+
+def ema(values: list, min_periods: int, alpha: float):
+    ema = pd.DataFrame(values).ewm(
+        alpha=alpha, min_periods=min_periods).mean().values[-1, 0]
+    return 999.0 if np.isnan(ema) else ema # type: ignore

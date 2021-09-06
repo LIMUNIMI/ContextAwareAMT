@@ -117,12 +117,21 @@ def build_model(hpar,
     autoencoder = build_encoder(hpar, dropout, generic)
     performer = build_performer_model(hpar, autoencoder.encoder.outchannels,
                                       dummy_avg)
-    model = feature_extraction.EncoderPerformer(autoencoder, performer,
-                                                contexts, mode)
+    model = feature_extraction.EncoderPerformer(autoencoder,
+                                                performer,
+                                                contexts,
+                                                mode,
+                                                ema_period=s.EMA_PERIOD,
+                                                ema_alpha=s.EMA_ALPHA)
     return model
 
 
-def my_train(mode, copy_checkpoint, logger, model, ae_train=True, perfm_train=True):
+def my_train(mode,
+             copy_checkpoint,
+             logger,
+             model,
+             ae_train=True,
+             perfm_train=True):
     """
     Creates callbacks, train and freeze the part that raised an early-stop.
     Return the best loss of that one and 0 for the other.
