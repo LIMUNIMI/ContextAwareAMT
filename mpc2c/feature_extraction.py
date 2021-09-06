@@ -142,7 +142,7 @@ class ResidualStack(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, insize, dropout, k, activation, kernel):
+    def __init__(self, insize, dropout, k1, k2, activation, kernel):
 
         super().__init__()
         self.dropout = nn.Dropout(dropout)
@@ -155,8 +155,8 @@ class Encoder(nn.Module):
         outchannels = 1
         while insize[0] > kernel and insize[1] > kernel:
             inchannels = outchannels
-            outchannels *= 4
-            nblocks = max(1, int(2**k / outchannels))
+            nblocks = max(1, int(2**k1 / outchannels))
+            outchannels *= k2
             blocks = ResidualStack(nblocks,
                                    inchannels,
                                    outchannels,
@@ -395,7 +395,7 @@ class EncoderPerformer(LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adadelta(self.parameters(),
-                                    lr=0.01,
+                                    lr=1,
                                     weight_decay=0)
         # optim = torch.optim.SGD(self.parameters(),
         #                         momentum=0.9,

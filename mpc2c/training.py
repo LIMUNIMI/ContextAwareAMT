@@ -79,7 +79,7 @@ def build_encoder(hpar, dropout, generic=False):
     else:
         loss_fn = reconstruction_loss
 
-    k, activation, kernel = get_hpar(hpar)
+    k1, k2, activation, kernel = get_hpar(hpar)
 
     m = feature_extraction.TripletEncoder(
         loss_fn=loss_fn,
@@ -87,7 +87,8 @@ def build_encoder(hpar, dropout, generic=False):
             s.BINS,
             s.MINI_SPEC_SIZE),  # mini_spec_size should change for pedaling...
         dropout=dropout,
-        k=k,
+        k1=k1,
+        k2=k2,
         activation=activation,
         kernel=kernel).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
@@ -95,7 +96,7 @@ def build_encoder(hpar, dropout, generic=False):
 
 
 def get_hpar(hpar):
-    return (hpar['ae_k'], hpar['activation'], hpar['kernel'])
+    return (hpar['ae_k1'], hpar['ae_k2'], hpar['activation'], hpar['kernel'])
 
 
 def build_performer_model(hpar, infeatures, avg_pred):
@@ -164,12 +165,12 @@ def my_train(mode, copy_checkpoint, logger, model, ae_train=True, perfm_train=Tr
     trainer.fit(model)
 
     # if early stopping interrupted, then we return the loss, otherwise we return -1
-    if ae_stopper.stopped_epoch > 0:  # type: ignore
-        model.autoencoder.freeze()
+    if ae_stopper and ae_stopper.stopped_epoch > 0:  # type: ignore
+        model.tripletencoder.freeze()
         ae_loss = ae_stopper.best_score  # type: ignore
     else:
         ae_loss = -1
-    if perfm_stopper.stopped_epoch > 0:  # type: ignore
+    if perfm_train and perfm_stopper.stopped_epoch > 0:  # type: ignore
         model.performer.freeze()
         perfm_loss = perfm_stopper.best_score  # type: ignore
     else:

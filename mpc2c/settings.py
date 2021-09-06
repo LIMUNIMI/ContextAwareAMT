@@ -92,7 +92,8 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = 500
 VEL_HYPERPARAMS = {
-    "ae_k": 4,
+    "ae_k1": 4,
+    "ae_k2": 4,
     "activation": nn.ReLU(),
     "kernel": 3,
     'performer_features': 7,
@@ -108,7 +109,7 @@ PED_HYPERPARAMS = {
 }
 VEL_BATCH_SIZE = 10
 PED_BATCH_SIZE = 1
-EARLY_STOP = 30
+EARLY_STOP = 50
 EARLY_RANGE = 0
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
@@ -119,7 +120,8 @@ DATASET_LEN = 1e-3
 # SKOPT
 # TODO: SKSPACE!
 PED_SKSPACE = [
-    space.Integer(0, 10, name='ae_k'),
+    space.Integer(0, 10, name='ae_k1'),
+    space.Integer(2, 6, name='ae_k2'),
     space.Categorical([nn.GELU(), nn.ReLU(), nn.Identity(), nn.SELU()],
                       name='activation'),
     space.Integer(2, 10, name='kernel'),
