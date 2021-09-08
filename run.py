@@ -121,12 +121,6 @@ def main():
                       Path(s.METADATASET_PATH), s.CONTEXT_SPLITS,
                       s.RESYNTH_FINAL_DECAY)
 
-    if args.checkpoint:
-        checkpoint = torch.load(args.checkpoint)['state_dict']
-        s.VEL_BATCH_SIZE = s.TRANSFER_VEL_BATCH_SIZE
-    else:
-        checkpoint = None
-
     if args.pedaling:
         mode = 'pedaling'
         hpar = s.PED_HYPERPARAMS
@@ -138,7 +132,7 @@ def main():
     if args.skopt:
 
         contexts = list(get_contexts(s.CARLA_PROJ).keys())
-        s.EPOCHS = 50
+        s.EPOCHS = 25
 
         def objective(x):
             return training.train(x, mode, generic=args.generic)

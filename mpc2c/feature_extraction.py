@@ -392,11 +392,11 @@ class EncoderPerformer(LightningModule):
         # compute loss average and log ema
         if log:
             self.ema_loss_pool["ae"].append(np.mean(self.loss_pool["ae"]))
-            self.ema_loss_pool["perfm"].append(np.mean(self.loss_pool["ae"]))
-            ae_ewm = ema(self.ema_loss_pool["ae"], self.ema_period, self.ema_alpha)
-            perfm_ewm = ema(self.ema_loss_pool["perfm"], self.ema_period, self.ema_alpha)
-            self.losslog('ae_val_loss_avg', ae_ewm)
-            self.losslog('perfm_val_loss_avg', perfm_ewm)
+            self.ema_loss_pool["perfm"].append(np.mean(self.loss_pool["perfm"]))
+            ae_ema = ema(self.ema_loss_pool["ae"], self.ema_period, self.ema_alpha)
+            perfm_ema = ema(self.ema_loss_pool["perfm"], self.ema_period, self.ema_alpha)
+            self.losslog('ae_val_loss_avg', ae_ema)
+            self.losslog('perfm_val_loss_avg', perfm_ema)
 
     def losslog(self, name, value):
         self.log(name,
@@ -407,7 +407,7 @@ class EncoderPerformer(LightningModule):
                  logger=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adadelta(self.parameters(), lr=1, weight_decay=0)
+        return torch.optim.Adadelta(self.parameters(), lr=self.lr, weight_decay=0)
         # optim = torch.optim.SGD(self.parameters(),
         #                         momentum=0.9,
         #                         lr=.1,
@@ -435,4 +435,4 @@ class EncoderPerformer(LightningModule):
 def ema(values: list, min_periods: int, alpha: float):
     ema = pd.DataFrame(values).ewm(
         alpha=alpha, min_periods=min_periods).mean().values[-1, 0]
-    return 999.0 if np.isnan(ema) else ema # type: ignore
+    return ema

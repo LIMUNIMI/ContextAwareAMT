@@ -10,7 +10,7 @@ from torch import nn  # type: ignore
 import torch  # type: ignore
 import torchinfo
 from pytorch_lightning import Trainer  # type: ignore
-from pytorch_lightning.callbacks import ModelCheckpoint  # type: ignore
+from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging  # type: ignore
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping  # type: ignore
 from pytorch_lightning.loggers import MLFlowLogger  # type: ignore
 
@@ -121,8 +121,7 @@ def build_model(hpar,
                                                 performer,
                                                 contexts,
                                                 mode,
-                                                ema_period=s.EMA_PERIOD,
-                                                ema_alpha=s.EMA_ALPHA)
+                                                ema_period=s.EMA_PERIOD)
     return model
 
 
@@ -147,15 +146,22 @@ def my_train(mode,
     if ae_train:
         ae_stopper = EarlyStopping(monitor='ae_val_loss_avg',
                                    min_delta=s.EARLY_RANGE,
+                                   check_finite=False,
                                    patience=s.EARLY_STOP)
         callbacks.append(ae_stopper)
     if perfm_train:
         perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
                                       min_delta=s.EARLY_RANGE,
+                                      check_finite=False,
                                       patience=s.EARLY_STOP)
         callbacks.append(perfm_stopper)
     if copy_checkpoint:
         callbacks.append(best_checkpoint_saver(copy_checkpoint))
+
+    if s.SWA:
+        callbacks.append(
+            StochasticWeightAveraging(swa_epoch_start=int(0.8 * s.EPOCHS),
+                                      annealing_epochs=int(0.2 * s.EPOCHS)))
 
     trainer = Trainer(
         callbacks=callbacks,
@@ -163,28 +169,42 @@ def my_train(mode,
         max_epochs=s.EPOCHS,
         logger=logger,
         # weights_summary="full",
+        auto_lr_find=True,
         reload_dataloaders_every_n_epochs=1,
-        log_every_n_steps=1,
+        # log_every_n_steps=1,
         log_gpu_memory=True,
-        track_grad_norm=2,
-        overfit_batches=10,
+        # track_grad_norm=2,
+        # overfit_batches=100,
         gpus=s.GPUS)
 
     # training!
+    trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-10, max_lr=1))
+    print("Fitting the model!")
     trainer.fit(model)
 
     # if early stopping interrupted, then we return the loss, otherwise we return -1
-    if ae_stopper and ae_stopper.stopped_epoch > 0:  # type: ignore
-        model.tripletencoder.freeze()
+    ae_loss = perfm_loss = None
+    if ae_train:
         ae_loss = ae_stopper.best_score  # type: ignore
-    else:
-        ae_loss = -1
-    if perfm_train and perfm_stopper.stopped_epoch > 0:  # type: ignore
-        model.performer.freeze()
+        if ae_stopper.stopped_epoch > 0:  # type: ignore
+            model.tripletencoder.freeze()
+        else:
+            _ae_loss = ae_loss
+            ae_loss = -1
+    if perfm_train:
         perfm_loss = perfm_stopper.best_score  # type: ignore
+        if perfm_stopper.stopped_epoch > 0:  # type: ignore
+            model.performers.freeze()
+        else:
+            _perfm_loss = perfm_loss
+            perfm_loss = -1
+    if perfm_loss == ae_loss == -1:
+        # no early-stop
+        print(f"losses: {ae_loss:.2f}, {_perfm_loss:2.f}") # type: ignore
+        return _ae_loss, _perfm_loss # type: ignore
     else:
-        perfm_loss = -1
-    return ae_loss, perfm_loss
+        print(f"losses: {ae_loss:.2f}, {perfm_loss:2.f}") # type: ignore
+        return ae_loss, perfm_loss
 
 
 def train(hpar, mode, copy_checkpoint='', generic=False):
@@ -212,19 +232,24 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     # training
     # this loss is also the same used for hyper-parameters tuning
     ae_loss, perfm_loss = my_train(mode, copy_checkpoint, logger, model)
-    # if training was stopped by `early-stopping`, freeze that part and finish
-    # training the other one
-    if (ae_loss == -1) != (perfm_loss == -1):
-        _ae_loss, _perfm_loss = my_train(mode, copy_checkpoint, logger, model,
-                                         ae_loss == -1, perfm_loss == -1)
-        ae_loss = max(ae_loss, _ae_loss)
-        perfm_loss = max(perfm_loss, _perfm_loss)
+    # if training is stopped by `early-stopping`, the loss is returned, otherwise -1 is returned
+    # if one was stopped, the other is not stopped
+    if ae_loss == -1:
+        ae_loss, _ = my_train(mode, copy_checkpoint, logger, model,
+                                         True, False)
+        # here _ is None!
+        # we now need to retrain the performers ->
+        perfm_loss = -1
+    if perfm_loss == -1:
+        _, perfm_loss = my_train(mode, copy_checkpoint, logger, model,
+                                      False, True)
+        # here _ is None!
 
     complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
-    loss = (ae_loss + perfm_loss) * complexity_loss
+    loss = (ae_loss + perfm_loss) * complexity_loss # type: ignore
     logger.log_metrics({
-        "best_ae_loss": float(ae_loss),
-        "best_perfm_loss": float(perfm_loss),
+        "best_ae_loss": float(ae_loss), # type: ignore
+        "best_perfm_loss": float(perfm_loss), # type: ignore
         "total_loss": float(loss)
     })
 

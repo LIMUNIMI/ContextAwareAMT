@@ -112,12 +112,13 @@ PED_BATCH_SIZE = 1
 EARLY_STOP = 50
 EARLY_RANGE = 0
 EMA_PERIOD = 20
-EMA_ALPHA = 0.5
+EMA_ALPHA = 0.6
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
 #: percentage of the dataset to use, use it for debugging or for skopt
 DATASET_LEN = 1e-3
+SWA = False
 
 # SKOPT
 # TODO: SKSPACE!
