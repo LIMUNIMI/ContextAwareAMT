@@ -37,16 +37,17 @@ def model_test(model_build_func, test_sample):
                 model = model_build_func(hpar)
                 print("model created")
                 model.eval()
-                model.to(s.DEVICE).validation_step(
-                    {
-                        'x': test_sample.to(s.DEVICE).to(s.DTYPE),
-                        'y': torch.tensor(0.5).to(s.DEVICE).to(s.DTYPE),
-                        'ae_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
-                        'ae_same': test_sample.to(s.DEVICE).to(s.DTYPE),
-                        'c': '0'
-                    },
-                    0,
-                    log=False)
+                with torch.no_grad():
+                    model.to(s.DEVICE).validation_step(
+                        {
+                            'x': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'y': torch.tensor(0.5).to(s.DEVICE).to(s.DTYPE),
+                            'ae_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'ae_same': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'c': '0'
+                        },
+                        0,
+                        log=False)
                 print("model tested")
             # except Exception as e:
             #     import traceback
@@ -178,7 +179,7 @@ def my_train(mode,
         gpus=s.GPUS)
 
     # training!
-    trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-10, max_lr=1))
+    trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
     print("Fitting the model!")
     trainer.fit(model)
 
@@ -200,10 +201,10 @@ def my_train(mode,
             perfm_loss = -1
     if perfm_loss == ae_loss == -1:
         # no early-stop
-        print(f"losses: {ae_loss:.2f}, {_perfm_loss:2.f}") # type: ignore
+        print(f"losses: {ae_loss:.2f}, {_perfm_loss:.2f}") # type: ignore
         return _ae_loss, _perfm_loss # type: ignore
     else:
-        print(f"losses: {ae_loss:.2f}, {perfm_loss:2.f}") # type: ignore
+        print(f"losses: {ae_loss:.2f}, {perfm_loss:.2f}") # type: ignore
         return ae_loss, perfm_loss
 
 

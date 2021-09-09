@@ -138,13 +138,13 @@ def main():
             return training.train(x, mode, generic=args.generic)
 
         if args.pedaling:
-            s.DATASET_LEN = 0.1
+            s.DATASET_LEN *= 0.1
             space = s.PED_SKSPACE
             test_sample = torch.rand(1, s.BINS, 100)
             checkpoint_path = "ped_skopt.pt"
 
         elif args.velocity:
-            s.DATASET_LEN = 1e-3
+            s.DATASET_LEN *= 0.1
             space = s.VEL_SKSPACE
             test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
             checkpoint_path = "vel_skopt.pt"

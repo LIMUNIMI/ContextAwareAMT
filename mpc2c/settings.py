@@ -1,6 +1,7 @@
 import torch
 from skopt import space
 from torch import nn
+import numpy as np
 
 from . import essentiaspec
 
@@ -90,7 +91,7 @@ PREPROCESSING = "pad"
 MAX_LAYERS = 30
 DEVICE = 'cuda'
 GPUS = 1
-EPOCHS = 500
+EPOCHS = np.inf
 VEL_HYPERPARAMS = {
     "ae_k1": 4,
     "ae_k2": 4,
@@ -116,22 +117,22 @@ EMA_ALPHA = 0.6
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
-#: percentage of the dataset to use, use it for debugging or for skopt
+#: percentage of the dataset to use
 DATASET_LEN = 1e-3
 SWA = False
 
 # SKOPT
 # TODO: SKSPACE!
 PED_SKSPACE = [
-    space.Integer(0, 10, name='ae_k1'),
+    space.Integer(0, 6, name='ae_k1'),
     space.Integer(2, 6, name='ae_k2'),
     space.Categorical([nn.GELU(), nn.ReLU(), nn.Identity(), nn.SELU()],
                       name='activation'),
-    space.Integer(2, 10, name='kernel'),
+    space.Integer(2, 5, name='kernel'),
     space.Integer(0, 8, name='performer_features'),
     space.Integer(1, 3, name='performer_layers'),
 ]
-VEL_SKSPACE = PED_SKSPACE + [space.Integer(2, 20, name='kernel_1')]
+VEL_SKSPACE = PED_SKSPACE + [space.Integer(2, 6, name='kernel_1')]
 SKITERATIONS = (0, 40)
 PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 0 # 1e-6
