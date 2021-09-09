@@ -44,13 +44,14 @@ class ResidualBlock(nn.Module):
         self.activation = activation
         self.reduce = reduce
         self.transposed = transposed
+        self.padding = 'valid' if reduce else 'same'
         self.stack = nn.Sequential(
             get_conv(inchannels,
                      outchannels,
                      kernel,
                      True,
                      transposed,
-                     padding=0 if reduce else (kernel - 1) // 2),
+                     padding=self.padding),
             nn.BatchNorm2d(outchannels),
             activation,
             get_conv(outchannels, outchannels, 1, False, transposed),
