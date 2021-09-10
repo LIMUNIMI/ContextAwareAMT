@@ -221,7 +221,7 @@ def process_velocities(i, dataset, nmf_params):
     return minispecs, velocities
 
 
-def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
+def get_loader(groups, redump, contexts, mode=None, nmf_params=None, njobs=s.NJOBS):
     """
     `nmf_params` and `mode` are needed only if `redump` is True
     """
@@ -254,6 +254,6 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None):
     dataset.subsample(s.DATASET_LEN)
     return DataLoader(dataset,
                       batch_sampler=AEBatchSampler(batch_size, dataset),
-                      num_workers=s.NJOBS,
+                      num_workers=njobs,
                       pin_memory=False)
     # collate_fn=ae_collate)

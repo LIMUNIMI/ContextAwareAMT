@@ -172,14 +172,16 @@ def my_train(mode,
         auto_lr_find=True,
         reload_dataloaders_every_n_epochs=1,
         # weights_summary="full",
-        # log_every_n_steps=1,
+        log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
         # overfit_batches=100,
         gpus=s.GPUS)
 
     # training!
+    model.njobs = 0 # there's some leak when using njobs > 0
     trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
+    model.njobs = s.NJOBS
     print("Fitting the model!")
     trainer.fit(model)
 

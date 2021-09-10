@@ -312,7 +312,8 @@ class EncoderPerformer(LightningModule):
                  lr=1,
                  wd=0,
                  ema_period=20,
-                 ema_alpha=0.5):
+                 ema_alpha=0.5,
+                 njobs=0):
         super().__init__()
         self.tripletencoder = tripletencoder
         self.performers = nn.ModuleDict(
@@ -327,6 +328,7 @@ class EncoderPerformer(LightningModule):
         self.ema_loss_pool = {"ae": [], "perfm": []}
         self.ema_period = ema_period
         self.ema_alpha = ema_alpha
+        self.njobs = njobs
 
     def training_step(self, batch, batch_idx):
 
@@ -423,12 +425,12 @@ class EncoderPerformer(LightningModule):
 
     def train_dataloader(self):
         dataloader = data_management.get_loader(['train'], False,
-                                                self.contexts, self.mode)
+                                                self.contexts, self.mode, njobs=self.njobs)
         return dataloader
 
     def val_dataloader(self):
         dataloader = data_management.get_loader(['validation'], False,
-                                                self.contexts, self.mode)
+                                                self.contexts, self.mode, njobs=self.njobs)
         self.val_batches = len(dataloader)
         return dataloader
 
