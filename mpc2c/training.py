@@ -30,9 +30,13 @@ def model_test(model_build_func, test_sample):
         print("----------")
         print("checking this set of hpar: ")
         pprint(hpar)
-        allowed = True
+        if hpar['ae_k1'] + hpar['ae_k2'] <= 8:
+            allowed = True
+        else:
+            allowed = False
 
         if allowed:
+            model = None
             try:
                 model = model_build_func(hpar)
                 print("model created")
@@ -55,6 +59,8 @@ def model_test(model_build_func, test_sample):
             except Exception as e:
                 print(e)
                 allowed = False
+            finally:
+                del model
 
         print(f"hyper-parameters allowed: {allowed}")
         return allowed
@@ -172,14 +178,14 @@ def my_train(mode,
         auto_lr_find=True,
         reload_dataloaders_every_n_epochs=1,
         # weights_summary="full",
-        log_every_n_steps=1,
+        # log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
         # overfit_batches=100,
         gpus=s.GPUS)
 
     # training!
-    model.njobs = 0 # there's some leak when using njobs > 0
+    model.njobs = 1 # there's some leak when using njobs > 0
     trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
     model.njobs = s.NJOBS
     print("Fitting the model!")
