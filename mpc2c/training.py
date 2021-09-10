@@ -103,7 +103,7 @@ def get_hpar(hpar):
 def build_performer_model(hpar, infeatures, avg_pred):
     m = feature_extraction.Performer(
         (hpar['performer_features'], hpar['performer_layers'], infeatures,
-         hpar['activation'], 1), F.l1_loss, avg_pred)
+         hpar['activation'], 1), nn.L1Loss(reduction='sum'), avg_pred)
 
     return m
 
@@ -169,11 +169,11 @@ def my_train(mode,
         precision=s.PRECISION,
         max_epochs=s.EPOCHS,
         logger=logger,
-        # weights_summary="full",
         auto_lr_find=True,
         reload_dataloaders_every_n_epochs=1,
+        # weights_summary="full",
         # log_every_n_steps=1,
-        log_gpu_memory=True,
+        # log_gpu_memory=True,
         # track_grad_norm=2,
         # overfit_batches=100,
         gpus=s.GPUS)
@@ -200,11 +200,10 @@ def my_train(mode,
             _perfm_loss = perfm_loss
             perfm_loss = -1
     if perfm_loss == ae_loss == -1:
-        # no early-stop
-        print(f"losses: {ae_loss:.2f}, {_perfm_loss:.2f}") # type: ignore
+        # no early-stop, return the original losses
         return _ae_loss, _perfm_loss # type: ignore
     else:
-        print(f"losses: {ae_loss:.2f}, {perfm_loss:.2f}") # type: ignore
+        # early-stop, return -1 for the part that should still be trained
         return ae_loss, perfm_loss
 
 
@@ -233,20 +232,28 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     # training
     # this loss is also the same used for hyper-parameters tuning
     ae_loss, perfm_loss = my_train(mode, copy_checkpoint, logger, model)
+    print(f"First-training losses: {ae_loss:.2f}, {perfm_loss:.2f}") # type: ignore
     # if training is stopped by `early-stopping`, the loss is returned, otherwise -1 is returned
     # if one was stopped, the other is not stopped
     if ae_loss == -1:
+        print("Continuing training encoder...")
         ae_loss, _ = my_train(mode, copy_checkpoint, logger, model,
                                          True, False)
         # here _ is None!
         # we now need to retrain the performers ->
         perfm_loss = -1
+
     if perfm_loss == -1:
+        print("Continuing training performers...")
         _, perfm_loss = my_train(mode, copy_checkpoint, logger, model,
                                       False, True)
         # here _ is None!
+    print(f"Final losses: {ae_loss:.2f}, {perfm_loss:.2f}") # type: ignore
 
-    complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
+    if s.COMPLEXITY_PENALIZER > 0:
+        complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
+    else:
+        complexity_loss = 1.0
     loss = (ae_loss + perfm_loss) * complexity_loss # type: ignore
     logger.log_metrics({
         "best_ae_loss": float(ae_loss), # type: ignore
@@ -255,4 +262,4 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     })
 
     # this is the loss used by hyper-parameters optimization
-    return loss
+    return float(loss)

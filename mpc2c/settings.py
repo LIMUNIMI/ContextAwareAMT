@@ -124,7 +124,7 @@ SWA = False
 # SKOPT
 # TODO: SKSPACE!
 PED_SKSPACE = [
-    space.Integer(0, 6, name='ae_k1'),
+    space.Integer(0, 7, name='ae_k1'),
     space.Integer(2, 6, name='ae_k2'),
     space.Categorical([nn.GELU(), nn.ReLU(), nn.Identity(), nn.SELU()],
                       name='activation'),
