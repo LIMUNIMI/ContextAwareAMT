@@ -139,13 +139,11 @@ def main():
 
         if args.pedaling:
             s.DATASET_LEN *= 0.1
-            space = s.PED_SKSPACE
             test_sample = torch.rand(1, s.BINS, 100)
             checkpoint_path = "ped_skopt.pt"
 
         elif args.velocity:
             s.DATASET_LEN *= 0.1
-            space = s.VEL_SKSPACE
             test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
             checkpoint_path = "vel_skopt.pt"
         else:
@@ -154,12 +152,13 @@ def main():
         space_constraint = training.model_test(
             lambda x: training.build_model(x, contexts), test_sample)
 
-        hyperopt(space,
+        hyperopt(s.SKSPACE,
                  checkpoint_path,
                  s.SKITERATIONS,
                  objective,
-                 space_constraint=space_constraint,
-                 plot_graphs=True)
+                 skoptimizer_kwargs=dict(space_constraint=space_constraint,
+                      plot_graphs=True),
+                 optimize_kwargs=dict(n_points=100))
 
     if args.train:
 

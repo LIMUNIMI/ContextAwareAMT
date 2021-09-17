@@ -93,12 +93,12 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = np.inf
 VEL_HYPERPARAMS = {
-    "ae_k1": 4,
-    "ae_k2": 4,
-    "activation": nn.ReLU(),
-    "kernel": 3,
-    'performer_features': 7,
-    'performer_layers': 3
+    "ae_k1": 7,
+    "ae_k2": 5,
+    "activation": nn.Identity(),
+    "kernel": 1,
+    'performer_features': 0,
+    'performer_layers': 1
 }
 # TODO: redo pedaling
 PED_HYPERPARAMS = {
@@ -123,16 +123,15 @@ SWA = False
 
 # SKOPT
 # TODO: SKSPACE!
-PED_SKSPACE = [
+SKSPACE = [
     space.Integer(0, 7, name='ae_k1'),
     space.Integer(2, 6, name='ae_k2'),
     space.Categorical([nn.GELU(), nn.ReLU(), nn.Identity(), nn.SELU()],
                       name='activation'),
-    space.Integer(2, 5, name='kernel'),
+    space.Integer(1, 3, name='kernel'),
     space.Integer(0, 8, name='performer_features'),
     space.Integer(1, 3, name='performer_layers'),
 ]
-VEL_SKSPACE = PED_SKSPACE + [space.Integer(2, 6, name='kernel_1')]
 SKITERATIONS = (0, 40)
 PLOT_GRAPHS = True
 COMPLEXITY_PENALIZER = 0 # 1e-6
