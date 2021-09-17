@@ -30,10 +30,7 @@ def model_test(model_build_func, test_sample):
         print("----------")
         print("checking this set of hpar: ")
         pprint(hpar)
-        if hpar['ae_k1'] + hpar['ae_k2'] <= 8:
-            allowed = True
-        else:
-            allowed = False
+        allowed = True
 
         if allowed:
             model = None
@@ -97,7 +94,7 @@ def build_encoder(hpar, dropout, generic=False):
         k1=k1,
         k2=k2,
         activation=activation,
-        kernel=kernel).to(s.DEVICE).to(s.DTYPE)
+        kernel=2 * kernel + 1).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
@@ -150,6 +147,7 @@ def my_train(mode,
                                        mode='min',
                                        save_weights_only=True)
     callbacks = [checkpoint_saver]
+    ae_stopper = perfm_stopper = None
     if ae_train:
         ae_stopper = EarlyStopping(monitor='ae_val_loss_avg',
                                    min_delta=s.EARLY_RANGE,
@@ -185,34 +183,22 @@ def my_train(mode,
         gpus=s.GPUS)
 
     # training!
-    model.njobs = 1 # there's some leak when using njobs > 0
-    trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
-    model.njobs = s.NJOBS
-    print("Fitting the model!")
-    trainer.fit(model)
+    stopped_epoch = 9999  # let's enter the while the first time
+    while stopped_epoch > s.EARLY_STOP:
+        model.njobs = 1  # there's some leak when using njobs > 0
+        trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
+        model.njobs = s.NJOBS
+        print("Fitting the model!")
+        trainer.fit(model)
+        if ae_train:
+            stopped_epoch = ae_stopper.stopped_epoch  # type: ignore
+        else:
+            stopped_epoch = 0
+        if perfm_train:
+            stopped_epoch = max(stopped_epoch,
+                                perfm_stopper.stopped_epoch)  # type: ignore
 
-    # if early stopping interrupted, then we return the loss, otherwise we return -1
-    ae_loss = perfm_loss = None
-    if ae_train:
-        ae_loss = ae_stopper.best_score  # type: ignore
-        if ae_stopper.stopped_epoch > 0:  # type: ignore
-            model.tripletencoder.freeze()
-        else:
-            _ae_loss = ae_loss
-            ae_loss = -1
-    if perfm_train:
-        perfm_loss = perfm_stopper.best_score  # type: ignore
-        if perfm_stopper.stopped_epoch > 0:  # type: ignore
-            model.performers.freeze()
-        else:
-            _perfm_loss = perfm_loss
-            perfm_loss = -1
-    if perfm_loss == ae_loss == -1:
-        # no early-stop, return the original losses
-        return _ae_loss, _perfm_loss # type: ignore
-    else:
-        # early-stop, return -1 for the part that should still be trained
-        return ae_loss, perfm_loss
+    return ae_stopper, perfm_stopper
 
 
 def train(hpar, mode, copy_checkpoint='', generic=False):
@@ -239,33 +225,42 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
 
     # training
     # this loss is also the same used for hyper-parameters tuning
-    ae_loss, perfm_loss = my_train(mode, copy_checkpoint, logger, model)
-    print(f"First-training losses: {ae_loss:.2f}, {perfm_loss:.2f}") # type: ignore
-    # if training is stopped by `early-stopping`, the loss is returned, otherwise -1 is returned
-    # if one was stopped, the other is not stopped
-    if ae_loss == -1:
-        print("Continuing training encoder...")
-        ae_loss, _ = my_train(mode, copy_checkpoint, logger, model,
-                                         True, False)
-        # here _ is None!
-        # we now need to retrain the performers ->
-        perfm_loss = -1
+    ae_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model)
+    ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
+    print(
+        f"First-training losses: {ae_loss:.2e}, {perfm_loss:.2e}"
+    )
 
-    if perfm_loss == -1:
+    # cases:
+    # A: encoder was stopped
+    # B: performers were stopped
+    # C: none was stopped
+
+    # TODO: freeze() seems to do nothing...
+    if ae_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
+        # case A
+        model.performers.freeze()
+        print("Continuing training encoder...")
+        ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model, True,
+                                 False)
+    if ae_stopper.stopped_epoch > 0:  # type: ignore
+        # case A and B
+        model.tripletencoder.freeze()
         print("Continuing training performers...")
-        _, perfm_loss = my_train(mode, copy_checkpoint, logger, model,
-                                      False, True)
-        # here _ is None!
-    print(f"Final losses: {ae_loss:.2f}, {perfm_loss:.2f}") # type: ignore
+        _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
+                                    False, True)
+
+    ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
+    print(f"Final losses: {ae_loss:.2e}, {perfm_loss:.2e}")
 
     if s.COMPLEXITY_PENALIZER > 0:
         complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
     else:
         complexity_loss = 1.0
-    loss = (ae_loss + perfm_loss) * complexity_loss # type: ignore
+    loss = (ae_loss + perfm_loss) * complexity_loss  # type: ignore
     logger.log_metrics({
-        "best_ae_loss": float(ae_loss), # type: ignore
-        "best_perfm_loss": float(perfm_loss), # type: ignore
+        "best_ae_loss": float(ae_loss),  # type: ignore
+        "best_perfm_loss": float(perfm_loss),  # type: ignore
         "total_loss": float(loss)
     })
 
