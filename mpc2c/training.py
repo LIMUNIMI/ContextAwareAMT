@@ -19,6 +19,7 @@ from . import settings as s
 from .mytorchutils import best_checkpoint_saver, compute_average, count_params
 from .asmd_resynth import get_contexts
 
+RANDGEN = torch.Generator()
 
 def model_test(model_build_func, test_sample):
     """
@@ -66,7 +67,6 @@ def model_test(model_build_func, test_sample):
 
 
 def reconstruction_loss(pred, same_pred, diff_pred):
-    # return F.l1_loss(pred, same_pred) / (F.l1_loss(same_pred, diff_pred) + F.l1_loss(pred, diff_pred))
     return F.triplet_margin_with_distance_loss(
         pred,
         same_pred,
@@ -76,10 +76,15 @@ def reconstruction_loss(pred, same_pred, diff_pred):
         swap=True,
         reduction='sum')
 
+def generic_loss(pred, same_pred, diff_pred):
+    if torch.randint(6, generator=RANDGEN) > 0:
+        return F.l1_loss(pred, diff_pred)
+    else:
+        return F.l1_loss(pred, same_pred)
 
 def build_encoder(hpar, dropout, generic=False):
     if generic:
-        loss_fn = lambda pred, _, diff_pred: F.l1_loss(pred, diff_pred)
+        loss_fn = generic_loss
     else:
         loss_fn = reconstruction_loss
 
