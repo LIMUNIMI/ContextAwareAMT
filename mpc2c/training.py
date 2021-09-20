@@ -236,7 +236,6 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     # B: performers were stopped
     # C: none was stopped
 
-    # TODO: freeze() seems to do nothing...
     if ae_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
         # case A
         model.performers.freeze()

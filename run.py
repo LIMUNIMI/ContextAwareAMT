@@ -158,7 +158,7 @@ def main():
                  objective,
                  skoptimizer_kwargs=dict(space_constraint=space_constraint,
                       plot_graphs=True),
-                 optimize_kwargs=dict(n_points=100))
+                 optimize_kwargs=dict(max_loss=20.0, n_points=100))
 
     if args.train:
 
