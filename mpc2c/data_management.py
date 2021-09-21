@@ -26,27 +26,28 @@ class AEDataset(DatasetDump):
         """
         super().__init__(*args, **kwargs)
         self.contexts = contexts
-        # keep track of which samples among those dumped were used
-        self.not_used = np.ones(sum(self.lengths), dtype=np.bool8)
-        # keep track of the context of each sample
-        fname = self.root / 'sample_contexts.pkl'
-        if fname.exists():
-            self.sample_contexts = pickle.load(open(fname,
-                                                    'rb')).astype(np.int64)
-        else:
-            self.sample_contexts = np.zeros(self.not_used.shape[0],
-                                            dtype=np.int64)
-            print(
-                "Pre-computing sample contexts (this is done once and cached to file...)"
-            )
-            k = 0
-            for i in trange(len(self.lengths)):
-                L = self.lengths[i]
-                context = self.songs[i]['groups'][-1]
-                self.sample_contexts[k:k + L] = self.contexts.index(context)
-                k += L
-            pickle.dump(self.sample_contexts, open(fname, 'wb'))
-        self.len = np.count_nonzero(self.not_used)
+        if self.dumped:
+            # keep track of which samples among those dumped were used
+            self.not_used = np.ones(sum(self.lengths), dtype=np.bool8)
+            # keep track of the context of each sample
+            fname = self.root / 'sample_contexts.pkl'
+            if fname.exists():
+                self.sample_contexts = pickle.load(open(fname,
+                                                        'rb')).astype(np.int64)
+            else:
+                self.sample_contexts = np.zeros(self.not_used.shape[0],
+                                                dtype=np.int64)
+                print(
+                    "Pre-computing sample contexts (this is done once and cached to file...)"
+                )
+                k = 0
+                for i in trange(len(self.lengths)):
+                    L = self.lengths[i]
+                    context = self.songs[i]['groups'][-1]
+                    self.sample_contexts[k:k + L] = self.contexts.index(context)
+                    k += L
+                pickle.dump(self.sample_contexts, open(fname, 'wb'))
+            self.len = np.count_nonzero(self.not_used)
 
     def subsample(self, perc):
         """
@@ -225,11 +226,6 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None, njobs=s.NJO
     """
     `nmf_params` and `mode` are needed only if `redump` is True
     """
-    if redump:
-        dumped = False
-    else:
-        dumped = True
-
     if mode == 'velocity':
         process_fn = process_velocities
         data_path = s.VELOCITY_DATA_PATH
@@ -244,16 +240,16 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None, njobs=s.NJO
 
     asmd_data = asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
                              metadataset_path=s.METADATASET_PATH)
-    dataset = AEDataset(contexts, asmd_data, data_path, dumped)
+    dataset = AEDataset(contexts, asmd_data, data_path, dumped = not redump)
 
-    if not dumped:
+    if redump:
         dataset.dump(process_fn, nmf_params, n_jobs=s.NJOBS, max_nbytes=None)
-
-    # select the groups, subsample dataset, and shuffle it
-    dataset = dataset.set_operation(dataset_utils.filter, groups=groups)
-    dataset.subsample(s.DATASET_LEN)
-    return DataLoader(dataset,
-                      batch_sampler=AEBatchSampler(batch_size, dataset),
-                      num_workers=njobs,
-                      pin_memory=False)
+    else:
+        # select the groups, subsample dataset, and shuffle it
+        dataset = dataset.set_operation(dataset_utils.filter, groups=groups)
+        dataset.subsample(s.DATASET_LEN)
+        return DataLoader(dataset,
+                          batch_sampler=AEBatchSampler(batch_size, dataset),
+                          num_workers=njobs,
+                          pin_memory=False)
     # collate_fn=ae_collate)

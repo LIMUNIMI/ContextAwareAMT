@@ -93,12 +93,12 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = np.inf
 VEL_HYPERPARAMS = {
-    "ae_k1": 7,
+    "ae_k1": 5,
     "ae_k2": 5,
-    "activation": nn.Identity(),
-    "kernel": 1,
-    'performer_features': 0,
-    'performer_layers': 1
+    "activation": nn.ReLU(),
+    "kernel": 2,
+    'performer_features': 3,
+    'performer_layers': 2
 }
 # TODO: redo pedaling
 PED_HYPERPARAMS = {
