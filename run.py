@@ -79,7 +79,7 @@ def parse_args():
         default=None,
         nargs='+',
         help=
-        "Evaluate the error distribution of model checkpoints given as argument. All contexts available in `settings.CARLA_PROJ` will be used, plus the 'orig' context. All models are evaluated on all contexts."
+        "Evaluate the error distribution of the model checkpoint given as argument. All contexts available in `settings.CARLA_PROJ` will be used. All performers are evaluated on all contexts."
     )
     parser.add_argument(
         "-cp",

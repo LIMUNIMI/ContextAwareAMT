@@ -378,7 +378,8 @@ class EncoderPerformer(LightningModule):
 
         loss = ae_out['loss'] + perfm_out['loss']
         self.loss_pool["ae"].append(ae_out["loss"].cpu().numpy().tolist())
-        self.loss_pool["perfm"].append(perfm_out["loss"].cpu().numpy().tolist())
+        self.loss_pool["perfm"].append(
+            perfm_out["loss"].cpu().numpy().tolist())
         if log:
             self.losslog('val_loss', loss)
             self.losslog('ae_val_loss', ae_out['loss'])
@@ -395,11 +396,32 @@ class EncoderPerformer(LightningModule):
         # compute loss average and log ema
         if log:
             self.ema_loss_pool["ae"].append(np.mean(self.loss_pool["ae"]))
-            self.ema_loss_pool["perfm"].append(np.mean(self.loss_pool["perfm"]))
-            ae_ema = ema(self.ema_loss_pool["ae"], self.ema_period, self.ema_alpha)
-            perfm_ema = ema(self.ema_loss_pool["perfm"], self.ema_period, self.ema_alpha)
+            self.ema_loss_pool["perfm"].append(np.mean(
+                self.loss_pool["perfm"]))
+            ae_ema = ema(self.ema_loss_pool["ae"], self.ema_period,
+                         self.ema_alpha)
+            perfm_ema = ema(self.ema_loss_pool["perfm"], self.ema_period,
+                            self.ema_alpha)
             self.losslog('ae_val_loss_avg', ae_ema)
             self.losslog('perfm_val_loss_avg', perfm_ema)
+            self.losslog("final_weight_variance_norm",
+                         self.performer_weight_variance_norm())
+
+    def performer_weight_variance_norm(self):
+        """
+        Computes the average variance norm of the weights of the performers
+        """
+        # get the number of tensor weights in the performers
+        N = len(self.performers['0'].stack[0].weight)
+        norm = 0
+        for i in range(N):
+            # get the list of the i-th parameters
+            params = [list(perf.parameters())[i] for perf in self.performers.values()]
+            # compute point-wise variances
+            v = torch.var(torch.stack(params), dim=(1,), unbiased=True)
+            # sum to the norm
+            norm += v
+        return norm / N
 
     def losslog(self, name, value):
         self.log(name,
@@ -410,7 +432,9 @@ class EncoderPerformer(LightningModule):
                  logger=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adadelta(self.parameters(), lr=self.lr, weight_decay=0)
+        return torch.optim.Adadelta(self.parameters(),
+                                    lr=self.lr,
+                                    weight_decay=0)
         # optim = torch.optim.SGD(self.parameters(),
         #                         momentum=0.9,
         #                         lr=.1,
@@ -424,18 +448,25 @@ class EncoderPerformer(LightningModule):
         # }
 
     def train_dataloader(self):
-        dataloader = data_management.get_loader(['train'], False,
-                                                self.contexts, self.mode, njobs=self.njobs)
+        dataloader = data_management.get_loader(['train'],
+                                                False,
+                                                self.contexts,
+                                                self.mode,
+                                                njobs=self.njobs)
         return dataloader
 
     def val_dataloader(self):
-        dataloader = data_management.get_loader(['validation'], False,
-                                                self.contexts, self.mode, njobs=self.njobs)
+        dataloader = data_management.get_loader(['validation'],
+                                                False,
+                                                self.contexts,
+                                                self.mode,
+                                                njobs=self.njobs)
         self.val_batches = len(dataloader)
         return dataloader
 
 
 def ema(values: list, min_periods: int, alpha: float):
-    ema = pd.DataFrame(values).ewm(
-        alpha=alpha, min_periods=min_periods).mean().values[-1, 0]
+    ema = pd.DataFrame(values).ewm(alpha=alpha,
+                                   min_periods=min_periods).mean().values[-1,
+                                                                          0]
     return ema
