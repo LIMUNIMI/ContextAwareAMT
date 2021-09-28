@@ -77,7 +77,7 @@ def reconstruction_loss(pred, same_pred, diff_pred):
         reduction='sum')
 
 def generic_loss(pred, same_pred, diff_pred):
-    if torch.randint(6, generator=RANDGEN) > 0:
+    if torch.randint(6, (1,), generator=RANDGEN) > 0:
         return F.l1_loss(pred, diff_pred)
     else:
         return F.l1_loss(pred, same_pred)
@@ -138,60 +138,66 @@ def my_train(mode,
              copy_checkpoint,
              logger,
              model,
+             generic,
              ae_train=True,
              perfm_train=True):
     """
     Creates callbacks, train and freeze the part that raised an early-stop.
     Return the best loss of that one and 0 for the other.
     """
-    # setup callbacks
-    checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}",
-                                       filename='{epoch}-{ae_loss:.2f}',
-                                       monitor='val_loss',
-                                       save_top_k=1,
-                                       mode='min',
-                                       save_weights_only=True)
-    callbacks = [checkpoint_saver]
-    ae_stopper = perfm_stopper = None
-    if ae_train:
-        ae_stopper = EarlyStopping(monitor='ae_val_loss_avg',
-                                   min_delta=s.EARLY_RANGE,
-                                   check_finite=False,
-                                   patience=s.EARLY_STOP)
-        callbacks.append(ae_stopper)
-    if perfm_train:
-        perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
-                                      min_delta=s.EARLY_RANGE,
-                                      check_finite=False,
-                                      patience=s.EARLY_STOP)
-        callbacks.append(perfm_stopper)
-    if copy_checkpoint:
-        callbacks.append(best_checkpoint_saver(copy_checkpoint))
-
-    if s.SWA:
-        callbacks.append(
-            StochasticWeightAveraging(swa_epoch_start=int(0.8 * s.EPOCHS),
-                                      annealing_epochs=int(0.2 * s.EPOCHS)))
-
-    trainer = Trainer(
-        callbacks=callbacks,
-        precision=s.PRECISION,
-        max_epochs=s.EPOCHS,
-        logger=logger,
-        auto_lr_find=True,
-        reload_dataloaders_every_n_epochs=1,
-        # weights_summary="full",
-        # log_every_n_steps=1,
-        # log_gpu_memory=True,
-        # track_grad_norm=2,
-        # overfit_batches=100,
-        gpus=s.GPUS)
-
-    # training!
     stopped_epoch = 9999  # let's enter the while the first time
     while stopped_epoch > s.EARLY_STOP:
+        # setup callbacks
+        checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}_generic={generic}",
+                                           filename='{epoch}-{ae_loss:.2f}',
+                                           monitor='val_loss',
+                                           save_top_k=1,
+                                           mode='min',
+                                           save_weights_only=True)
+        callbacks = [checkpoint_saver]
+        ae_stopper = perfm_stopper = None
+        if ae_train:
+            ae_stopper = EarlyStopping(monitor='ae_val_loss_avg',
+                                       min_delta=s.EARLY_RANGE,
+                                       check_finite=False,
+                                       patience=s.EARLY_STOP)
+            callbacks.append(ae_stopper)
+        if perfm_train:
+            perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
+                                          min_delta=s.EARLY_RANGE,
+                                          check_finite=False,
+                                          patience=s.EARLY_STOP)
+            callbacks.append(perfm_stopper)
+        if copy_checkpoint:
+            callbacks.append(best_checkpoint_saver(copy_checkpoint))
+
+        if s.SWA:
+            callbacks.append(
+                StochasticWeightAveraging(swa_epoch_start=int(0.8 * s.EPOCHS),
+                                          annealing_epochs=int(0.2 * s.EPOCHS)))
+
+    # training!
+        trainer = Trainer(
+            callbacks=callbacks,
+            precision=s.PRECISION,
+            max_epochs=s.EPOCHS,
+            logger=logger,
+            auto_lr_find=True,
+            reload_dataloaders_every_n_epochs=1,
+            # weights_summary="full",
+            # log_every_n_steps=1,
+            # log_gpu_memory=True,
+            # track_grad_norm=2,
+            # overfit_batches=1,
+            gpus=s.GPUS)
+
         model.njobs = 1  # there's some leak when using njobs > 0
-        trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
+        if os.path.exists("lr_find_temp_model.ckpt"):
+            os.remove("lr_find_temp_model.ckpt")
+        d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
+        if d['lr_find'].suggestion() is None:
+            model.lr = 1e-5
+            model.learning_rate = 1e-5
         model.njobs = s.NJOBS
         print("Fitting the model!")
         trainer.fit(model)
@@ -230,7 +236,7 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
 
     # training
     # this loss is also the same used for hyper-parameters tuning
-    ae_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model)
+    ae_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model, generic)
     ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
     print(
         f"First-training losses: {ae_loss:.2e}, {perfm_loss:.2e}"
@@ -245,14 +251,14 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
         # case A
         model.performers.freeze()
         print("Continuing training encoder...")
-        ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model, True,
-                                 False)
+        ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model, generic,
+                                 True, False)
     if ae_stopper.stopped_epoch > 0:  # type: ignore
         # case A and B
         model.tripletencoder.freeze()
         print("Continuing training performers...")
         _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
-                                    False, True)
+                                    generic, False, True)
 
     ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
     print(f"Final losses: {ae_loss:.2e}, {perfm_loss:.2e}")
