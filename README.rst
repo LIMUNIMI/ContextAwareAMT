@@ -68,35 +68,8 @@ N.B. TODO
 .. #. Look for hyper-parameters for pedaling using the original context: ``python
 ..    run.py -p -sk``. We obtained hyperparams defined in ``settings.py``
 ..    and loss function of 0.1803.
-#. Fully train velocity models: ``python run.py -v -t``
-
-   * Dummy loss: 0.1207
-   * Validation loss: 0.1409 (69 epochs)
-   * 354845 batches in training
-   * 55008 batches in validation
-   * Learning rate: 1.41e-5
-   * 73287 parameters::
-
-      MIDIParameterEstimation(
-        (dropout): Dropout(p=0.1, inplace=False)
-        (lstm): LSTM(13, 128, batch_first=True)
-        (stack): Sequential(
-          (0): Conv2d(1, 1, kernel_size=(3, 6), stride=(1, 1), bias=False)
-          (1): Identity()
-          (2): ReLU()
-          (3): Conv2d(1, 1, kernel_size=(3, 6), stride=(1, 1), bias=False)
-          (4): Identity()
-          (5): ReLU()
-          (6): Conv2d(1, 1, kernel_size=(3, 6), stride=(1, 1), bias=False)
-          (7): Identity()
-          (8): ReLU()
-          (9): Conv2d(1, 1, kernel_size=(1, 15), stride=(1, 1), bias=False)
-          (10): Identity()
-          (11): ReLU()
-          (12): Conv2d(1, 1, kernel_size=(1, 1), stride=(1, 1))
-          (13): Sigmoid()
-        )
-      )
+#. Fully train velocity models with specific indipendency: ``python run.py -v -t``
+#. Fully train velocity models with generic indipendency: ``python run.py -v -t -g``
 
 .. #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
@@ -122,7 +95,7 @@ N.B. TODO
 ..         )
 ..       )
 
-#. After each training, you will find a checkpoint file in the `models` directory
+#. After each training, you will find a few checkpoint files in the relative directory directory; find the most recent one with ``ls -l``
 
 ----
 
