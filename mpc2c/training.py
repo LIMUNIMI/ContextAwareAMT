@@ -78,9 +78,9 @@ def reconstruction_loss(pred, same_pred, diff_pred):
 
 def generic_loss(pred, same_pred, diff_pred):
     if torch.randint(6, (1,), generator=RANDGEN) > 0:
-        return F.l1_loss(pred, diff_pred)
+        return F.l1_loss(pred, diff_pred, reduction='sum')
     else:
-        return F.l1_loss(pred, same_pred)
+        return F.l1_loss(pred, same_pred, reduction='sum')
 
 def build_encoder(hpar, dropout, generic=False):
     if generic:
