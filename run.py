@@ -135,7 +135,9 @@ def main():
         s.EPOCHS = 25
 
         def objective(x):
-            return training.train(x, mode, generic=args.generic)
+            l1 = training.train(x, mode, generic=True)
+            l2 = training.train(x, mode, generic=False)
+            return (l1 + l2) / 2
 
         if args.pedaling:
             s.DATASET_LEN *= 0.1

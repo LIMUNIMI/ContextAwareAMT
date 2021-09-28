@@ -271,8 +271,26 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     logger.log_metrics({
         "best_ae_loss": float(ae_loss),  # type: ignore
         "best_perfm_loss": float(perfm_loss),  # type: ignore
-        "total_loss": float(loss)
+        "total_loss": float(loss),
+        "weight_variance_norm": performer_weight_variance_norm(model.performers)
     })
 
     # this is the loss used by hyper-parameters optimization
     return float(loss)
+
+def performer_weight_variance_norm(performers):
+    """
+    Computes the average variance norm of the weights of the performers
+    """
+    # get the number of tensor weights in the performers
+    N = len(performers['0'].stack[0].weight)
+    norm = 0
+    for i in range(N):
+        # get the list of the i-th parameters
+        params = [list(perf.parameters())[i] for perf in performers.values()]
+        # compute point-wise variances
+        v = torch.var(torch.stack(params), dim=(1,), unbiased=True)
+        # sum to the norm
+        norm += v
+    return norm / N
+
