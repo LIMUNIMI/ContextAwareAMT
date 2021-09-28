@@ -1,6 +1,6 @@
 import math
 from typing import List, Any
-from copy import copy
+from copy import deepcopy
 
 # import plotly.express as px
 import torch  # type: ignore
@@ -317,7 +317,7 @@ class EncoderPerformer(LightningModule):
         super().__init__()
         self.tripletencoder = tripletencoder
         self.performers = nn.ModuleDict(
-            {str(c): copy(performer)
+            {str(c): deepcopy(performer)
              for c in range(len(contexts))})
         self.lr = lr
         self.wd = wd
