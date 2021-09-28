@@ -412,7 +412,7 @@ class EncoderPerformer(LightningModule):
         Computes the average variance norm of the weights of the performers
         """
         # get the number of tensor weights in the performers
-        N = len(self.performers['0'].stack[0].weight)
+        N = len(list(self.performers['0'].parameters()))
         norm = 0
         for i in range(N):
             # get the list of the i-th parameters
@@ -420,7 +420,7 @@ class EncoderPerformer(LightningModule):
             # compute point-wise variances
             v = torch.var(torch.stack(params), dim=(1,), unbiased=True)
             # sum to the norm
-            norm += v
+            norm += torch.norm(v)
         return norm / N
 
     def losslog(self, name, value):
