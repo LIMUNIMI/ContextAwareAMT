@@ -64,12 +64,11 @@ N.B. TODO
 #. Look for hyper-parameters for velocity using the original context: ``python
    run.py -v -sk``. We obtained hyperparams defined in ``settings.py``
    and loss function of 0.1143.
-#. Do the same with the ``-g`` option for generic indipendence.
 .. #. Look for hyper-parameters for pedaling using the original context: ``python
 ..    run.py -p -sk``. We obtained hyperparams defined in ``settings.py``
 ..    and loss function of 0.1803.
-#. Fully train velocity models with specific indipendency: ``python run.py -v -t``
-#. Fully train velocity models with generic indipendency: ``python run.py -v -t -g``
+#. Fully train velocity models with specific independence: ``python run.py -v -t``
+#. Fully train velocity models with generic independence: ``python run.py -v -t -g``
 
 .. #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
 
@@ -107,23 +106,23 @@ N.B. TODO
   10% and 5%
 
 
-4. Evaluating error distributions
----------------------------------
+4. Evaluation
+-------------
 
-N.B. TODO
+#. MLFLow reports the average variance norm of the performers weight
 
-#. Evaluate error distributions of velocity models whose checkpoints are in a
-   given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can
-   use shell expansion like ``models/*vel*.pt``
-#. Evaluate error distributions of pedaling models whose checkpoints are in a
-   given directory: ``python run.py -p -e <list of checkpoints> -cp``; you can
-   use shell expansion like ``models/*ped*.pt``
+.. #. Evaluate error distributions of velocity models whose checkpoints are in a
+..    given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can
+..    use shell expansion like ``models/*vel*.pt``
+.. #. Evaluate error distributions of pedaling models whose checkpoints are in a
+..    given directory: ``python run.py -p -e <list of checkpoints> -cp``; you can
+..    use shell expansion like ``models/*ped*.pt``
 
-These commands will create a plotly plots with violin plots of generic and
-specific contexts and Wilcoxon p-values.
+.. These commands will create a plotly plots with violin plots of generic and
+.. specific contexts and Wilcoxon p-values.
 
-You can plot the tests multiple times without retesting: ``python run.py -p -cp -cf
-results/*.csv``.
+.. You can plot the tests multiple times without retesting: ``python run.py -p -cp -cf
+.. results/*.csv``.
 
 Notes
 -----
