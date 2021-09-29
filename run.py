@@ -48,8 +48,9 @@ def parse_args():
     parser.add_argument(
         "-g",
         "--generic",
-        action="store_true",
-        help="Use generic indipendence instead of specific indipendence")
+        action="store",
+        default="specific",
+        help="Use generic or no independence instead of specific independence; accepted values: `specific`, `generic`, `none` ")
 
     parser.add_argument(
         "-sk",
@@ -135,9 +136,10 @@ def main():
         s.EPOCHS = 25
 
         def objective(x):
-            l1 = training.train(x, mode, generic=True)
-            l2 = training.train(x, mode, generic=False)
-            return (l1 + l2) / 2
+            l3 = training.train(x, mode, independence='none')
+            l1 = training.train(x, mode, independence='specific')
+            l2 = training.train(x, mode, independence='generic')
+            return (l1 + l2 + l3) / 3
 
         if args.pedaling:
             s.DATASET_LEN *= 0.1
@@ -168,7 +170,7 @@ def main():
         training.train(hpar,
                        mode,
                        copy_checkpoint=Path("models") / f"{mode}.pt",
-                       generic=args.generic)
+                       independence=args.generic)
 
     if args.redump:
         contexts = list(get_contexts(s.CARLA_PROJ).keys())

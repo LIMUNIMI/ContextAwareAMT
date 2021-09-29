@@ -66,7 +66,7 @@ def model_test(model_build_func, test_sample):
     return constraint
 
 
-def reconstruction_loss(pred, same_pred, diff_pred):
+def specific_loss(pred, same_pred, diff_pred):
     return F.triplet_margin_with_distance_loss(
         pred,
         same_pred,
@@ -82,11 +82,15 @@ def generic_loss(pred, same_pred, diff_pred):
     else:
         return F.l1_loss(pred, same_pred, reduction='sum')
 
-def build_encoder(hpar, dropout, generic=False):
-    if generic:
+def build_encoder(hpar, dropout, independence):
+    if independence == 'generic':
         loss_fn = generic_loss
+    elif independence == 'specific':
+        loss_fn = specific_loss
+    elif independence == 'none':
+        loss_fn = lambda *_: torch.tensor(0., device=s.DEVICE)
     else:
-        loss_fn = reconstruction_loss
+        raise RuntimeError(f"Unknown independence value {independence}")
 
     k1, k2, activation, kernel = get_hpar(hpar)
 
@@ -120,16 +124,17 @@ def build_model(hpar,
                 mode,
                 dropout=s.TRAIN_DROPOUT,
                 dummy_avg=torch.tensor(0.5).cuda(),
-                generic=True):
+                independence='specific'):
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
-    autoencoder = build_encoder(hpar, dropout, generic)
+    autoencoder = build_encoder(hpar, dropout, independence)
     performer = build_performer_model(hpar, autoencoder.encoder.outchannels,
                                       dummy_avg)
     model = feature_extraction.EncoderPerformer(autoencoder,
                                                 performer,
                                                 contexts,
                                                 mode,
+                                                independence,
                                                 ema_period=s.EMA_PERIOD)
     return model
 
@@ -138,7 +143,7 @@ def my_train(mode,
              copy_checkpoint,
              logger,
              model,
-             generic,
+             independence,
              ae_train=True,
              perfm_train=True):
     """
@@ -148,7 +153,7 @@ def my_train(mode,
     stopped_epoch = 9999  # let's enter the while the first time
     while stopped_epoch > s.EARLY_STOP:
         # setup callbacks
-        checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}_generic={generic}",
+        checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}_independence={independence}",
                                            filename='{epoch}-{ae_loss:.2f}',
                                            monitor='val_loss',
                                            save_top_k=1,
@@ -212,7 +217,7 @@ def my_train(mode,
     return ae_stopper, perfm_stopper
 
 
-def train(hpar, mode, copy_checkpoint='', generic=False):
+def train(hpar, mode, copy_checkpoint='', independence='specific'):
     """
     1. Builds a model given `hpar` and `mode`
     2. Train the model
@@ -231,12 +236,12 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
     #                             n_jobs=-1,
     #                             backend='threading').to(s.DEVICE)
 
-    model = build_model(hpar, mode, generic=generic)
+    model = build_model(hpar, mode, independence=independence)
     torchinfo.summary(model)
 
     # training
     # this loss is also the same used for hyper-parameters tuning
-    ae_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model, generic)
+    ae_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model, independence)
     ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
     print(
         f"First-training losses: {ae_loss:.2e}, {perfm_loss:.2e}"
@@ -251,14 +256,14 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
         # case A
         model.performers.freeze()
         print("Continuing training encoder...")
-        ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model, generic,
+        ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model, independence,
                                  True, False)
     if ae_stopper.stopped_epoch > 0:  # type: ignore
         # case A and B
         model.tripletencoder.freeze()
         print("Continuing training performers...")
         _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
-                                    generic, False, True)
+                                    independence, False, True)
 
     ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
     print(f"Final losses: {ae_loss:.2e}, {perfm_loss:.2e}")
@@ -272,7 +277,7 @@ def train(hpar, mode, copy_checkpoint='', generic=False):
         "best_ae_loss": float(ae_loss),  # type: ignore
         "best_perfm_loss": float(perfm_loss),  # type: ignore
         "total_loss": float(loss),
-        "final_weight_variance_norm": model.performer_weight_variance_norm()
+        "final_weight_variance_norm": model.performer_weight_variance()
     })
 
     # this is the loss used by hyper-parameters optimization
