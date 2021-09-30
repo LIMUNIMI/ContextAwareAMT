@@ -1,6 +1,28 @@
 import essentia.standard as esst  # type: ignore
 import numpy as np
 import pretty_midi as pm  # type: ignore
+from scipy.optimize import linear_sum_assignment
+
+
+def permute_tensors(t0, t1):
+    """
+    Permute the rows of tensor `t1` so that the L1/L2 distances between `t0`
+    and `t1` is minimized.
+
+    Returns the permutation of columns (the indices)
+
+    see https://math.stackexchange.com/questions/3225410/find-a-permutation-of-the-rows-of-a-matrix-that-minimizes-the-sum-of-squared-err
+
+    For instance, `t0` and `t1` could be tensors describing a linear layer, in
+    which case, the permutation of rows must be applied to the columns of the
+    next layer
+    """
+
+    _, cols = linear_sum_assignment((t0 @ t1.T).detach().cpu().numpy(),
+                                    maximize=True)
+
+    # note: cols are the columns of the cost matrix `t0 @ t1.T`, but the rows of t1
+    return cols.tolist()
 
 
 def amp2db(arr, clean=True):
@@ -258,7 +280,8 @@ def make_pianoroll(mat,
 
         # the release
         release_end = min(end + release_f * release_b, pr.shape[2])
-        fill_base(pitch, end, release_end, attack_b + inner_b, release_f, release_b)
+        fill_base(pitch, end, release_end, attack_b + inner_b, release_f,
+                  release_b)
 
         # the eps range after the offset and after release
         if eps_range > 0:

@@ -419,17 +419,45 @@ class EncoderPerformer(LightningModule):
     def performer_weight_variance(self):
         """
         Computes the average variance of the weights of the performers
+        after having put the weights tensors in the same order as the first
+        performer
+        
+        see https://math.stackexchange.com/questions/3225410/find-a-permutation-of-the-rows-of-a-matrix-that-minimizes-the-sum-of-squared-err
         """
         # get the number of tensor weights in the performers
         N = len(list(self.performers['0'].parameters()))
+        permutations = [None] * len(self.performers)
         s = 0
         c = 0
         for i in range(N):
             # get the list of the i-th parameters
             params = [list(perf.parameters())[i] for perf in self.performers.values()]
+            for i in range(len(params)):
+                if i > 0:
+                    # retrieving last permutation
+                    perm_cols = permutations[i]
+                    if params[0].data.ndim > 1:
+                        # a new linear layer
+                        # computing and updating row permutation
+                        if params[0].shape[0] == 1:
+                            # awkward pytorch: in this case the smart indexing below remove one dimension
+                            perm_rows = slice(None)
+                        else:
+                            perm_rows = utils.permute_tensors(params[0], params[i])
+                        if perm_cols is not None:
+                            # apply row permutation of the previous layer to the columns of this layer
+                            params[i] = params[i][perm_rows, perm_cols]
+                        else:
+                            # this is the first layer: no permutation of inputs (columns)
+                            params[i] = params[i][perm_rows]
+                        permutations[i] = perm_rows
+                    elif perm_cols is not None:
+                        # this is bias or batch normalization
+                        # apply row permutation of the previous layer to this array
+                        params[i] = params[i][perm_cols]
             # compute point-wise variances
             v = torch.var(torch.stack(params), dim=(0,), unbiased=True)
-            # sum to the norm
+            # sum to the avg
             s += torch.sum(v)
             c += v.numel()
         # average
