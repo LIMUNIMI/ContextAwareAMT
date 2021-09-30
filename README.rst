@@ -109,7 +109,7 @@ N.B. TODO
 4. Evaluation
 -------------
 
-#. MLFLow reports the average variance norm of the performers weight
+#. MLFLow reports the average variance norm of the performers weight and the test loss
 
 .. #. Evaluate error distributions of velocity models whose checkpoints are in a
 ..    given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can

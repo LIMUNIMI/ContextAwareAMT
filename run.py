@@ -39,7 +39,7 @@ def parse_args():
         "-p",
         "--pedaling",
         action="store_true",
-        help="Perform actions for pedaling estimation (frame-wise prediction)."
+        help="TODO Perform actions for pedaling estimation (frame-wise prediction)."
     )
     parser.add_argument("-t",
                         "--train",
@@ -63,42 +63,6 @@ def parse_args():
                         "--redump",
                         action="store_true",
                         help="Pre-process the full dataset and dumps it")
-    parser.add_argument(
-        "-pt",
-        "--checkpoint",
-        action="store",
-        type=str,
-        default=None,
-        help=
-        "Load parameters from this checkpoint and freeze the initial weights if training."
-    )
-    parser.add_argument(
-        "-e",
-        "--evaluate",
-        action="store",
-        type=str,
-        default=None,
-        nargs='+',
-        help=
-        "Evaluate the error distribution of the model checkpoint given as argument. All contexts available in `settings.CARLA_PROJ` will be used. All performers are evaluated on all contexts."
-    )
-    parser.add_argument(
-        "-cp",
-        "--compare",
-        action="store_true",
-        help=
-        "Only valid if `--evaluate` is used. Using this option, you can name your models starting with the context on which they were trained (e.g. `pianoteq0_vel.pt`); in this way, one more plot is created, representing the `orig` model compared to the other models on their specific context."
-    )
-    parser.add_argument(
-        "-cf",
-        "--csv-file",
-        action="store",
-        type=str,
-        default=None,
-        nargs='+',
-        help=
-        "Expects at least one input, namely paths to csv files containing the saved tests that should be plotted"
-    )
     return parser.parse_args()
 
 
@@ -180,24 +144,6 @@ def main():
                                        contexts=contexts,
                                        mode=mode,
                                        nmf_params=nmf_params)
-
-    if args.evaluate or args.csv_file:
-        compare = args.compare
-        if args.csv_file:
-            for fname in args.csv_file:
-                evaluate.plot_from_file(fname,
-                                        compare=compare,
-                                        mode=mode,
-                                        ext='.svg')
-        else:
-
-            dfs = evaluate.evaluate(args.evaluate, mode, Path(s.RESULT_PATH))
-
-            for i, df in enumerate(dfs):
-                evaluate.plot(df,
-                              compare,
-                              mode=mode,
-                              save=Path(s.IMAGES_PATH) / f"{mode}_eval.{i}")
 
 
 if __name__ == "__main__":
