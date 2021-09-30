@@ -21,6 +21,7 @@ from .asmd_resynth import get_contexts
 
 RANDGEN = torch.Generator()
 
+
 def model_test(model_build_func, test_sample):
     """
     A function to build a constraint around the model size; the constraint
@@ -76,11 +77,13 @@ def specific_loss(pred, same_pred, diff_pred):
         swap=True,
         reduction='sum')
 
+
 def generic_loss(pred, same_pred, diff_pred):
-    if torch.randint(6, (1,), generator=RANDGEN) > 0:
+    if torch.randint(6, (1, ), generator=RANDGEN) > 0:
         return F.l1_loss(pred, diff_pred, reduction='sum')
     else:
         return F.l1_loss(pred, same_pred, reduction='sum')
+
 
 def build_encoder(hpar, dropout, independence):
     if independence == 'generic':
@@ -136,7 +139,7 @@ def build_model(hpar,
                                                 mode,
                                                 independence,
                                                 ema_period=s.EMA_PERIOD)
-    return model
+    return model.to(s.DEVICE)
 
 
 def my_train(mode,
@@ -153,12 +156,13 @@ def my_train(mode,
     stopped_epoch = 9999  # let's enter the while the first time
     while stopped_epoch > s.EARLY_STOP:
         # setup callbacks
-        checkpoint_saver = ModelCheckpoint(f"checkpoint_{mode}_independence={independence}",
-                                           filename='{epoch}-{ae_loss:.2f}',
-                                           monitor='val_loss',
-                                           save_top_k=1,
-                                           mode='min',
-                                           save_weights_only=True)
+        checkpoint_saver = ModelCheckpoint(
+            f"checkpoint_{mode}_independence={independence}",
+            filename='{epoch}-{ae_loss:.2f}',
+            monitor='val_loss',
+            save_top_k=1,
+            mode='min',
+            save_weights_only=True)
         callbacks = [checkpoint_saver]
         ae_stopper = perfm_stopper = None
         if ae_train:
@@ -179,7 +183,8 @@ def my_train(mode,
         if s.SWA:
             callbacks.append(
                 StochasticWeightAveraging(swa_epoch_start=int(0.8 * s.EPOCHS),
-                                          annealing_epochs=int(0.2 * s.EPOCHS)))
+                                          annealing_epochs=int(0.2 *
+                                                               s.EPOCHS)))
 
     # training!
         trainer = Trainer(
@@ -189,6 +194,7 @@ def my_train(mode,
             logger=logger,
             auto_lr_find=True,
             reload_dataloaders_every_n_epochs=1,
+            num_sanity_val_steps=0,
             # weights_summary="full",
             # log_every_n_steps=1,
             # log_gpu_memory=True,
@@ -217,17 +223,19 @@ def my_train(mode,
     return ae_stopper, perfm_stopper
 
 
-def train(hpar, mode, copy_checkpoint='', independence='specific'):
+def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
     """
     1. Builds a model given `hpar` and `mode`
     2. Train the model
     3. Saves the trained model weights to `copy_checkpoint`
-    4. Returns the best validation loss function + the complexity penalty set
-       in `settings`
+    4. Test the trained model if `test is True`
+    4. Returns the best validation loss (or test loss if `test` is True)
     """
     # the logger
     logger = MLFlowLogger(experiment_name=f'{mode}',
                           tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
+
+    logger.log_metrics({"mode": mode, "independence": independence})
 
     # dummy model (baseline)
     # TODO: check the following function!
@@ -241,11 +249,10 @@ def train(hpar, mode, copy_checkpoint='', independence='specific'):
 
     # training
     # this loss is also the same used for hyper-parameters tuning
-    ae_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model, independence)
+    ae_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
+                                         independence)
     ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
-    print(
-        f"First-training losses: {ae_loss:.2e}, {perfm_loss:.2e}"
-    )
+    print(f"First-training losses: {ae_loss:.2e}, {perfm_loss:.2e}")
 
     # cases:
     # A: encoder was stopped
@@ -256,8 +263,8 @@ def train(hpar, mode, copy_checkpoint='', independence='specific'):
         # case A
         model.performers.freeze()
         print("Continuing training encoder...")
-        ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model, independence,
-                                 True, False)
+        ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
+                                 independence, True, False)
     if ae_stopper.stopped_epoch > 0:  # type: ignore
         # case A and B
         model.tripletencoder.freeze()
@@ -268,16 +275,22 @@ def train(hpar, mode, copy_checkpoint='', independence='specific'):
     ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
     print(f"Final losses: {ae_loss:.2e}, {perfm_loss:.2e}")
 
-    if s.COMPLEXITY_PENALIZER > 0:
-        complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
+    if test:
+        trainer = Trainer(
+            precision=s.PRECISION,
+            logger=logger,
+            gpus=s.GPUS)
+        loss = trainer.test(model)[0]["test_loss_avg"]
     else:
-        complexity_loss = 1.0
-    loss = (ae_loss + perfm_loss) * complexity_loss  # type: ignore
+        loss = ae_loss + perfm_loss
+
     logger.log_metrics({
-        "best_ae_loss": float(ae_loss),  # type: ignore
-        "best_perfm_loss": float(perfm_loss),  # type: ignore
-        "total_loss": float(loss),
-        "final_weight_variance_norm": model.performer_weight_variance()
+        "best_ae_val_loss":
+        float(ae_loss),  # type: ignore
+        "best_perfm_val_loss":
+        float(perfm_loss),  # type: ignore
+        "final_weight_variance_avg":
+        model.performer_weight_variance()
     })
 
     # this is the loss used by hyper-parameters optimization

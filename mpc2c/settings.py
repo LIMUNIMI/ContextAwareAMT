@@ -91,7 +91,7 @@ PREPROCESSING = "pad"
 MAX_LAYERS = 30
 DEVICE = 'cuda'
 GPUS = 1
-EPOCHS = np.inf
+EPOCHS = 100
 VEL_HYPERPARAMS = {
     "ae_k1": 5,
     "ae_k2": 5,
@@ -122,7 +122,6 @@ DATASET_LEN = 1e-3
 SWA = False
 
 # SKOPT
-# TODO: SKSPACE!
 SKSPACE = [
     space.Integer(0, 7, name='ae_k1'),
     space.Integer(2, 6, name='ae_k2'),

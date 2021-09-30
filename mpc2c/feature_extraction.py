@@ -9,7 +9,7 @@ from pytorch_lightning import LightningModule  # type: ignore
 import pandas as pd
 import numpy as np
 
-from . import data_management
+from . import data_management, utils
 
 
 def ema(values: list, min_periods: int, alpha: float):
@@ -222,11 +222,14 @@ class TripletEncoder(LightningModule):
         # self.decoder = Decoder(self.encoder)
         self.loss_fn = loss_fn
 
+    def forward(self, x):
+        return self.encoder(x)
+
     def training_step(self, batch, batch_idx):
 
-        latent_x = self.encoder(batch['x'])
-        latent_same = self.encoder(batch['ae_same'])
-        latent_diff = self.encoder(batch['ae_diff'])
+        latent_x = self.forward(batch['x'])
+        latent_same = self.forward(batch['ae_same'])
+        latent_diff = self.forward(batch['ae_diff'])
         # out = self.decoder(latent)
         loss = self.loss_fn(latent_x, latent_same, latent_diff)
 
@@ -234,9 +237,9 @@ class TripletEncoder(LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        latent_x = self.encoder(batch['x'])
-        latent_same = self.encoder(batch['ae_same'])
-        latent_diff = self.encoder(batch['ae_diff'])
+        latent_x = self.forward(batch['x'])
+        latent_same = self.forward(batch['ae_same'])
+        latent_diff = self.forward(batch['ae_diff'])
         # out = self.decoder(latent)
         loss = self.loss_fn(latent_x, latent_same, latent_diff)
 
@@ -321,7 +324,8 @@ class EncoderPerformer(LightningModule):
                  wd=0,
                  ema_period=20,
                  ema_alpha=0.5,
-                 njobs=0):
+                 njobs=0,
+                 testloss = nn.L1Loss(reduction='none')):
         super().__init__()
         self.tripletencoder = tripletencoder
         self.performers = nn.ModuleDict(
@@ -338,6 +342,12 @@ class EncoderPerformer(LightningModule):
         self.ema_alpha = ema_alpha
         self.njobs = njobs
         self.independence = independence
+        self.testloss = testloss
+
+    def forward(self, x, context):
+        ae_out = self.tripletencoder.forward(x)
+        perfm_out = self.performers[context].forward(ae_out)
+        return perfm_out
 
     def training_step(self, batch, batch_idx):
 
@@ -376,15 +386,6 @@ class EncoderPerformer(LightningModule):
                 'y': batch['y']
             }, batch_idx)
 
-        # log an image of reconstruction
-        # if batch_idx == 0:
-        #     self.logger.experiment.log_figure(
-        #         px.imshow(ae_out['out'][0].cpu().numpy()),
-        #         'out0' + str(time.time()) + '.html')
-        #     self.logger.experiment.log_figure(
-        #         px.imshow(batch['x'][0].cpu().numpy()),
-        #         'inp0' + str(time.time()) + '.html')
-
         loss = ae_out['loss'] + perfm_out['loss']
         self.loss_pool["ae"].append(ae_out["loss"].cpu().numpy().tolist())
         self.loss_pool["perfm"].append(
@@ -413,8 +414,21 @@ class EncoderPerformer(LightningModule):
                             self.ema_alpha)
             self.losslog('ae_val_loss_avg', ae_ema)
             self.losslog('perfm_val_loss_avg', perfm_ema)
-            self.losslog("weight_variance_norm",
+            self.losslog("weight_variance_avg",
                          self.performer_weight_variance())
+
+    def test_step(self, batch, batch_idx):
+
+        pred = self.forward(batch['x'], batch['c'][0])
+        return self.testloss(batch['y'], pred[:, 0]).cpu().numpy()
+
+    def test_epoch_end(self, outputs, log=True):
+        outputs = np.concatenate(outputs)
+        out_avg = np.mean(outputs)
+        out_std = np.std(outputs)
+        if log:
+            self.losslog('test_loss_avg', out_avg)
+            self.losslog('test_loss_std', out_std)
 
     def performer_weight_variance(self):
         """
@@ -490,5 +504,12 @@ class EncoderPerformer(LightningModule):
                                                 self.contexts,
                                                 self.mode,
                                                 njobs=self.njobs)
-        self.val_batches = len(dataloader)
+        return dataloader
+
+    def test_dataloader(self):
+        dataloader = data_management.get_loader(['test'],
+                                                False,
+                                                self.contexts,
+                                                self.mode,
+                                                njobs=self.njobs)
         return dataloader

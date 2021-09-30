@@ -2,7 +2,8 @@ import argparse
 import pickle
 from pathlib import Path
 
-import torch
+import skopt  # type: ignore
+import torch  # type: ignore
 
 from mpc2c import create_template, data_management, evaluate
 from mpc2c import settings as s
@@ -39,7 +40,8 @@ def parse_args():
         "-p",
         "--pedaling",
         action="store_true",
-        help="TODO Perform actions for pedaling estimation (frame-wise prediction)."
+        help=
+        "TODO Perform actions for pedaling estimation (frame-wise prediction)."
     )
     parser.add_argument("-t",
                         "--train",
@@ -50,7 +52,9 @@ def parse_args():
         "--generic",
         action="store",
         default="specific",
-        help="Use generic or no independence instead of specific independence; accepted values: `specific`, `generic`, `none` ")
+        help=
+        "Use generic or no independence instead of specific independence; accepted values: `specific`, `generic`, `none` "
+    )
 
     parser.add_argument(
         "-sk",
@@ -97,21 +101,18 @@ def main():
     if args.skopt:
 
         contexts = list(get_contexts(s.CARLA_PROJ).keys())
-        s.EPOCHS = 25
 
         def objective(x):
-            l3 = training.train(x, mode, independence='none')
-            l1 = training.train(x, mode, independence='specific')
-            l2 = training.train(x, mode, independence='generic')
+            l3 = training.train(x, mode, independence='none', test=True)
+            l1 = training.train(x, mode, independence='specific', test=True)
+            l2 = training.train(x, mode, independence='generic', test=True)
             return (l1 + l2 + l3) / 3
 
         if args.pedaling:
-            s.DATASET_LEN *= 0.1
             test_sample = torch.rand(1, s.BINS, 100)
             checkpoint_path = "ped_skopt.pt"
 
         elif args.velocity:
-            s.DATASET_LEN *= 0.1
             test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
             checkpoint_path = "vel_skopt.pt"
         else:
@@ -124,9 +125,11 @@ def main():
                  checkpoint_path,
                  s.SKITERATIONS,
                  objective,
-                 skoptimizer_kwargs=dict(space_constraint=space_constraint,
-                      plot_graphs=True),
-                 optimize_kwargs=dict(max_loss=20.0, n_points=100))
+                 skoptimizer_kwargs=dict(
+                     space_constraint=space_constraint,
+                     plot_graphs=True,
+                     optimization_method=skopt.dummy_minimize),
+                 optimize_kwargs=dict(max_loss=20.0, initial_point_generator="grid"))
 
     if args.train:
 
