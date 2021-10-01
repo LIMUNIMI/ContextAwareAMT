@@ -91,7 +91,7 @@ def build_encoder(hpar, dropout, independence):
     elif independence == 'specific':
         loss_fn = specific_loss
     elif independence == 'none':
-        loss_fn = lambda *_: torch.tensor(0., device=s.DEVICE)
+        loss_fn = None
     else:
         raise RuntimeError(f"Unknown independence value {independence}")
 
@@ -139,7 +139,7 @@ def build_model(hpar,
                                                 mode,
                                                 independence,
                                                 ema_period=s.EMA_PERIOD)
-    return model.to(s.DEVICE)
+    return model
 
 
 def my_train(mode,
@@ -210,6 +210,9 @@ def my_train(mode,
             model.lr = 1e-5
             model.learning_rate = 1e-5
         model.njobs = s.NJOBS
+        trainer.train_dataloader = model.train_dataloader()
+        trainer.val_dataloader = model.val_dataloader()
+        trainer.test_dataloader = model.test_dataloader()
         print("Fitting the model!")
         trainer.fit(model)
         if ae_train:

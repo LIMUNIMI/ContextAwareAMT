@@ -16,7 +16,10 @@ essentia = "^2.1b6.dev184"
 plotly = "^4.12.0"
 torch = "^1.7.0"
 # TODO: change this when this branch is merged!
-scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
+# scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
+scikit-optimize = "^0.8.1"
+# errors with most recent version of sicki-learn and scikit-optimize
+scikit-learn = "<1.0"
 jack-client = "^0.5.2"
 pysoundfile = "^0.9.0"
 PyQt5 = "^5.15.2"

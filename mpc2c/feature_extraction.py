@@ -221,6 +221,7 @@ class TripletEncoder(LightningModule):
         self.encoder = Encoder(**kwargs)
         # self.decoder = Decoder(self.encoder)
         self.loss_fn = loss_fn
+        self.independence = 'specific'
 
     def forward(self, x):
         return self.encoder(x)
@@ -228,22 +229,17 @@ class TripletEncoder(LightningModule):
     def training_step(self, batch, batch_idx):
 
         latent_x = self.forward(batch['x'])
-        latent_same = self.forward(batch['ae_same'])
-        latent_diff = self.forward(batch['ae_diff'])
-        # out = self.decoder(latent)
-        loss = self.loss_fn(latent_x, latent_same, latent_diff)
+        loss = torch.tensor(0.0)
+        if self.loss_fn is not None:
+            latent_same = self.forward(batch['ae_same'])
+            latent_diff = self.forward(batch['ae_diff'])
+            loss = self.loss_fn(latent_x, latent_same, latent_diff)
 
         return {'loss': loss, 'latent': latent_x}
 
     def validation_step(self, batch, batch_idx):
 
-        latent_x = self.forward(batch['x'])
-        latent_same = self.forward(batch['ae_same'])
-        latent_diff = self.forward(batch['ae_diff'])
-        # out = self.decoder(latent)
-        loss = self.loss_fn(latent_x, latent_same, latent_diff)
-
-        return {'loss': loss, 'latent': latent_x}
+        return self.training_step(batch, batch_idx)
 
 
 class Performer(LightningModule):
@@ -342,6 +338,7 @@ class EncoderPerformer(LightningModule):
         self.ema_alpha = ema_alpha
         self.njobs = njobs
         self.independence = independence
+        self.tripletencoder.independence = independence
         self.testloss = testloss
 
     def forward(self, x, context):
@@ -444,31 +441,27 @@ class EncoderPerformer(LightningModule):
         s = 0
         c = 0
         for i in range(N):
-            # get the list of the i-th parameters
+            # get the list of the i-th layer parameters
             params = [list(perf.parameters())[i] for perf in self.performers.values()]
-            for i in range(len(params)):
-                if i > 0:
+            for j in range(len(self.performers)):
+                if j > 0:
                     # retrieving last permutation
-                    perm_cols = permutations[i]
+                    perm_cols = permutations[j]
                     if params[0].data.ndim > 1:
                         # a new linear layer
                         # computing and updating row permutation
-                        if params[0].shape[0] == 1:
-                            # awkward pytorch: in this case the smart indexing below remove one dimension
-                            perm_rows = slice(None)
-                        else:
-                            perm_rows = utils.permute_tensors(params[0], params[i])
+                        perm_rows = utils.permute_tensors(params[0], params[j])
+                        permutations[j] = perm_rows
+                        if params[0].shape[0] > 1:
+                            # apply row permutation
+                            params[j] = params[j][perm_rows]
                         if perm_cols is not None:
                             # apply row permutation of the previous layer to the columns of this layer
-                            params[i] = params[i][perm_rows, perm_cols]
-                        else:
-                            # this is the first layer: no permutation of inputs (columns)
-                            params[i] = params[i][perm_rows]
-                        permutations[i] = perm_rows
+                            params[j] = params[j][:, perm_cols]
                     elif perm_cols is not None:
                         # this is bias or batch normalization
                         # apply row permutation of the previous layer to this array
-                        params[i] = params[i][perm_cols]
+                        params[j] = params[j][perm_cols]
             # compute point-wise variances
             v = torch.var(torch.stack(params), dim=(0,), unbiased=True)
             # sum to the avg

@@ -109,25 +109,25 @@ def main():
             return (l1 + l2 + l3) / 3
 
         if args.pedaling:
-            test_sample = torch.rand(1, s.BINS, 100)
+            # test_sample = torch.rand(1, s.BINS, 100)
             checkpoint_path = "ped_skopt.pt"
 
         elif args.velocity:
-            test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
+            # test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
             checkpoint_path = "vel_skopt.pt"
         else:
             raise RuntimeError("Velocity or pedaling must be set")
 
-        space_constraint = training.model_test(
-            lambda x: training.build_model(x, contexts), test_sample)
+        # space_constraint = training.model_test(
+        #     lambda x: training.build_model(x, contexts), test_sample)
 
         hyperopt(s.SKSPACE,
                  checkpoint_path,
                  s.SKITERATIONS,
                  objective,
                  skoptimizer_kwargs=dict(
-                     space_constraint=space_constraint,
-                     plot_graphs=True,
+                     # space_constraint=space_constraint,
+                     plot_graphs=False,
                      optimization_method=skopt.dummy_minimize),
                  optimize_kwargs=dict(max_loss=20.0, initial_point_generator="grid"))
 

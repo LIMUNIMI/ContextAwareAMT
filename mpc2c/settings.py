@@ -133,7 +133,6 @@ SKSPACE = [
 ]
 SKITERATIONS = (0, 40)
 PLOT_GRAPHS = True
-COMPLEXITY_PENALIZER = 0 # 1e-6
 
 #: If compiling code with cython in pure-python mode
 BUILD = False
