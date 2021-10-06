@@ -153,75 +153,75 @@ def my_train(mode,
     Creates callbacks, train and freeze the part that raised an early-stop.
     Return the best loss of that one and 0 for the other.
     """
-    stopped_epoch = 9999  # let's enter the while the first time
-    while stopped_epoch > s.EARLY_STOP:
-        # setup callbacks
-        checkpoint_saver = ModelCheckpoint(
-            f"checkpoint_{mode}_independence={independence}",
-            filename='{epoch}-{ae_loss:.2f}',
-            monitor='val_loss',
-            save_top_k=1,
-            mode='min',
-            save_weights_only=True)
-        callbacks = [checkpoint_saver]
-        ae_stopper = perfm_stopper = None
-        if ae_train:
-            ae_stopper = EarlyStopping(monitor='ae_val_loss_avg',
-                                       min_delta=s.EARLY_RANGE,
-                                       check_finite=False,
-                                       patience=s.EARLY_STOP)
-            callbacks.append(ae_stopper)
-        if perfm_train:
-            perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
-                                          min_delta=s.EARLY_RANGE,
-                                          check_finite=False,
-                                          patience=s.EARLY_STOP)
-            callbacks.append(perfm_stopper)
-        if copy_checkpoint:
-            callbacks.append(best_checkpoint_saver(copy_checkpoint))
+    # stopped_epoch = 9999  # let's enter the while the first time
+    # while stopped_epoch > s.EARLY_STOP:
+    # setup callbacks
+    checkpoint_saver = ModelCheckpoint(
+        f"checkpoint_{mode}_independence={independence}",
+        filename='{epoch}-{ae_loss:.2f}',
+        monitor='val_loss',
+        save_top_k=1,
+        mode='min',
+        save_weights_only=True)
+    callbacks = [checkpoint_saver]
+    ae_stopper = perfm_stopper = None
+    if ae_train:
+        ae_stopper = EarlyStopping(monitor='ae_val_loss_avg',
+                                   min_delta=s.EARLY_RANGE,
+                                   check_finite=False,
+                                   patience=s.EARLY_STOP)
+        callbacks.append(ae_stopper)
+    if perfm_train:
+        perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
+                                      min_delta=s.EARLY_RANGE,
+                                      check_finite=False,
+                                      patience=s.EARLY_STOP)
+        callbacks.append(perfm_stopper)
+    if copy_checkpoint:
+        callbacks.append(best_checkpoint_saver(copy_checkpoint))
 
-        if s.SWA:
-            callbacks.append(
-                StochasticWeightAveraging(swa_epoch_start=int(0.8 * s.EPOCHS),
-                                          annealing_epochs=int(0.2 *
-                                                               s.EPOCHS)))
+    if s.SWA:
+        callbacks.append(
+            StochasticWeightAveraging(swa_epoch_start=int(0.8 * s.EPOCHS),
+                                      annealing_epochs=int(0.2 *
+                                                           s.EPOCHS)))
 
     # training!
-        trainer = Trainer(
-            callbacks=callbacks,
-            precision=s.PRECISION,
-            max_epochs=s.EPOCHS,
-            logger=logger,
-            auto_lr_find=True,
-            reload_dataloaders_every_n_epochs=1,
-            num_sanity_val_steps=0,
-            # weights_summary="full",
-            # log_every_n_steps=1,
-            # log_gpu_memory=True,
-            # track_grad_norm=2,
-            # overfit_batches=1,
-            gpus=s.GPUS)
+    trainer = Trainer(
+        callbacks=callbacks,
+        precision=s.PRECISION,
+        max_epochs=s.EPOCHS,
+        logger=logger,
+        auto_lr_find=True,
+        reload_dataloaders_every_n_epochs=1,
+        num_sanity_val_steps=0,
+        # weights_summary="full",
+        # log_every_n_steps=1,
+        # log_gpu_memory=True,
+        # track_grad_norm=2,
+        # overfit_batches=1,
+        gpus=s.GPUS)
 
-        model.njobs = 1  # there's some leak when using njobs > 0
-        if os.path.exists("lr_find_temp_model.ckpt"):
-            os.remove("lr_find_temp_model.ckpt")
-        d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
-        if d['lr_find'].suggestion() is None:
-            model.lr = 1e-5
-            model.learning_rate = 1e-5
-        model.njobs = s.NJOBS
-        trainer.train_dataloader = model.train_dataloader()
-        trainer.val_dataloader = model.val_dataloader()
-        trainer.test_dataloader = model.test_dataloader()
-        print("Fitting the model!")
-        trainer.fit(model)
-        if ae_train:
-            stopped_epoch = ae_stopper.stopped_epoch  # type: ignore
-        else:
-            stopped_epoch = 0
-        if perfm_train:
-            stopped_epoch = max(stopped_epoch,
-                                perfm_stopper.stopped_epoch)  # type: ignore
+    model.njobs = 1  # there's some leak when using njobs > 0
+    if os.path.exists("lr_find_temp_model.ckpt"):
+        os.remove("lr_find_temp_model.ckpt")
+    d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
+    if d['lr_find'].suggestion() is None:
+        model.lr = 1e-5
+        model.learning_rate = 1e-5
+    model.njobs = s.NJOBS
+    trainer.train_dataloader = model.train_dataloader()
+    trainer.val_dataloader = model.val_dataloader()
+    trainer.test_dataloader = model.test_dataloader()
+    print("Fitting the model!")
+    trainer.fit(model)
+    # if ae_train:
+    #     stopped_epoch = ae_stopper.stopped_epoch  # type: ignore
+    # else:
+    #     stopped_epoch = 0
+    # if perfm_train:
+    #     stopped_epoch = max(stopped_epoch,
+    #                         perfm_stopper.stopped_epoch)  # type: ignore
 
     return ae_stopper, perfm_stopper
 
@@ -238,7 +238,8 @@ def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
     logger = MLFlowLogger(experiment_name=f'{mode}',
                           tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
 
-    logger.log_metrics({"mode": mode, "independence": independence})
+    logger.log_hyperparams(hpar)
+    logger.log_hyperparams({"mode": mode, "independence": independence})
 
     # dummy model (baseline)
     # TODO: check the following function!
@@ -264,7 +265,8 @@ def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
 
     if ae_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
         # case A
-        model.performers.freeze()
+        for p in model.performers.values():
+            p.freeze()
         print("Continuing training encoder...")
         ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
                                  independence, True, False)
