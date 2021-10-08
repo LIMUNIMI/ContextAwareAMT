@@ -1,5 +1,3 @@
-import math
-from typing import List, Any
 from copy import deepcopy
 
 # import plotly.express as px
@@ -65,6 +63,7 @@ class ResidualBlock(nn.Module):
             nn.BatchNorm2d(outchannels),
             activation,
         )
+
         self.kernel = (kernel, kernel)
         if not reduce:
             if inchannels == outchannels:
@@ -272,7 +271,7 @@ class Performer(LightningModule):
         # input_features = k * (2**input_features)
 
         stack = []
-        for i in range(num_layers - 2):
+        for _ in range(num_layers - 2):
             stack.append(nn.Linear(middle_features, middle_features))
             stack.append(
                 nn.BatchNorm1d(middle_features,
@@ -321,7 +320,7 @@ class EncoderPerformer(LightningModule):
                  ema_period=20,
                  ema_alpha=0.5,
                  njobs=0,
-                 testloss = nn.L1Loss(reduction='none')):
+                 testloss=nn.L1Loss(reduction='none')):
         super().__init__()
         self.tripletencoder = tripletencoder
         self.performers = nn.ModuleDict(
@@ -442,7 +441,10 @@ class EncoderPerformer(LightningModule):
         c = 0
         for i in range(N):
             # get the list of the i-th layer parameters
-            params = [list(perf.parameters())[i] for perf in self.performers.values()]
+            params = [
+                list(perf.parameters())[i]
+                for perf in self.performers.values()
+            ]
             for j in range(len(self.performers)):
                 if j > 0:
                     # retrieving last permutation
@@ -463,7 +465,7 @@ class EncoderPerformer(LightningModule):
                         # apply row permutation of the previous layer to this array
                         params[j] = params[j][perm_cols]
             # compute point-wise variances
-            v = torch.var(torch.stack(params), dim=(0,), unbiased=True)
+            v = torch.var(torch.stack(params), dim=(0, ), unbiased=True)
             # sum to the avg
             s += torch.sum(v)
             c += v.numel()
