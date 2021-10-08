@@ -506,5 +506,6 @@ class EncoderPerformer(LightningModule):
                                                 False,
                                                 self.contexts,
                                                 self.mode,
-                                                njobs=self.njobs)
+                                                njobs=1)
+        # for some reason there are leakings with njobs > 1
         return dataloader
