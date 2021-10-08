@@ -205,7 +205,7 @@ def my_train(mode,
         # log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
-        overfit_batches=10,
+        # overfit_batches=10,
         gpus=s.GPUS)
 
     model.njobs = 1  # there's some leak when using njobs > 0
