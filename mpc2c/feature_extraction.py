@@ -410,8 +410,8 @@ class EncoderPerformer(LightningModule):
                             self.ema_alpha)
             self.losslog('ae_val_loss_avg', ae_ema)
             self.losslog('perfm_val_loss_avg', perfm_ema)
-            self.losslog("weight_variance_avg",
-                         self.performer_weight_variance())
+            for key, val in self.performer_weight_moments().items():
+                self.losslog("weight_variance_" + key, val)
 
     def test_step(self, batch, batch_idx):
 
@@ -426,7 +426,7 @@ class EncoderPerformer(LightningModule):
             self.losslog('test_loss_avg', out_avg)
             self.losslog('test_loss_std', out_std)
 
-    def performer_weight_variance(self):
+    def performer_weight_moments(self):
         """
         Computes the average variance of the weights of the performers
         after having put the weights tensors in the same order as the first
@@ -437,8 +437,7 @@ class EncoderPerformer(LightningModule):
         # get the number of tensor weights in the performers
         N = len(list(self.performers['0'].parameters()))
         permutations = [None] * len(self.performers)
-        s = 0
-        c = 0
+        s = []
         for i in range(N):
             # get the list of the i-th layer parameters
             params = [
@@ -467,10 +466,8 @@ class EncoderPerformer(LightningModule):
             # compute point-wise variances
             v = torch.var(torch.stack(params), dim=(0, ), unbiased=True)
             # sum to the avg
-            s += torch.sum(v)
-            c += v.numel()
-        # average
-        return float(s / c)
+            s.append(v)
+        return utils.torch_moments(s)
 
     def losslog(self, name, value):
         self.log(name,

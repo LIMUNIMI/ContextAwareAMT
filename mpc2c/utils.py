@@ -2,6 +2,21 @@ import essentia.standard as esst  # type: ignore
 import numpy as np
 import pretty_midi as pm  # type: ignore
 from scipy.optimize import linear_sum_assignment
+import torch
+
+
+def torch_moments(t: list):
+    """
+    Computes moments on a list of tensors t
+    """
+    mean = torch.mean(t)
+    diffs = t - mean
+    var = torch.mean(torch.pow(diffs, 2.0))
+    std = torch.pow(var, 0.5)
+    zscores = diffs / std
+    skews = torch.mean(torch.pow(zscores, 3.0))
+    kurtoses = torch.mean(torch.pow(zscores, 4.0)) - 3.0
+    return {"mean": mean, "var": var, "skew": skews, "kurt": kurtoses}
 
 
 def permute_tensors(t0, t1):

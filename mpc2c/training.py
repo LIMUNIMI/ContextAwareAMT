@@ -296,9 +296,10 @@ def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
         "best_ae_val_loss":
         float(ae_loss),  # type: ignore
         "best_perfm_val_loss":
-        float(perfm_loss),  # type: ignore
-        "final_weight_variance_avg":
-        model.performer_weight_variance()
+        float(perfm_loss)  # type: ignore
+    })
+    logger.log_metrics({
+        "final_weight_variance_" + k: v for k, v in model.performer_weight_moments().items()
     })
 
     # this is the loss used by hyper-parameters optimization

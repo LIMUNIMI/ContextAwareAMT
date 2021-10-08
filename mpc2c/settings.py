@@ -91,7 +91,7 @@ PREPROCESSING = "pad"
 MAX_LAYERS = 30
 DEVICE = 'cuda'
 GPUS = 1
-EPOCHS = 100
+EPOCHS = 50
 VEL_HYPERPARAMS = {
     "ae_k1": 5,
     "ae_k2": 5,
@@ -110,9 +110,9 @@ PED_HYPERPARAMS = {
 }
 VEL_BATCH_SIZE = 10
 PED_BATCH_SIZE = 1
-EARLY_STOP = 50
-EARLY_RANGE = 0
-EMA_PERIOD = 20
+EARLY_STOP = 20
+EARLY_RANGE = 1e-4
+EMA_PERIOD = 15
 EMA_ALPHA = 0.6
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
@@ -131,7 +131,7 @@ SKSPACE = [
     space.Integer(0, 8, name='performer_features'),
     space.Integer(1, 3, name='performer_layers'),
 ]
-SKITERATIONS = (0, 40)
+SKITERATIONS = (0, 30)
 PLOT_GRAPHS = True
 
 #: If compiling code with cython in pure-python mode
