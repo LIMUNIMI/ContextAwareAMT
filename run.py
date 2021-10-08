@@ -103,10 +103,11 @@ def main():
         contexts = list(get_contexts(s.CARLA_PROJ).keys())
 
         def objective(x):
-            l3 = training.train(x, mode, independence='none', test=True)
-            l1 = training.train(x, mode, independence='specific', test=True)
-            l2 = training.train(x, mode, independence='generic', test=True)
-            return (l1 + l2 + l3) / 3
+            l1 = training.train(x, mode, independence='none', test=True)
+            l2 = training.train(x, mode, independence='specific', test=True)
+            # l3 = training.train(x, mode, independence='generic', test=True)
+            # return (l1 + l2 + l3) / 3
+            return (l1 + l2) / 2
 
         if args.pedaling:
             # test_sample = torch.rand(1, s.BINS, 100)
@@ -121,15 +122,17 @@ def main():
         # space_constraint = training.model_test(
         #     lambda x: training.build_model(x, contexts), test_sample)
 
-        hyperopt(s.SKSPACE,
-                 checkpoint_path,
-                 s.SKITERATIONS,
-                 objective,
-                 skoptimizer_kwargs=dict(
-                     # space_constraint=space_constraint,
-                     plot_graphs=False,
-                     optimization_method=skopt.dummy_minimize),
-                 optimize_kwargs=dict(max_loss=20.0, initial_point_generator="grid"))
+        hyperopt(
+            s.SKSPACE,
+            checkpoint_path,
+            s.SKITERATIONS,
+            objective,
+            skoptimizer_kwargs=dict(
+                # space_constraint=space_constraint,
+                plot_graphs=False,
+                optimization_method=skopt.dummy_minimize),
+            optimize_kwargs=dict(max_loss=20.0,
+                                 initial_point_generator="grid"))
 
     if args.train:
 

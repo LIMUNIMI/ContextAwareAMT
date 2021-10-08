@@ -1,22 +1,21 @@
 # from memory_profiler import profile
 
 import os
-from copy import deepcopy
-from pathlib import Path
 from pprint import pprint
+
+from sklearn.metrics.pairwise import cosine_distances
 
 import torch.nn.functional as F  # type: ignore
 from torch import nn  # type: ignore
 import torch  # type: ignore
-import torchinfo
+import torchinfo  # type: ignore
 from pytorch_lightning import Trainer  # type: ignore
 from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging  # type: ignore
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping  # type: ignore
 from pytorch_lightning.loggers import MLFlowLogger  # type: ignore
 
-from . import data_management, feature_extraction
+from . import feature_extraction
 from . import settings as s
-from .mytorchutils import best_checkpoint_saver, compute_average, count_params
 from .asmd_resynth import get_contexts
 
 RANDGEN = torch.Generator()
@@ -67,12 +66,20 @@ def model_test(model_build_func, test_sample):
     return constraint
 
 
+def cosine_distance(x, y, reduction='none'):
+    out = 1 - F.cosine_similarity(x, y)
+    if reduction is 'none':
+        return out
+    elif reduction is 'sum':
+        return out.sum(axis=-1)
+
+
 def specific_loss(pred, same_pred, diff_pred):
     return F.triplet_margin_with_distance_loss(
         pred,
         same_pred,
         diff_pred,
-        distance_function=lambda x, y: 1 - F.cosine_similarity(x, y),
+        distance_function=cosine_distance,
         margin=1,
         swap=True,
         reduction='sum')
@@ -80,9 +87,9 @@ def specific_loss(pred, same_pred, diff_pred):
 
 def generic_loss(pred, same_pred, diff_pred):
     if torch.randint(6, (1, ), generator=RANDGEN) > 0:
-        return F.l1_loss(pred, diff_pred, reduction='sum')
+        return cosine_distance(pred, diff_pred, reduction='sum')
     else:
-        return F.l1_loss(pred, same_pred, reduction='sum')
+        return cosine_distance(pred, same_pred, reduction='sum')
 
 
 def build_encoder(hpar, dropout, independence):
@@ -177,14 +184,13 @@ def my_train(mode,
                                       check_finite=False,
                                       patience=s.EARLY_STOP)
         callbacks.append(perfm_stopper)
-    if copy_checkpoint:
-        callbacks.append(best_checkpoint_saver(copy_checkpoint))
+    # if copy_checkpoint:
+    #     callbacks.append(best_checkpoint_saver(copy_checkpoint))
 
     if s.SWA:
         callbacks.append(
             StochasticWeightAveraging(swa_epoch_start=int(0.8 * s.EPOCHS),
-                                      annealing_epochs=int(0.2 *
-                                                           s.EPOCHS)))
+                                      annealing_epochs=int(0.2 * s.EPOCHS)))
 
     # training!
     trainer = Trainer(
@@ -199,7 +205,7 @@ def my_train(mode,
         # log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
-        # overfit_batches=1,
+        overfit_batches=10,
         gpus=s.GPUS)
 
     model.njobs = 1  # there's some leak when using njobs > 0
@@ -281,10 +287,7 @@ def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
     print(f"Final losses: {ae_loss:.2e}, {perfm_loss:.2e}")
 
     if test:
-        trainer = Trainer(
-            precision=s.PRECISION,
-            logger=logger,
-            gpus=s.GPUS)
+        trainer = Trainer(precision=s.PRECISION, logger=logger, gpus=s.GPUS)
         loss = trainer.test(model)[0]["test_loss_avg"]
     else:
         loss = ae_loss + perfm_loss
