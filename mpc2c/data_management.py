@@ -44,7 +44,8 @@ class AEDataset(DatasetDump):
                 for i in trange(len(self.lengths)):
                     L = self.lengths[i]
                     context = self.songs[i]['groups'][-1]
-                    self.sample_contexts[k:k + L] = self.contexts.index(context)
+                    self.sample_contexts[k:k +
+                                         L] = self.contexts.index(context)
                     k += L
                 pickle.dump(self.sample_contexts, open(fname, 'wb'))
             self.len = np.count_nonzero(self.not_used)
@@ -112,31 +113,31 @@ class AEDataset(DatasetDump):
         same_target = choice(same.inverted[bin])
         # we use song indiex and song sample index, so we don't need to specify
         # if dataset was filtered
-        ae_same, _ = same.get_input(*same_target)
-        ae_same /= ae_same.abs().max()
-        ae_diff, _ = different.get_input(*diff_target)
-        ae_diff /= ae_diff.abs().max()
+        enc_same, _ = same.get_input(*same_target)
+        enc_same /= enc_same.abs().max()
+        enc_diff, _ = different.get_input(*diff_target)
+        enc_diff /= enc_diff.abs().max()
 
         return {
             "c": str(c),
             "x": x,
             "y": y,
-            "ae_same": ae_same,
-            "ae_diff": ae_diff,
+            "enc_same": enc_same,
+            "enc_diff": enc_diff,
         }
 
 
 class AEBatchSampler(Sampler):
-    def __init__(self, batch_size: int, ae_dataset: AEDataset):
+    def __init__(self, batch_size: int, enc_dataset: AEDataset):
         """
         Makes batches so that each one has a different context
         """
-        super().__init__(ae_dataset)
+        super().__init__(enc_dataset)
         self.batch_size = batch_size
-        self.ae_dataset = ae_dataset
-        self.contexts = cycle(ae_dataset.contexts)
-        self.len = np.count_nonzero(ae_dataset.not_used)
-        self.not_used_init = self.ae_dataset.not_used.copy()
+        self.enc_dataset = enc_dataset
+        self.contexts = cycle(enc_dataset.contexts)
+        self.len = np.count_nonzero(enc_dataset.not_used)
+        self.not_used_init = self.enc_dataset.not_used.copy()
 
     def __len__(self):
         return self.len // self.batch_size + 1
@@ -145,23 +146,23 @@ class AEBatchSampler(Sampler):
         return self
 
     def __next__(self):
-        c = self.ae_dataset.contexts.index(next(self.contexts))
+        c = self.enc_dataset.contexts.index(next(self.contexts))
         # find the first `self.batch_size` samples not used and having context `c`
         batch = np.argwhere(
-            np.logical_and(self.ae_dataset.not_used,
-                           (self.ae_dataset.sample_contexts == c)))
+            np.logical_and(self.enc_dataset.not_used,
+                           (self.enc_dataset.sample_contexts == c)))
         # sample indices are referred to the whole dumped dataset
         batch = batch[:self.batch_size, 0]
         if batch.shape[0] < 1:
             # not actually used (we reload the dataloader at every epoch)
-            self.ae_dataset.not_used = self.not_used_init.copy()
-            self.contexts = cycle(self.ae_dataset.contexts)
+            self.enc_dataset.not_used = self.not_used_init.copy()
+            self.contexts = cycle(self.enc_dataset.contexts)
             raise StopIteration
-        self.ae_dataset.not_used[batch] = False
+        self.enc_dataset.not_used[batch] = False
         return batch
 
 
-def ae_collate(batch):
+def enc_collate(batch):
     """
     `batch` is what is returned by `AEBatchSampler.__iter__`: a list of tuples
     where each tuple is what returned by `AEDataset.next_item_context`
@@ -222,7 +223,12 @@ def process_velocities(i, dataset, nmf_params):
     return minispecs, velocities
 
 
-def get_loader(groups, redump, contexts, mode=None, nmf_params=None, njobs=s.NJOBS):
+def get_loader(groups,
+               redump,
+               contexts,
+               mode=None,
+               nmf_params=None,
+               njobs=s.NJOBS):
     """
     `nmf_params` and `mode` are needed only if `redump` is True
     """
@@ -240,7 +246,7 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None, njobs=s.NJO
 
     asmd_data = asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
                              metadataset_path=s.METADATASET_PATH)
-    dataset = AEDataset(contexts, asmd_data, data_path, dumped = not redump)
+    dataset = AEDataset(contexts, asmd_data, data_path, dumped=not redump)
 
     if redump:
         dataset.dump(process_fn, nmf_params, n_jobs=s.NJOBS, max_nbytes=None)
@@ -252,4 +258,4 @@ def get_loader(groups, redump, contexts, mode=None, nmf_params=None, njobs=s.NJO
                           batch_sampler=AEBatchSampler(batch_size, dataset),
                           num_workers=njobs,
                           pin_memory=False)
-    # collate_fn=ae_collate)
+    # collate_fn=enc_collate)

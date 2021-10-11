@@ -6,6 +6,8 @@ from torch import nn  # type: ignore
 from pytorch_lightning import LightningModule  # type: ignore
 import pandas as pd
 import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.metrics.cluster import adjusted_mutual_info_score
 
 from . import data_management, utils
 
@@ -206,21 +208,14 @@ class Encoder(nn.Module):
 
 
 class TripletEncoder(LightningModule):
-    def __init__(self, loss_fn, **kwargs):
+    def __init__(self, **kwargs):
         """
         triplet-encoder module
-
-        the loss must accept 3 values:
-            * prediction
-            * same target prediction
-            * different target prediction
         """
 
         super().__init__()
         self.encoder = Encoder(**kwargs)
         # self.decoder = Decoder(self.encoder)
-        self.loss_fn = loss_fn
-        self.independence = 'specific'
 
     def forward(self, x):
         return self.encoder(x)
@@ -228,13 +223,8 @@ class TripletEncoder(LightningModule):
     def training_step(self, batch, batch_idx):
 
         latent_x = self.forward(batch['x'])
-        loss = torch.tensor(0.0)
-        if self.loss_fn is not None:
-            latent_same = self.forward(batch['ae_same'])
-            latent_diff = self.forward(batch['ae_diff'])
-            loss = self.loss_fn(latent_x, latent_same, latent_diff)
 
-        return {'loss': loss, 'latent': latent_x}
+        return {'latent': latent_x}
 
     def validation_step(self, batch, batch_idx):
 
@@ -310,11 +300,11 @@ class EncoderPerformer(LightningModule):
     autoencoder-performer architecture
     """
     def __init__(self,
-                 tripletencoder,
+                 encoder,
                  performer,
                  contexts,
                  mode,
-                 independence,
+                 context_specific=True,
                  lr=1,
                  wd=0,
                  ema_period=20,
@@ -322,13 +312,15 @@ class EncoderPerformer(LightningModule):
                  njobs=0,
                  testloss=nn.L1Loss(reduction='none')):
         super().__init__()
-        self.tripletencoder = tripletencoder
+        self.encoder = encoder
         self.performers = nn.ModuleDict(
+            {str(c): deepcopy(performer)
+             for c in range(len(contexts))})
+        self.context_classifiers = nn.ModuleDict(
             {str(c): deepcopy(performer)
              for c in range(len(contexts))})
         self.lr = lr
         self.wd = wd
-        self.active = 0  # 0 -> both, 1 -> autoencoder only, 2 -> performers only
         self.mode = mode
         self.contexts = contexts
         self.loss_pool = {"ae": [], "perfm": []}
@@ -336,67 +328,77 @@ class EncoderPerformer(LightningModule):
         self.ema_period = ema_period
         self.ema_alpha = ema_alpha
         self.njobs = njobs
-        self.independence = independence
-        self.tripletencoder.independence = independence
+        self.context_specific = context_specific
         self.testloss = testloss
 
     def forward(self, x, context):
-        ae_out = self.tripletencoder.forward(x)
-        perfm_out = self.performers[context].forward(ae_out)
+        enc_out = self.encoder.forward(x)
+        perfm_out = self.performers[context].forward(enc_out)
         return perfm_out
 
     def training_step(self, batch, batch_idx):
 
-        ae_out = self.tripletencoder.training_step(batch, batch_idx)
-        if self.active < 2 and self.independence is not None:
-            self.tripletencoder.freeze()
-        perfm_out = self.performers[batch['c'][0]].training_step(
+        context_s = batch['c'][0]
+        context_i = int(context_s)
+        enc_out = self.encoder.training_step(batch, batch_idx)
+        perfm_out = self.performers[context_s].training_step(
             {
-                'x': ae_out['latent'],
+                'x': enc_out['latent'],
                 'y': batch['y']
             }, batch_idx)
-        if self.active < 2 and self.independence is not None:
-            self.tripletencoder.unfreeze()
-
-        loss = ae_out['loss'] + perfm_out['loss']
+        loss = perfm_out['loss']
+        out = {'loss': loss, 'perfm_train_loss': perfm_out['loss'].detach()}
+        if self.context_specific:
+            cont_out = self.context_classifiers[context_s].training_step(
+                {
+                    'x': enc_out['latent'],
+                    'y': context_i
+                }, batch_idx)
+            loss += cont_out['loss']
+            self.losslog('cont_train_loss', cont_out['loss'])
+            out['cont_train_loss'] = cont_out['loss'].detach()
 
         lr_scheduler = self.lr_schedulers()
         if lr_scheduler is not None:
             lr_scheduler.step()
 
         self.losslog('train_loss', loss)
-        self.losslog('ae_train_loss', ae_out['loss'])
         self.losslog('perfm_train_loss', perfm_out['loss'])
-        return {
-            'loss': loss,
-            'ae_train_loss': ae_out['loss'].detach(),
-            'perfm_train_loss': perfm_out['loss'].detach(),
-        }
+        return out
 
     def validation_step(self, batch, batch_idx, log=True):
 
-        ae_out = self.tripletencoder.validation_step(batch, batch_idx)
-        perfm_out = self.performers[batch['c'][0]].validation_step(
+        context_s = batch['c'][0]
+        context_i = int(context_s)
+        enc_out = self.encoder.validation_step(batch, batch_idx)
+        perfm_out = self.performers[context_s].validation_step(
             {
-                'x': ae_out['latent'],
+                'x': enc_out['latent'],
                 'y': batch['y']
             }, batch_idx)
+        loss = perfm_out['loss']
+        out = {'loss': loss, 'perfm_train_loss': perfm_out['loss'].detach()}
+        if self.context_specific:
+            cont_out = self.context_classifiers[context_s].validation_step(
+                {
+                    'x': enc_out['latent'],
+                    'y': context_i
+                }, batch_idx)
+            loss += cont_out['loss']
+            self.losslog('cont_val_loss', cont_out['loss'])
+            out['cont_val_loss'] = cont_out['loss'].detach()
+            self.loss_pool["cont"].append(
+                cont_out["loss"].cpu().numpy().tolist())
+            self.losslog('cont_val_loss', cont_out['loss'])
 
-        loss = ae_out['loss'] + perfm_out['loss']
-        self.loss_pool["ae"].append(ae_out["loss"].cpu().numpy().tolist())
+        self.loss_pool["enc"].append(enc_out["loss"].cpu().numpy().tolist())
         self.loss_pool["perfm"].append(
             perfm_out["loss"].cpu().numpy().tolist())
         if log:
             self.losslog('val_loss', loss)
-            self.losslog('ae_val_loss', ae_out['loss'])
             self.losslog('perfm_val_loss', perfm_out['loss'])
             self.losslog('dummy_loss', perfm_out['dummy_loss'])
-        return {
-            'loss': loss,
-            'ae_val_loss': ae_out['loss'],
-            'perfm_val_loss': perfm_out['loss'],
-            'dummy_loss': perfm_out['dummy_loss']
-        }
+        return out
 
     def on_validation_epoch_end(self, log=True):
         # compute loss average and log ema
@@ -404,30 +406,45 @@ class EncoderPerformer(LightningModule):
             self.ema_loss_pool["ae"].append(np.mean(self.loss_pool["ae"]))
             self.ema_loss_pool["perfm"].append(np.mean(
                 self.loss_pool["perfm"]))
-            ae_ema = ema(self.ema_loss_pool["ae"], self.ema_period,
-                         self.ema_alpha)
+            enc_ema = ema(self.ema_loss_pool["ae"], self.ema_period,
+                          self.ema_alpha)
             perfm_ema = ema(self.ema_loss_pool["perfm"], self.ema_period,
                             self.ema_alpha)
-            self.losslog('ae_val_loss_avg', ae_ema)
+            self.losslog('enc_val_loss_avg', enc_ema)
             self.losslog('perfm_val_loss_avg', perfm_ema)
             for key, val in self.performer_weight_moments().items():
                 self.losslog("weight_variance_" + key, val)
 
     def test_step(self, batch, batch_idx):
 
-        pred = self.forward(batch['x'], batch['c'][0])
-        # TODO:
-        # * append latent variables to a list in this object
+        context_s = batch['c'][0]
+        context_i = int(context_s)
+        enc_out = self.encoder.validation_step(batch, batch_idx)
+        perfm_out = self.performers[context_s].validation_step(
+            {
+                'x': enc_out['latent'],
+                'y': batch['y']
+            }, batch_idx)
+        self.test_latent_x.append(enc_out.cpu().numpy())
+        self.test_latent_y.append(context_i)
         # * add test_epoch_end in which latent variables are clusterized
-        return self.testloss(batch['y'], pred[:, 0]).cpu().numpy()
+        return self.testloss(batch['y'], perfm_out[:, 0]).cpu().numpy()
 
     def test_epoch_end(self, outputs, log=True):
         outputs = np.concatenate(outputs)
         out_avg = np.mean(outputs)
         out_std = np.std(outputs)
+
+        # TODO: use cosine distance! (needed?)
+        cluster_computer = KMeans(n_clusters=6)
+        labels = cluster_computer.fit_predict(
+            np.concatenate(self.test_latent_x))
+        ami = adjusted_mutual_info_score(self.test_latent_y, labels)
+
         if log:
             self.losslog('test_loss_avg', out_avg)
             self.losslog('test_loss_std', out_std)
+            self.losslog('test_ami', ami)
 
     def performer_weight_moments(self):
         """

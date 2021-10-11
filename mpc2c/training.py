@@ -44,8 +44,8 @@ def model_test(model_build_func, test_sample):
                         {
                             'x': test_sample.to(s.DEVICE).to(s.DTYPE),
                             'y': torch.tensor(0.5).to(s.DEVICE).to(s.DTYPE),
-                            'ae_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
-                            'ae_same': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'enc_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'enc_same': test_sample.to(s.DEVICE).to(s.DTYPE),
                             'c': '0'
                         },
                         0,
@@ -119,7 +119,7 @@ def build_encoder(hpar, dropout, independence):
 
 
 def get_hpar(hpar):
-    return (hpar['ae_k1'], hpar['ae_k2'], hpar['activation'], hpar['kernel'])
+    return (hpar['enc_k1'], hpar['enc_k2'], hpar['activation'], hpar['kernel'])
 
 
 def build_performer_model(hpar, infeatures, avg_pred):
@@ -154,7 +154,7 @@ def my_train(mode,
              logger,
              model,
              independence,
-             ae_train=True,
+             enc_train=True,
              perfm_train=True):
     """
     Creates callbacks, train and freeze the part that raised an early-stop.
@@ -165,19 +165,19 @@ def my_train(mode,
     # setup callbacks
     checkpoint_saver = ModelCheckpoint(
         f"checkpoint_{mode}_independence={independence}",
-        filename='{epoch}-{ae_loss:.2f}',
+        filename='{epoch}-{enc_loss:.2f}',
         monitor='val_loss',
         save_top_k=1,
         mode='min',
         save_weights_only=True)
     callbacks = [checkpoint_saver]
-    ae_stopper = perfm_stopper = None
-    if ae_train:
-        ae_stopper = EarlyStopping(monitor='ae_val_loss_avg',
-                                   min_delta=s.EARLY_RANGE,
-                                   check_finite=False,
-                                   patience=s.EARLY_STOP)
-        callbacks.append(ae_stopper)
+    enc_stopper = perfm_stopper = None
+    if enc_train:
+        enc_stopper = EarlyStopping(monitor='enc_val_loss_avg',
+                                    min_delta=s.EARLY_RANGE,
+                                    check_finite=False,
+                                    patience=s.EARLY_STOP)
+        callbacks.append(enc_stopper)
     if perfm_train:
         perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
                                       min_delta=s.EARLY_RANGE,
@@ -205,7 +205,7 @@ def my_train(mode,
         # log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
-        # overfit_batches=10,
+        overfit_batches=2,
         gpus=s.GPUS)
 
     model.njobs = 1  # there's some leak when using njobs > 0
@@ -221,15 +221,15 @@ def my_train(mode,
     trainer.test_dataloader = model.test_dataloader()
     print("Fitting the model!")
     trainer.fit(model)
-    # if ae_train:
-    #     stopped_epoch = ae_stopper.stopped_epoch  # type: ignore
+    # if enc_train:
+    #     stopped_epoch = enc_stopper.stopped_epoch  # type: ignore
     # else:
     #     stopped_epoch = 0
     # if perfm_train:
     #     stopped_epoch = max(stopped_epoch,
     #                         perfm_stopper.stopped_epoch)  # type: ignore
 
-    return ae_stopper, perfm_stopper
+    return enc_stopper, perfm_stopper
 
 
 def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
@@ -259,41 +259,41 @@ def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
 
     # training
     # this loss is also the same used for hyper-parameters tuning
-    ae_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
-                                         independence)
-    ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
-    print(f"First-training losses: {ae_loss:.2e}, {perfm_loss:.2e}")
+    enc_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
+                                          independence)
+    enc_loss, perfm_loss = enc_stopper.best_score, perfm_stopper.best_score  # type: ignore
+    print(f"First-training losses: {enc_loss:.2e}, {perfm_loss:.2e}")
 
     # cases:
     # A: encoder was stopped
     # B: performers were stopped
     # C: none was stopped
 
-    if ae_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
+    if enc_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
         # case A
         for p in model.performers.values():
             p.freeze()
         print("Continuing training encoder...")
-        ae_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
-                                 independence, True, False)
-    if ae_stopper.stopped_epoch > 0:  # type: ignore
+        enc_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
+                                  independence, True, False)
+    if enc_stopper.stopped_epoch > 0:  # type: ignore
         # case A and B
-        model.tripletencoder.freeze()
+        model.encoder.freeze()
         print("Continuing training performers...")
         _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
                                     independence, False, True)
 
-    ae_loss, perfm_loss = ae_stopper.best_score, perfm_stopper.best_score  # type: ignore
-    print(f"Final losses: {ae_loss:.2e}, {perfm_loss:.2e}")
+    enc_loss, perfm_loss = enc_stopper.best_score, perfm_stopper.best_score  # type: ignore
+    print(f"Final losses: {enc_loss:.2e}, {perfm_loss:.2e}")
 
     if test:
         trainer = Trainer(precision=s.PRECISION, logger=logger, gpus=s.GPUS)
         loss = trainer.test(model)[0]["test_loss_avg"]
     else:
-        loss = ae_loss + perfm_loss
+        loss = enc_loss + perfm_loss
 
     logger.log_metrics({
-        "best_ae_val_loss": float(ae_loss),  # type: ignore
+        "best_enc_val_loss": float(enc_loss),  # type: ignore
         "best_perfm_val_loss": float(perfm_loss)  # type: ignore
     })
     logger.log_metrics({
