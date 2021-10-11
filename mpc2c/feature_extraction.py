@@ -416,6 +416,9 @@ class EncoderPerformer(LightningModule):
     def test_step(self, batch, batch_idx):
 
         pred = self.forward(batch['x'], batch['c'][0])
+        # TODO:
+        # * append latent variables to a list in this object
+        # * add test_epoch_end in which latent variables are clusterized
         return self.testloss(batch['y'], pred[:, 0]).cpu().numpy()
 
     def test_epoch_end(self, outputs, log=True):
@@ -465,9 +468,9 @@ class EncoderPerformer(LightningModule):
                         params[j] = params[j][perm_cols]
             # compute point-wise variances
             v = torch.var(torch.stack(params), dim=(0, ), unbiased=True)
-            # sum to the avg
-            s.append(v)
-        return utils.torch_moments(s)
+            # append to the list the average variance
+            s.append(torch.mean(v))
+        return utils.torch_moments(torch.stack(s))
 
     def losslog(self, name, value):
         self.log(name,

@@ -68,9 +68,9 @@ def model_test(model_build_func, test_sample):
 
 def cosine_distance(x, y, reduction='none'):
     out = 1 - F.cosine_similarity(x, y)
-    if reduction is 'none':
+    if reduction == 'none':
         return out
-    elif reduction is 'sum':
+    elif reduction == 'sum':
         return out.sum(axis=-1)
 
 
@@ -293,13 +293,12 @@ def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
         loss = ae_loss + perfm_loss
 
     logger.log_metrics({
-        "best_ae_val_loss":
-        float(ae_loss),  # type: ignore
-        "best_perfm_val_loss":
-        float(perfm_loss)  # type: ignore
+        "best_ae_val_loss": float(ae_loss),  # type: ignore
+        "best_perfm_val_loss": float(perfm_loss)  # type: ignore
     })
     logger.log_metrics({
-        "final_weight_variance_" + k: v for k, v in model.performer_weight_moments().items()
+        "final_weight_variance_" + k: v
+        for k, v in model.performer_weight_moments().items()
     })
 
     # this is the loss used by hyper-parameters optimization
