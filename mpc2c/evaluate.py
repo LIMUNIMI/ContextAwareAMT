@@ -15,7 +15,7 @@ from scipy.stats import wilcoxon
 from . import settings as s
 from .asmd_resynth import get_contexts
 from .mytorchutils import make_loss_func, test
-from .training import build_performer_model
+from .training import build_specializer_model
 
 SONG_LEVEL = True
 
@@ -63,7 +63,7 @@ def evaluate_velocity(checkpoints: T.Dict[str, T.Any],
             pd.DataFrame(),
         ]
         # TODO build autoencoder and performer
-        model = build_performer_model(s.VEL_HYPERPARAMS, 0.5)
+        model = build_specializer_model(s.VEL_HYPERPARAMS, 0.5)
 
         model.load_state_dict(torch.load(checkpoint)['state_dict'])
 
@@ -100,7 +100,7 @@ def evaluate_pedaling(checkpoints: T.Dict[str, T.Any],
             tl_size = int(match.groups()[0])
 
         errors = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
-        model = build_performer_model(s.PED_HYPERPARAMS, 0.5)
+        model = build_specializer_model(s.PED_HYPERPARAMS, 0.5)
 
         state_dict = torch.load(checkpoint)['state_dict']
 

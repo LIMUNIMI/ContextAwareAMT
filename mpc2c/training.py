@@ -2,6 +2,7 @@
 
 import os
 from pprint import pprint
+from Cython.Compiler.Errors import context
 
 from sklearn.metrics.pairwise import cosine_distances
 
@@ -44,8 +45,8 @@ def model_test(model_build_func, test_sample):
                         {
                             'x': test_sample.to(s.DEVICE).to(s.DTYPE),
                             'y': torch.tensor(0.5).to(s.DEVICE).to(s.DTYPE),
-                            'enc_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
-                            'enc_same': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'cont_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'cont_same': test_sample.to(s.DEVICE).to(s.DTYPE),
                             'c': '0'
                         },
                         0,
@@ -92,20 +93,11 @@ def generic_loss(pred, same_pred, diff_pred):
         return cosine_distance(pred, same_pred, reduction='sum')
 
 
-def build_encoder(hpar, dropout, independence):
-    if independence == 'generic':
-        loss_fn = generic_loss
-    elif independence == 'specific':
-        loss_fn = specific_loss
-    elif independence == 'none':
-        loss_fn = None
-    else:
-        raise RuntimeError(f"Unknown independence value {independence}")
+def build_encoder(hpar, dropout):
 
     k1, k2, activation, kernel = get_hpar(hpar)
 
-    m = feature_extraction.TripletEncoder(
-        loss_fn=loss_fn,
+    m = feature_extraction.Encoder(
         insize=(
             s.BINS,
             s.MINI_SPEC_SIZE),  # mini_spec_size should change for pedaling...
@@ -119,13 +111,14 @@ def build_encoder(hpar, dropout, independence):
 
 
 def get_hpar(hpar):
-    return (hpar['enc_k1'], hpar['enc_k2'], hpar['activation'], hpar['kernel'])
+    return (hpar['enc_k1'], hpar['enc_k2'], hpar['activation'],
+            hpar['kernel'])
 
 
-def build_performer_model(hpar, infeatures, avg_pred):
-    m = feature_extraction.Performer(
+def build_specializer_model(hpar, infeatures, loss, nout):
+    m = feature_extraction.Specializer(
         (hpar['performer_features'], hpar['performer_layers'], infeatures,
-         hpar['activation'], 1), nn.L1Loss(reduction='sum'), avg_pred)
+         hpar['activation'], 1), loss, nout)
 
     return m
 
@@ -133,18 +126,22 @@ def build_performer_model(hpar, infeatures, avg_pred):
 def build_model(hpar,
                 mode,
                 dropout=s.TRAIN_DROPOUT,
-                dummy_avg=torch.tensor(0.5).cuda(),
-                independence='specific'):
+                context_specific=True):
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
-    autoencoder = build_encoder(hpar, dropout, independence)
-    performer = build_performer_model(hpar, autoencoder.encoder.outchannels,
-                                      dummy_avg)
-    model = feature_extraction.EncoderPerformer(autoencoder,
+    encoder = build_encoder(hpar, dropout)
+    performer = build_specializer_model(hpar, encoder.outchannels,
+                                        nn.L1Loss(reduction='sum'),
+                                        1)
+    cont_classifier = build_specializer_model(
+        hpar, encoder.outchannels,
+        nn.CrossEntropyLoss(reduction='sum'), len(contexts))
+    model = feature_extraction.EncoderPerformer(encoder,
                                                 performer,
+                                                cont_classifier,
                                                 contexts,
                                                 mode,
-                                                independence,
+                                                context_specific,
                                                 ema_period=s.EMA_PERIOD)
     return model
 
@@ -153,8 +150,8 @@ def my_train(mode,
              copy_checkpoint,
              logger,
              model,
-             independence,
-             enc_train=True,
+             context_specific,
+             cont_train=True,
              perfm_train=True):
     """
     Creates callbacks, train and freeze the part that raised an early-stop.
@@ -164,20 +161,20 @@ def my_train(mode,
     # while stopped_epoch > s.EARLY_STOP:
     # setup callbacks
     checkpoint_saver = ModelCheckpoint(
-        f"checkpoint_{mode}_independence={independence}",
-        filename='{epoch}-{enc_loss:.2f}',
+        f"checkpoint_{mode}_context={context_specific}",
+        filename='{epoch}-{cont_loss:.2f}',
         monitor='val_loss',
         save_top_k=1,
         mode='min',
         save_weights_only=True)
     callbacks = [checkpoint_saver]
-    enc_stopper = perfm_stopper = None
-    if enc_train:
-        enc_stopper = EarlyStopping(monitor='enc_val_loss_avg',
-                                    min_delta=s.EARLY_RANGE,
-                                    check_finite=False,
-                                    patience=s.EARLY_STOP)
-        callbacks.append(enc_stopper)
+    cont_stopper = perfm_stopper = None
+    if cont_train:
+        cont_stopper = EarlyStopping(monitor='cont_val_loss_avg',
+                                     min_delta=s.EARLY_RANGE,
+                                     check_finite=False,
+                                     patience=s.EARLY_STOP)
+        callbacks.append(cont_stopper)
     if perfm_train:
         perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
                                       min_delta=s.EARLY_RANGE,
@@ -205,34 +202,36 @@ def my_train(mode,
         # log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
-        overfit_batches=2,
+        # overfit_batches=2,
+        # fast_dev_run=True,
         gpus=s.GPUS)
 
     model.njobs = 1  # there's some leak when using njobs > 0
     if os.path.exists("lr_find_temp_model.ckpt"):
         os.remove("lr_find_temp_model.ckpt")
     d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
-    if d['lr_find'].suggestion() is None:
-        model.lr = 1e-5
-        model.learning_rate = 1e-5
+    if d['lr_find'] is None or d['lr_find'].suggestion() is None:
+        model.lr = 1
+        model.learning_rate = 1
     model.njobs = s.NJOBS
+    # need to reload dataloaders for using multiple jobs
     trainer.train_dataloader = model.train_dataloader()
     trainer.val_dataloader = model.val_dataloader()
     trainer.test_dataloader = model.test_dataloader()
     print("Fitting the model!")
     trainer.fit(model)
-    # if enc_train:
-    #     stopped_epoch = enc_stopper.stopped_epoch  # type: ignore
+    # if cont_train:
+    #     stopped_epoch = cont_stopper.stopped_epoch  # type: ignore
     # else:
     #     stopped_epoch = 0
     # if perfm_train:
     #     stopped_epoch = max(stopped_epoch,
     #                         perfm_stopper.stopped_epoch)  # type: ignore
 
-    return enc_stopper, perfm_stopper
+    return cont_stopper, perfm_stopper
 
 
-def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
+def train(hpar, mode, context_specific, copy_checkpoint='', test=True):
     """
     1. Builds a model given `hpar` and `mode`
     2. Train the model
@@ -245,59 +244,54 @@ def train(hpar, mode, copy_checkpoint='', independence='specific', test=True):
                           tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
 
     logger.log_hyperparams(hpar)
-    logger.log_hyperparams({"mode": mode, "independence": independence})
+    logger.log_hyperparams({"mode": mode, "context_specific": context_specific})
 
-    # dummy model (baseline)
-    # TODO: check the following function!
-    # dummy_avg = compute_average(trainloader.dataset,
-    #                             *axes,
-    #                             n_jobs=-1,
-    #                             backend='threading').to(s.DEVICE)
-
-    model = build_model(hpar, mode, independence=independence)
+    model = build_model(hpar, mode, context_specific=context_specific)
     torchinfo.summary(model)
 
     # training
     # this loss is also the same used for hyper-parameters tuning
-    enc_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
-                                          independence)
-    enc_loss, perfm_loss = enc_stopper.best_score, perfm_stopper.best_score  # type: ignore
-    print(f"First-training losses: {enc_loss:.2e}, {perfm_loss:.2e}")
+    cont_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger,
+                                           model, context_specific)
+    cont_loss, perfm_loss = cont_stopper.best_score, perfm_stopper.best_score  # type: ignore
+    print(f"First-training losses: {cont_loss:.2e}, {perfm_loss:.2e}")
 
     # cases:
     # A: encoder was stopped
     # B: performers were stopped
     # C: none was stopped
 
-    if enc_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
+    if cont_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
         # case A
         for p in model.performers.values():
             p.freeze()
+        for c in model.context_classifiers.values():
+            c.freeze()
         print("Continuing training encoder...")
-        enc_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
-                                  independence, True, False)
-    if enc_stopper.stopped_epoch > 0:  # type: ignore
+        cont_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
+                                   context_specific, True, False)
+    if cont_stopper.stopped_epoch > 0:  # type: ignore
         # case A and B
         model.encoder.freeze()
         print("Continuing training performers...")
         _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
-                                    independence, False, True)
+                                    context_specific, False, True)
 
-    enc_loss, perfm_loss = enc_stopper.best_score, perfm_stopper.best_score  # type: ignore
-    print(f"Final losses: {enc_loss:.2e}, {perfm_loss:.2e}")
+    cont_loss, perfm_loss = cont_stopper.best_score, perfm_stopper.best_score  # type: ignore
+    print(f"Final losses: {cont_loss:.2e}, {perfm_loss:.2e}")
 
     if test:
         trainer = Trainer(precision=s.PRECISION, logger=logger, gpus=s.GPUS)
-        loss = trainer.test(model)[0]["test_loss_avg"]
+        loss = trainer.test(model)[0]["perfm_test_avg"]
     else:
-        loss = enc_loss + perfm_loss
+        loss = cont_loss + perfm_loss
 
     logger.log_metrics({
-        "best_enc_val_loss": float(enc_loss),  # type: ignore
+        "best_cont_val_loss": float(cont_loss),  # type: ignore
         "best_perfm_val_loss": float(perfm_loss)  # type: ignore
     })
     logger.log_metrics({
-        "final_weight_variance_" + k: v
+        "final_weight_variance_" + k: float(v)
         for k, v in model.performer_weight_moments().items()
     })
 

@@ -48,12 +48,11 @@ def parse_args():
                         action="store_true",
                         help="Train a model.")
     parser.add_argument(
-        "-g",
-        "--generic",
-        action="store",
-        default="specific",
+        "-cs",
+        "--contextspecific",
+        action="store_true",
         help=
-        "Use generic or no independence instead of specific independence; accepted values: `specific`, `generic`, `none` "
+        "Train a specializer against context specificity on the same latent space used for performance regression"
     )
 
     parser.add_argument(
@@ -67,6 +66,11 @@ def parse_args():
                         "--redump",
                         action="store_true",
                         help="Pre-process the full dataset and dumps it")
+    parser.add_argument(
+        "-pc",
+        "--printcontexts",
+        action="store_true",
+        help="Print contexts in the order with the labels shown in mlflow log")
     return parser.parse_args()
 
 
@@ -90,6 +94,12 @@ def main():
                       Path(s.METADATASET_PATH), s.CONTEXT_SPLITS,
                       s.RESYNTH_FINAL_DECAY)
 
+    contexts = list(get_contexts(s.CARLA_PROJ).keys())
+
+    if args.printcontexts:
+        for i, c in enumerate(contexts):
+            print(f"{i}: {c}")
+
     if args.pedaling:
         mode = 'pedaling'
         hpar = s.PED_HYPERPARAMS
@@ -100,11 +110,9 @@ def main():
     nmf_params = load_nmf_params()
     if args.skopt:
 
-        contexts = list(get_contexts(s.CARLA_PROJ).keys())
-
         def objective(x):
-            l1 = training.train(x, mode, independence='none', test=True)
-            l2 = training.train(x, mode, independence='specific', test=True)
+            l1 = training.train(x, mode, False, test=True)
+            l2 = training.train(x, mode, True, test=True)
             # l3 = training.train(x, mode, independence='generic', test=True)
             # return (l1 + l2 + l3) / 3
             return (l1 + l2) / 2
@@ -139,8 +147,8 @@ def main():
         print("----------------")
         training.train(hpar,
                        mode,
-                       copy_checkpoint=Path("models") / f"{mode}.pt",
-                       independence=args.generic)
+                       args.contextspecific,
+                       copy_checkpoint=Path("models") / f"{mode}.pt")
 
     if args.redump:
         contexts = list(get_contexts(s.CARLA_PROJ).keys())

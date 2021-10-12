@@ -93,8 +93,8 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = 50
 VEL_HYPERPARAMS = {
-    "ae_k1": 5,
-    "ae_k2": 5,
+    "enc_k1": 5,
+    "enc_k2": 5,
     "activation": nn.ReLU(),
     "kernel": 2,
     'performer_features': 3,
@@ -123,15 +123,16 @@ SWA = False
 
 # SKOPT
 SKSPACE = [
-    space.Integer(0, 7, name='ae_k1'),
-    space.Integer(2, 6, name='ae_k2'),
-    space.Categorical([nn.GELU(), nn.ReLU(), nn.Identity(), nn.SELU()],
-                      name='activation'),
+    space.Integer(0, 7, name='enc_k1'),
+    space.Integer(2, 6, name='enc_k2'),
+    space.Categorical(
+        [nn.GELU(), nn.ReLU(), nn.Identity(),
+         nn.SELU()], name='activation'),
     space.Integer(1, 3, name='kernel'),
     space.Integer(0, 8, name='performer_features'),
     space.Integer(1, 3, name='performer_layers'),
 ]
-SKITERATIONS = (0, 30)
+SKITERATIONS = (0, 10)
 PLOT_GRAPHS = True
 
 #: If compiling code with cython in pure-python mode
