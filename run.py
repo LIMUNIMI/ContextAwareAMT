@@ -1,9 +1,12 @@
 import argparse
 import pickle
 from pathlib import Path
+import subprocess
+from logging import error
+
+import mlflow # type: ignore
 
 import skopt  # type: ignore
-import torch  # type: ignore
 
 from mpc2c import create_template, data_management, evaluate
 from mpc2c import settings as s
@@ -106,6 +109,9 @@ def main():
     elif args.velocity:
         mode = 'velocity'
         hpar = s.VEL_HYPERPARAMS
+    else:
+        error("Please specify -p or -v")
+        return
 
     nmf_params = load_nmf_params()
     if args.skopt:
@@ -125,10 +131,13 @@ def main():
             # test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
             checkpoint_path = "vel_skopt.pt"
         else:
-            raise RuntimeError("Velocity or pedaling must be set")
+            return # not reachable, here to shutup the pyright
 
         # space_constraint = training.model_test(
         #     lambda x: training.build_model(x, contexts), test_sample)
+        exp = mlflow.get_experiment_by_name(mode)
+        if exp:
+            mlflow.delete_experiment(exp.experiment_id)
 
         hyperopt(
             s.SKSPACE,
@@ -141,6 +150,9 @@ def main():
                 optimization_method=skopt.dummy_minimize),
             optimize_kwargs=dict(max_loss=20.0,
                                  initial_point_generator="grid"))
+        if not exp:
+            exp = mlflow.get_experiment_by_name(mode)
+        subprocess.run(['mlflow', 'experiments', 'csv', '-x', exp.experiment_id, '-o', f'{mode}_results.csv'])
 
     if args.train:
 
