@@ -247,7 +247,7 @@ def train(hpar, mode, context_specific, copy_checkpoint='', test=True):
     logger.log_hyperparams({"mode": mode, "context_specific": context_specific})
 
     model = build_model(hpar, mode, context_specific=context_specific)
-    torchinfo.summary(model)
+    # torchinfo.summary(model)
 
     # training
     # this loss is also the same used for hyper-parameters tuning
