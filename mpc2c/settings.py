@@ -126,9 +126,8 @@ SKSPACE = [
     space.Integer(0, 7, name='enc_k1'),
     space.Integer(2, 6, name='enc_k2'),
     space.Categorical(
-        [nn.GELU(), nn.ReLU(), nn.Identity(),
-         nn.SELU()], name='activation'),
-    space.Integer(1, 3, name='kernel'),
+        [nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
+    space.Integer(2, 5, name='kernel'),
     space.Integer(0, 8, name='performer_features'),
     space.Integer(1, 3, name='performer_layers'),
 ]
