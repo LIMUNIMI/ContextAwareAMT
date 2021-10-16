@@ -181,7 +181,7 @@ class Encoder(LightningModule):
         # add one convolution to reduce the size to 1x1
         stack.append(
             nn.Sequential(nn.Conv2d(outchannels, outchannels, insize),
-                          nn.BatchNorm2d(outchannels), nn.Tanh()))
+                          nn.BatchNorm2d(outchannels), activation))
 
         self.stack = nn.Sequential(*stack)
         self.outchannels = outchannels
@@ -346,7 +346,7 @@ class EncoderPerformer(LightningModule):
                                  device=enc_out.device,
                                  dtype=torch.long).expand(enc_out.shape[0])
                 }, batch_idx)
-            loss += cont_out['loss']
+            loss = loss + cont_out['loss']
             self.losslog('cont_train_loss', cont_out['loss'])
             out['cont_train_loss'] = cont_out['loss'].detach()
 
@@ -380,7 +380,7 @@ class EncoderPerformer(LightningModule):
                                  device=enc_out.device,
                                  dtype=torch.long).expand(enc_out.shape[0])
                 }, batch_idx)
-            loss += cont_out['loss']
+            loss = loss + cont_out['loss']
             out['cont_val_loss'] = cont_out['loss'].detach()
             self.loss_pool["cont"].append(
                 cont_out["loss"].cpu().numpy().tolist())
