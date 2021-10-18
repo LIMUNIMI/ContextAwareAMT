@@ -302,10 +302,7 @@ class EncoderPerformer(LightningModule):
              for c in range(len(contexts))})
         self.context_specific = context_specific
         if self.context_specific:
-            self.context_classifiers = nn.ModuleDict({
-                str(c): deepcopy(cont_classifier)
-                for c in range(len(contexts))
-            })
+            self.context_classifier = cont_classifier
         self.lr = lr
         self.wd = wd
         self.mode = mode
@@ -337,7 +334,7 @@ class EncoderPerformer(LightningModule):
         loss = perfm_out['loss']
         out = {'loss': loss, 'perfm_train_loss': perfm_out['loss'].detach()}
         if self.context_specific:
-            cont_out = self.context_classifiers[context_s].training_step(
+            cont_out = self.context_classifier.training_step(
                 {
                     'x':
                     enc_out,
@@ -371,7 +368,7 @@ class EncoderPerformer(LightningModule):
         loss = perfm_out['loss']
         out = {'loss': loss, 'perfm_val_loss': perfm_out['loss'].detach()}
         if self.context_specific:
-            cont_out = self.context_classifiers[context_s].validation_step(
+            cont_out = self.context_classifier.validation_step(
                 {
                     'x':
                     enc_out,
@@ -421,7 +418,7 @@ class EncoderPerformer(LightningModule):
                 'y': batch['y']
             }, batch_idx)['out']
         if self.context_specific:
-            cont_out = self.context_classifiers[context_s].validation_step(
+            cont_out = self.context_classifier.validation_step(
                 {
                     'x': enc_out,
                     'y': batch_y
