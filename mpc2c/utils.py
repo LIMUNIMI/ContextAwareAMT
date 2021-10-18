@@ -1,6 +1,63 @@
-import essentia.standard as esst
+import essentia.standard as esst  # type: ignore
 import numpy as np
-import pretty_midi as pm
+import pretty_midi as pm  # type: ignore
+from scipy.optimize import linear_sum_assignment
+import torch
+
+
+def torch_moments(t: list):
+    """
+    Computes moments on a list of tensors t
+    """
+    mean = torch.mean(t)
+    diffs = t - mean
+    var = torch.mean(torch.pow(diffs, 2.0))
+    std = torch.pow(var, 0.5)
+    zscores = diffs / std
+    skews = torch.mean(torch.pow(zscores, 3.0))
+    kurtoses = torch.mean(torch.pow(zscores, 4.0)) - 3.0
+    return {"mean": mean, "var": var, "skew": skews, "kurt": kurtoses}
+
+
+def permute_tensors(t0, t1):
+    """
+    Permute the rows of tensor `t1` so that the L1/L2 distances between `t0`
+    and `t1` is minimized.
+
+    Returns the permutation of columns (the indices)
+
+    see https://math.stackexchange.com/questions/3225410/find-a-permutation-of-the-rows-of-a-matrix-that-minimizes-the-sum-of-squared-err
+
+    For instance, `t0` and `t1` could be tensors describing a linear layer, in
+    which case, the permutation of rows must be applied to the columns of the
+    next layer
+    """
+
+    _, cols = linear_sum_assignment((t0 @ t1.T).detach().cpu().numpy(),
+                                    maximize=True)
+
+    # note: cols are the columns of the cost matrix `t0 @ t1.T`, but the rows of t1
+    return cols.tolist()
+
+
+def amp2db(arr, clean=True):
+    """
+    Convert an array to -dBFS
+
+    If `clean` is False, you need to take care that all values are > 0
+    (usually, > 1e-31 or 1e-15), otherwise, `arr` is normalized to sum and clipped
+    """
+    if clean:
+        arr /= 1e4 * arr.sum()
+        arr[arr < 1e-15] = 1e-15
+    return -20 * np.log10(arr) / np.log10(np.finfo('float64').max)
+
+
+def db2amp(arr):
+    """
+    Convert an array to amplitude from -dBFS
+    """
+    return 10**(-arr * np.log10(np.finfo('float64').max) / 20)
 
 
 def pad(arr1, arr2):
@@ -135,13 +192,10 @@ def midipath2mat(path):
 
 
 def make_pianoroll(mat,
+                   basis_frames,
                    res=0.25,
                    velocities=True,
                    only_onsets=False,
-                   only_offsets=False,
-                   basis=1,
-                   attack=1,
-                   basis_l=1,
                    eps=1e-15,
                    eps_range=0):
     """
@@ -151,15 +205,27 @@ def make_pianoroll(mat,
     turn this off use `velocities=False`
 
     if `only_onsets` is true, only the attack is used and the other part of the
-    notes are discarded (useful for aligning with amt). Similarly
-    `only_offsets`
+    notes are discarded (useful for aligning with amt).
 
-    `basis` is the number of basis for the nmf; `attack` is the attack
-    duration, all other basis will be long `basis_l` column except the last one
-    that will last till the end if needed
+    `basis_frames` is a dictionary similar to the following:
 
-    `eps_range` defines how to much is note is enlarged before onset and after
-    offset in seconds, while `eps` defines the value to use for enlargement
+        BASIS_FRAMES = {
+            #: the number of basis for the attack
+            'attack_b': 1,
+            #: the number of basis for the release
+            'release_b': 15,
+            #: the number of basis for the inner
+            'inner_b': 14,
+            #: the number of frames for the attack basis
+            'attack_f': 1,
+            #: the number of frames for the release basis
+            'release_f': 1,
+            #: the number of frames for the inner basis
+            'inner_f': 2,
+        }
+
+    `eps_range` defines how many columns each note is enlarged before onset and
+    after release, while `eps` defines the value to use for enlargement
 
     Note that pitch 0 is not used and pitch 128 cannot be added if MIDI pitches
     in [1, 128] are used (as in asmd)
@@ -167,9 +233,37 @@ def make_pianoroll(mat,
 
     L = int(np.max(mat[:, 2]) / res) + 1
 
-    pr = np.zeros((128, basis, L))
+    attack_b, release_b, inner_b =\
+        basis_frames['attack_b'], basis_frames['release_b'], basis_frames['inner_b']
+    attack_f, release_f, inner_f =\
+        basis_frames['attack_f'], basis_frames['release_f'], basis_frames['inner_f']
+    nbasis = attack_b + release_b + inner_b
+
+    pr = np.zeros((128, nbasis, L))
 
     eps_range = int(eps_range / res)
+
+    def fill_base(pitch, start, end, first_base, fpb, nbasis):
+        """
+        Fill a `nbases` from `first_base` for pitch `pitch` from frame `start`
+        to `end` excluded, using `fpb` frames per base.
+        If `end` would be before the number of basis specified, the procedure
+        is interrupted and the note is filled up to the last frame.
+        Returns the first non-filled frame
+        """
+        _end = min(start + nbasis * fpb, end)
+        for b in range(first_base, first_base + nbasis):
+            if start + fpb >= _end:
+                if start < _end:
+                    pr[pitch, b, start:_end] = vel
+                # if start >= end, then start == _end (start > _end is impossible)
+                break
+            else:
+                pr[pitch, b, start:start + fpb] = vel
+                start += fpb
+        # if the for loopended without reaching `break`, then
+        # start == start + fpb * nbasis == _end
+        return _end
 
     for i in range(mat.shape[0]):
         note = mat[i]
@@ -182,44 +276,37 @@ def make_pianoroll(mat,
         else:
             vel = 1
 
-        if only_offsets:
-            pr[pitch, basis - 1, end - 1] = vel
-            continue
-
-        # the attack basis
-        pr[pitch, 0, start:start + attack] = vel
-
         # the eps_range before onset
         if eps_range > 0:
             start_eps = max(0, start - eps_range)
             pr[pitch, 0, start_eps:start] = eps
 
-        start += attack
+        # the attack basis
+        start = fill_base(pitch, start, end, 0, attack_f, attack_b)
+        if only_onsets:
+            continue
 
-        # all the other basis
-        END = False
-        for b in range(1, basis):
-            for k in range(basis_l):
-                t = start + (b - 1) * basis_l + k
-                if t < end:
-                    pr[pitch, b, t] = vel
-                else:
-                    END = True
-                    break
-            if END:
-                break
+        # the inner basis
+        start = fill_base(pitch, start, end, attack_b, inner_f, inner_b)
 
-        # the ending part
-        if not only_onsets:
-            if start + (basis - 1) * basis_l < end:
-                pr[pitch, basis - 1, start + (basis - 1) * basis_l:end] = vel
-                # the eps_range after the offset
-                if eps_range > 0:
-                    end_eps = min(L, end + eps_range)
-                    pr[pitch, basis - 1, end:end_eps] = eps
+        # other basis until the offset
+        while start < end:
+            start = fill_base(pitch, start, end, attack_b + inner_b - 1, 1, 1)
+
+        # the release
+        release_end = min(end + release_f * release_b, pr.shape[2])
+        fill_base(pitch, end, release_end, attack_b + inner_b, release_f,
+                  release_b)
+
+        # the eps range after the offset and after release
+        if eps_range > 0:
+            end_eps = min(L, end + eps_range)
+            pr[pitch, attack_b + inner_b - 1, end:end_eps] = eps
+            end_eps = min(L, release_end + eps_range)
+            pr[pitch, nbasis - 1, release_end:end_eps] = eps
 
     # collapse pitch and basis dimension
-    pr = pr.reshape((128 * basis, -1), order='C')
+    pr = pr.reshape((128 * nbasis, -1), order='C')
     return pr
 
 

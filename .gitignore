@@ -20,3 +20,10 @@ images/skopt_vel3_numsamples.txt
 images/skopt_vel4_convergence.txt
 images/skopt_vel4_dependency.txt
 .ropeproject/
+
+tags
+session.vim
+to_be_synthesized/pianoteq_scales.flac
+scales.mid
+to_be_synthesized/scales.mid
+session.nvim

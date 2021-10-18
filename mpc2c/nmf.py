@@ -3,18 +3,21 @@ from types import SimpleNamespace
 import numpy as np
 
 from . import settings as s
-from .utils import find_start_stop, make_pianoroll, pad, stretch_pianoroll
+from .utils import find_start_stop, make_pianoroll, pad, stretch_pianoroll, amp2db
 
 
-def NMF(V,
+def NMF(
+        V,
         W,
         H,
-        B=10,
+        # B=10,
+        # params=None,
         num_iter=10,
-        params=None,
         cost_func='Music',
         fixH=False,
-        fixW=False):
+        fixW=False,
+        invertV=False,
+        invertW=False):
     """Given a non-negative matrix V, find non-negative templates W and
     activations H that approximate V.
 
@@ -41,7 +44,7 @@ def NMF(V,
           'EucDdist' for Euclidean Distance
           'KLDiv' for Kullback Leibler Divergence
           'ISDiv' for Itakura Saito Divergence
-          'Music' for score-informed music applications [3]
+          # 'Music' for score-informed music applications [3]
 
     num_iter : int
         Number of iterations the algorithm will run.
@@ -55,52 +58,56 @@ def NMF(V,
     fixW : bool
         If True, W is not updated
 
-    params : dict
-        parameters for `Music` updates with these names:
-            a1, a2, a3, b1, b2, Mh, Mw
+    # params : dict
+    #     parameters for `Music` updates with these names:
+    #         a1, a2, a3, b1, b2, Mh, Mw
 
-        `Mh` and `Mw` *MUST* be provided, the others can miss and in that case
-        the following are used [3]:
-            a1, a2, a3, b1, b2 = 0, 1e3, 1, 1e2, 0
+    #     `Mh` and `Mw` *MUST* be provided, the others can miss and in that case
+    #     the following are used [3]:
+    #         a1, a2, a3, b1, b2 = 0, 1e3, 1, 1e2, 0
 
-    B : int
-        the number of basis for template
+    # B : int
+    #     the number of basis for template (only needed for the `Music` distance)
     """
     # normalize to unit sum
-    V /= V.sum()
+    V /= V.max()
+    if invertV:
+        V[...] = 1 - V
 
-    # normalize activations
-    W /= W.sum(axis=0) + s.EPS
+    # normalize W
+    W /= W.max(axis=0) + s.EPS
+    if invertW:
+        W[...] = 1 - W
 
     # normalize H
-    H /= H.sum()
+    H /= H.max()
 
     # get important params
     K, M = V.shape
-    L = num_iter
-    if cost_func == 'Music':
-        # default ones
-        if "Mh" not in params or "Mw" not in params:
-            raise RuntimeError("Mh and Mw *MUST* be provided")
-        params = {
-            "a1": params.get("a1") or 10,
-            "a2": params.get("a2") or 10,
-            "a3": params.get("a3") or 0,
-            "b1": params.get("b1") or 0,
-            "b2": params.get("b2") or 0,
-            "Mh": params["Mh"],
-            "Mw": params["Mw"]
-        }
-        p = SimpleNamespace(**params)
+    # if cost_func == 'Music':
+    #     # default ones
+    #     if "Mh" not in params or "Mw" not in params:
+    #         raise RuntimeError("Mh and Mw *MUST* be provided")
+    #     params = {
+    #         "a1": params.get("a1") or 10,
+    #         "a2": params.get("a2") or 10,
+    #         "a3": params.get("a3") or 0,
+    #         "b1": params.get("b1") or 0,
+    #         "b2": params.get("b2") or 0,
+    #         "Mh": params["Mh"],
+    #         "Mw": params["Mw"]
+    #     }
+    #     p = SimpleNamespace(**params)
 
     # create helper matrix of all ones
-    onesMatrix = np.ones((K, M))
+    if cost_func == 'KLDiv':
+        onesMatrix = np.ones((K, M))
 
     # main iterations
-    for iter in range(L):
+    for _ in range(num_iter):
 
         # compute approximation
-        Lambda = s.EPS + W @ H
+        Lambda = W @ H
 
         # switch between pre-defined update rules
         if cost_func == 'EucDist':
@@ -113,6 +120,7 @@ def NMF(V,
 
         elif cost_func == 'KLDiv':
             # Kullback Leibler divergence update rules
+            Lambda += s.EPS
             if not fixW:
                 W *= ((V / Lambda) @ H.T) / (onesMatrix @ H.T + s.EPS)
 
@@ -121,47 +129,35 @@ def NMF(V,
 
         elif cost_func == 'ISDiv':
             # Itakura Saito divergence update rules
+            Lambda += s.EPS
             if not fixW:
                 W *= ((Lambda**-2 * V) @ H.T) / ((Lambda**-1) @ H.T + s.EPS)
 
             if not fixH:
                 H *= (W.T @ (Lambda**-2 * V)) / (W.T @ (Lambda**-1) + s.EPS)
 
-        elif cost_func == 'Music':
-            # update rules for music score-informed applications
+        # elif cost_func == 'Music':
+        #     # update rules for music score-informed applications
 
-            if not fixW:
-                W_indicator = np.zeros_like(W)
-                W_indicator[:, ::B] += W[:, ::B]
-                numW = (V / Lambda) @ H.T
-                numW[1:] += 2 * p.b1 * W_indicator[1:]
-                numW[:-1] += 2 * p.b1 * W_indicator[:-1] + p.b2 * p.Mw[:-1]
+        #     if not fixW:
+        #         W_indicator = np.zeros_like(W)
+        #         W_indicator[:, ::B] += W[:, ::B]
+        #         numW = (V / Lambda) @ H.T
+        #         numW[1:] += 2 * p.b1 * W_indicator[1:]
+        #         numW[:-1] += 2 * p.b1 * W_indicator[:-1] + p.b2 * p.Mw[:-1]
 
-                W *= numW / (onesMatrix @ H.T + s.EPS + p.b2 +
-                             4 * p.b1 * W_indicator)
+        #         W *= numW / (onesMatrix @ H.T + s.EPS + p.b2 +
+        #                      4 * p.b1 * W_indicator)
 
-            if not fixH:
-                numH = W.T @ (V / Lambda) + p.a1 * p.Mh
-                numH[:, B:] += p.a2 * H[:, B:]
-                numH[:, :-B] += H[:, :-B]
-                H *= numH / (W.T @ onesMatrix + s.EPS + p.a1 + p.a3 +
-                             4 * p.a2 * H)
+        #     if not fixH:
+        #         numH = W.T @ (V / Lambda) + p.a1 * p.Mh
+        #         numH[:, B:] += p.a2 * H[:, B:]
+        #         numH[:, :-B] += H[:, :-B]
+        #         H *= numH / (W.T @ onesMatrix + s.EPS + p.a1 + p.a3 +
+        #                      4 * p.a2 * H)
 
         else:
             raise ValueError('Unknown cost function')
-
-
-def make_nonnegative(arr: np.ndarray, th: int = 1):
-    """
-    Make `arr` have values in [0, 1], where [0, 0.5] corresponds to [-K, 0],
-    while (0.5, 1] corresponds to (0, K], and
-
-        K = max(|arr|) = max(min(arr), max(arr))
-    """
-    # the new threshold is 1, not 0 anymore...
-    arr /= np.abs(arr).max()
-    arr += th
-    arr /= 2 * th
 
 
 class NMFTools:
@@ -169,11 +165,14 @@ class NMFTools:
                  initW,
                  minpitch,
                  maxpitch,
+                 basis_frames=s.BASIS_FRAMES,
                  spec=s.SPEC,
                  realign=False,
                  cost_func=s.NMF_COST_FUNC):
-        self.initW = initW[:, minpitch * s.BASIS:(maxpitch + 1) *
-                           s.BASIS].astype(np.float32)
+        self.basis = basis_frames['attack_b'] +\
+                                   basis_frames['release_b'] + basis_frames['inner_b']
+        self.initW = initW[:, (minpitch - 1) * self.basis +
+                           1:maxpitch * self.basis + 1].astype(np.float32)
         self.minpitch = minpitch
         self.maxpitch = maxpitch
         self.sr = spec.sample_rate
@@ -186,34 +185,34 @@ class NMFTools:
         self.score = score
 
         # remove stoping and starting silence in audio
-        start, stop = find_start_stop(audio, sample_rate=self.sr)
-        audio = audio[start:stop]
+        # start, stop = find_start_stop(audio, sample_rate=self.sr)
+        # audio = audio[start:stop]
         self.initV = self.spec.spectrogram(audio, 440 if s.RETUNING else 0)
+        self.initV = amp2db(self.initV)
 
         # computing resolution of the pianoroll (seconds per column)
         self.res = len(audio) / self.sr / self.initV.shape[1]
         self.initH = make_pianoroll(score,
+                                    s.BASIS_FRAMES,
                                     res=self.res,
-                                    basis=s.BASIS,
                                     velocities=False,
-                                    attack=s.ATTACK,
+                                    only_onsets=False,
                                     eps=s.EPS_ACTIVATIONS,
                                     eps_range=s.EPS_RANGE).astype(np.float32)
-
         if s.PREPROCESSING == "stretch":
             # remove trailing zeros in H
-            nonzero_cols = self.initH.any(axis=0).nonzero()[0]
-            start = nonzero_cols[0]
-            stop = nonzero_cols[-1]
-            self.initH = self.H[:, start:stop + 1]
+            # nonzero_cols = self.initH.any(axis=0).nonzero()[0]
+            # start = nonzero_cols[0]
+            # stop = nonzero_cols[-1]
+            # self.initH = self.H[:, start:stop + 1]
 
             # stretch pianoroll
             self.initH = stretch_pianoroll(self.initH, self.initV.shape[1])
         elif s.PREPROCESSING == "pad":
             self.initV, self.initH = pad(self.initV, self.initH)
 
-        self.initH = self.initH[self.minpitch * s.BASIS:(self.maxpitch + 1) *
-                                s.BASIS, :]
+        self.initH = self.initH[self.minpitch *
+                                self.basis:(self.maxpitch + 1) * self.basis, :]
 
         # check shapes
         assert self.initV.shape == (self.initW.shape[0], self.initH.shape[1]),\
@@ -223,11 +222,6 @@ class NMFTools:
 
         self.initV_sum = self.initV.sum()
 
-    def renormalize(self, arr, initV_sum=True):
-        if initV_sum:
-            return arr / (arr.sum() + s.EPS) * self.initV_sum
-        else:
-            return arr / (arr.sum() + s.EPS)
 
     def perform_nmf(self, audio, score):
         self.to2d()
@@ -239,10 +233,28 @@ class NMFTools:
         self.V = self.initV.copy()
 
         # perform nfm
+        K = 5
+        start = 0
+        hop = self.V.shape[1] // K
+        end = hop
+        for _ in range(K):
+            NMF(
+                self.V[:, start:end],
+                self.W,
+                self.H[:, start:end],
+                num_iter=1,
+                cost_func=self.cost_func,
+                fixH=True,
+                fixW=False,
+                # inverting allows to have most of frames near to 0 instead of 1
+                invertV=True,
+                invertW=True)
+            start = end
+            end = min(self.V.shape[1], start + hop)
+
         NMF(self.V,
             self.W,
             self.H,
-            B=s.BASIS,
             num_iter=5,
             cost_func=self.cost_func,
             fixH=False,
@@ -252,19 +264,21 @@ class NMFTools:
         if self.initW.ndim != 3:
             npitch = self.maxpitch - self.minpitch + 1
             if hasattr(self, 'H'):
-                self.H = self.H.reshape(npitch, s.BASIS, -1)
-                self.initH = self.initH.reshape(npitch, s.BASIS, -1)
-            self.W = self.W.reshape((-1, npitch, s.BASIS), order='C')
-            self.initW = self.initW.reshape((-1, npitch, s.BASIS), order='C')
+                self.H = self.H.reshape(npitch, self.basis, -1)
+                self.initH = self.initH.reshape(npitch, self.basis, -1)
+            self.W = self.W.reshape((-1, npitch, self.basis), order='C')
+            self.initW = self.initW.reshape((-1, npitch, self.basis),
+                                            order='C')
 
     def to2d(self):
         if self.initW.ndim != 2:
             npitch = self.maxpitch - self.minpitch + 1
             if hasattr(self, 'H'):
-                self.H = self.H.reshape(npitch * s.BASIS, -1)
-                self.initH = self.initH.reshape(npitch * s.BASIS, -1)
-            self.W = self.W.reshape((-1, npitch * s.BASIS), order='C')
-            self.initW = self.initW.reshape((-1, npitch * s.BASIS), order='C')
+                self.H = self.H.reshape(npitch * self.basis, -1)
+                self.initH = self.initH.reshape(npitch * self.basis, -1)
+            self.W = self.W.reshape((-1, npitch * self.basis), order='C')
+            self.initW = self.initW.reshape((-1, npitch * self.basis),
+                                            order='C')
 
     def generate_minispecs(self, onsets_from_H=False):
         """
@@ -281,14 +295,14 @@ class NMFTools:
         for pitch, onset, offset in self.gen_notes_from_H(onsets_from_H):
             # select the sorrounding space in H
             start = onset
-            end = min(start + s.MINI_SPEC_SIZE, self.H.shape[2], offset + 1)
+            end = min(
+                start + s.MINI_SPEC_SIZE, self.H.shape[2], offset +
+                s.BASIS_FRAMES['release_b'] * s.BASIS_FRAMES['release_f'])
 
             # compute the mini_spec
-            mini_spec = self.renormalize(
-                self.W[:, pitch, :] @ self.H[pitch, :, start:end],
-                initV_sum=False)
+            mini_spec = 1 - self.W[:, pitch, :] @ self.H[pitch, :, start:end]
 
-            # normalizing with rms
+            # padding
             if mini_spec.shape[1] < s.MINI_SPEC_SIZE:
                 mini_spec = np.pad(mini_spec,
                                    pad_width=[
@@ -359,8 +373,8 @@ class NMFTools:
             # compute offset
             pitch, onset, offset = note[:3]
             if not onsets_from_H:
-                onset = int(onset / self.res)
-                offset = min(int(offset / self.res), summed_pr.shape[1] - 1)
+                onset = int(onset / self.res) + 1
+                offset = min(int(offset / self.res), summed_pr.shape[1])
                 pitch = int(pitch - self.minpitch)
 
             # argmax = np.argmax(self.H[pitch, :, onset:offset + 1]) + onset

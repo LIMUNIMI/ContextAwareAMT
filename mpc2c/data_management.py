@@ -1,28 +1,186 @@
-import pathlib
+import pickle
+from typing import List
+from itertools import cycle
+from random import choice
 
-import essentia as es
-from torch.utils.data import DataLoader
+import numpy as np
+import essentia as es  # type: ignore
+from torch.utils.data import DataLoader, Sampler  # type: ignore
+from tqdm import trange
 
 from . import nmf
 from . import settings as s
 from . import utils
 from .asmd.asmd import asmd, dataset_utils
-from .mytorchutils import (DatasetDump, dummy_collate, no_batch_collate,
-                           pad_collate)
+from .mytorchutils import DatasetDump
 
-# TODO: create a DumpableDataset which inherits and overloads `get_target`
-# TODO: self._get_sample(i, getter_fn=self._get_input) not filtered
-# among the inverted index
+# import heartrate
+# heartrate.trace(port=8080)
 
 
-def transform_func(arr: es.array):
+class AEDataset(DatasetDump):
+    def __init__(self, contexts: List[str], *args, **kwargs):
+        """
+        if `generic`, then data are generated for generic independence,
+        otherwise for specific indipendence
+        """
+        super().__init__(*args, **kwargs)
+        self.contexts = contexts
+        if self.dumped:
+            # keep track of which samples among those dumped were used
+            self.not_used = np.ones(sum(self.lengths), dtype=np.bool8)
+            # keep track of the context of each sample
+            fname = self.root / 'sample_contexts.pkl'
+            if fname.exists():
+                self.sample_contexts = pickle.load(open(fname,
+                                                        'rb')).astype(np.int64)
+            else:
+                self.sample_contexts = np.zeros(self.not_used.shape[0],
+                                                dtype=np.int64)
+                print(
+                    "Pre-computing sample contexts (this is done once and cached to file...)"
+                )
+                k = 0
+                for i in trange(len(self.lengths)):
+                    L = self.lengths[i]
+                    context = self.songs[i]['groups'][-1]
+                    self.sample_contexts[k:k +
+                                         L] = self.contexts.index(context)
+                    k += L
+                pickle.dump(self.sample_contexts, open(fname, 'wb'))
+            self.len = np.count_nonzero(self.not_used)
+
+    def subsample(self, perc):
+        """
+        Sub-sample this dataset at the sample-level (not songs-level)
+        """
+        d = np.where(self.not_used)[0]
+        chosen = np.random.default_rng(1992).choice(d,
+                                                    int(d.shape[0] *
+                                                        (1 - perc)),
+                                                    replace=False)
+        self.not_used[chosen] = False
+        self.len = np.count_nonzero(self.not_used)
+
+    def __len__(self):
+        return self.len
+
+    def set_operation(self, *args, **kwargs):
+        """
+        Need to extend the `DatasetDump`'s method because we need to update `not_used`
+        """
+        out = super().set_operation(*args, **kwargs)
+        out.not_used = self.not_used.copy()
+        k = 0
+        for i in range(len(out.lengths)):
+            L = out.lengths[i]
+            out.not_used[k:k + L] = out.included[i]
+            k += L
+        out.len = np.count_nonzero(out.not_used)
+        return out
+
+    def __getitem__(self, idx, filtered=False):
+        """
+        Returns 4 data: input, target label, target reconstruction (same and different context)
+
+        the input is of context `c`
+
+        raise `StopIteration` when finished
+        """
+
+        # computing:
+        c = self.sample_contexts[idx]
+        # 1. dataset with the same context
+        same = self.set_operation(dataset_utils.filter,
+                                  groups=[self.contexts[c]])
+        # 2.  dataset with different contexts (contains data not in this split too)
+        different = same.set_operation(
+            dataset_utils.complement)  # type: ignore
+        # 3.  dataset with different contexts (only in this split)
+        different = self.set_operation(dataset_utils.intersect,
+                                       different.dataset)  # type: ignore
+        # the part above takes 0.1 second each (due to the creation of `inverted`
+        # object, totalling 0.3 seconds)
+
+        x, _ = self.get_input(idx, filtered=filtered)
+        x /= x.abs().max()
+        y = self.get_target(idx, filtered=filtered)
+
+        # take a random sample from `different` with the same label
+        bin = self.get_bin(y)
+        diff_target = choice(different.inverted[bin])
+        # take a random sample from `same` with the same label
+        same_target = choice(same.inverted[bin])
+        # we use song indiex and song sample index, so we don't need to specify
+        # if dataset was filtered
+        enc_same, _ = same.get_input(*same_target)
+        enc_same /= enc_same.abs().max()
+        enc_diff, _ = different.get_input(*diff_target)
+        enc_diff /= enc_diff.abs().max()
+
+        return {
+            "c": str(c),
+            "x": x,
+            "y": y,
+            "enc_same": enc_same,
+            "enc_diff": enc_diff,
+        }
+
+
+class AEBatchSampler(Sampler):
+    def __init__(self, batch_size: int, enc_dataset: AEDataset):
+        """
+        Makes batches so that each one has a different context
+        """
+        super().__init__(enc_dataset)
+        self.batch_size = batch_size
+        self.enc_dataset = enc_dataset
+        self.contexts = cycle(enc_dataset.contexts)
+        self.len = np.count_nonzero(enc_dataset.not_used)
+        self.not_used_init = self.enc_dataset.not_used.copy()
+
+    def __len__(self):
+        return self.len // self.batch_size + 1
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        c = self.enc_dataset.contexts.index(next(self.contexts))
+        # find the first `self.batch_size` samples not used and having context `c`
+        batch = np.argwhere(
+            np.logical_and(self.enc_dataset.not_used,
+                           (self.enc_dataset.sample_contexts == c)))
+        # sample indices are referred to the whole dumped dataset
+        batch = batch[:self.batch_size, 0]
+        if batch.shape[0] < 1:
+            # not actually used (we reload the dataloader at every epoch)
+            self.enc_dataset.not_used = self.not_used_init.copy()
+            self.contexts = cycle(self.enc_dataset.contexts)
+            raise StopIteration
+        self.enc_dataset.not_used[batch] = False
+        return batch
+
+
+def enc_collate(batch):
+    """
+    `batch` is what is returned by `AEBatchSampler.__iter__`: a list of tuples
+    where each tuple is what returned by `AEDataset.next_item_context`
+    """
+
+    # do we need it? if samples have the same size, not
+    pass
+
+
+def transform_func(dbarr: es.array):
     """
     Takes a 2d array in float32 and computes the first 13 MFCC, on each column
     resulting in a new 2darray with 13 columns
     """
     out = []
-    for col in range(arr.shape[1]):
-        out.append(s.MFCC(arr[:, col]))
+    for col in range(dbarr.shape[1]):
+        amp = utils.db2amp(dbarr[:, col])
+        out.append(s.MFCC(amp / (amp.sum() + s.EPS) * amp.size))
 
     return es.array(out).T
 
@@ -43,7 +201,8 @@ def process_pedaling(i, dataset, nmf_params):
         i, frame_based=True, winlen=winlen, hop=hop)[0] / 127
     # padding so that pedaling and diff_spec have the same length
     pedaling, diff_spec = utils.pad(pedaling[:, 1:].T, diff_spec)
-    # TODO: pedaling should now return frames like velocities...
+    # TODO check the shape here, it should be (frames, features, 1)
+    __import__('ipdb').set_trace()
     return diff_spec[None], pedaling[None]
 
 
@@ -56,79 +215,47 @@ def process_velocities(i, dataset, nmf_params):
     nmf_tools.perform_nmf(audio, score)
     nmf_tools.to2d()
     velocities = dataset_utils.get_score_mat(
-        dataset, i, score_type=['precise_alignment'])[:, 3] / 127
+        dataset, i, score_type=['precise_alignment'])[:,
+                                                      3] / 127  # type: ignore
     minispecs = nmf_tools.get_minispecs(transform=transform_func)
+    # now the shape should be (notes, features, frames) for minispecs
+    # now the shape should be (notes, ) for velocities
     return minispecs, velocities
 
 
-def get_loader(groups, mode, redump, nmf_params=None, song_level=False):
+def get_loader(groups,
+               redump,
+               contexts,
+               mode=None,
+               nmf_params=None,
+               njobs=s.NJOBS):
     """
-    nmf_params is needed only if `redump` is True
-    `song_level` allows to make each bach correspond to one song (e.g. for
-    testing at the song-level)
+    `nmf_params` and `mode` are needed only if `redump` is True
     """
-    # TODO: dump the whole dataset here
-    dataset = dataset_utils.filter(
-        asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
-                     metadataset_path=s.METADATASET_PATH),
-        groups=groups)
-    dataset, _ = dataset_utils.choice(dataset,
-                                      p=[s.DATASET_LEN, 1 - s.DATASET_LEN],
-                                      random_state=1992)
-    # dataset.paths = dataset.paths[:int(s.DATASET_LEN * len(dataset.paths))]
     if mode == 'velocity':
-        num_samples = [
-            len(gt['precise_alignment']['pitches'])
-            for i in range(len(dataset.paths)) for gt in dataset.get_gts(i)
-        ]
-        # TODO: select only the needed groups
-        # TODO: sub-sample the dataset here
-        # use `apply_func`
-        velocity_dataset = DatasetDump(dataset,
-                                       pathlib.Path(s.VELOCITY_DATA_PATH) /
-                                       "_".join(groups),
-                                       not redump,
-                                       song_level=song_level,
-                                       num_samples=num_samples)
-        # max_nbytes=None disable shared memory for large arrays
-        if redump:
-            velocity_dataset.dump(process_velocities,
-                                  nmf_params,
-                                  n_jobs=s.NJOBS,
-                                  max_nbytes=None)
-        return DataLoader(
-            velocity_dataset,
-            batch_size=s.VEL_BATCH_SIZE if not song_level else 1,
-            num_workers=s.NJOBS,
-            pin_memory=True,
-            collate_fn=dummy_collate if not song_level else no_batch_collate)
+        process_fn = process_velocities
+        data_path = s.VELOCITY_DATA_PATH
+        batch_size = s.VEL_BATCH_SIZE
     elif mode == 'pedaling':
-        pedaling_dataset = DatasetDump(dataset,
-                                       pathlib.Path(s.PEDALING_DATA_PATH) /
-                                       "_".join(groups),
-                                       not redump,
-                                       song_level=song_level,
-                                       num_samples=None)
-        # max_nbytes=None disable shared memory for large arrays
-        if redump:
-            pedaling_dataset.dump(process_pedaling,
-                                  nmf_params,
-                                  n_jobs=s.NJOBS,
-                                  max_nbytes=None)
-        return DataLoader(
-            pedaling_dataset,
-            batch_size=s.PED_BATCH_SIZE if not song_level else 1,
-            num_workers=s.NJOBS,
-            pin_memory=True,
-            collate_fn=pad_collate if not song_level else no_batch_collate)
+        process_fn = process_pedaling
+        data_path = s.PEDALING_DATA_PATH
+        batch_size = s.PED_BATCH_SIZE
+    else:
+        raise RuntimeError(
+            f"mode {mode} not known: available are `velocity` and `pedaling`")
 
+    asmd_data = asmd.Dataset(definitions=[s.RESYNTH_DATA_PATH],
+                             metadataset_path=s.METADATASET_PATH)
+    dataset = AEDataset(contexts, asmd_data, data_path, dumped=not redump)
 
-def multiple_splits_one_context(splits, context, *args, **kwargs):
-    ret = []
-    for split in splits:
-        ret.append(
-            get_loader([split, context] if context is not None else [split],
-                       *args, **kwargs))
-    if len(ret) == 1:
-        ret = ret[0]
-    return ret
+    if redump:
+        dataset.dump(process_fn, nmf_params, n_jobs=s.NJOBS, max_nbytes=None)
+    else:
+        # select the groups, subsample dataset, and shuffle it
+        dataset = dataset.set_operation(dataset_utils.filter, groups=groups)
+        dataset.subsample(s.DATASET_LEN)
+        return DataLoader(dataset,
+                          batch_sampler=AEBatchSampler(batch_size, dataset),
+                          num_workers=njobs,
+                          pin_memory=False)
+    # collate_fn=enc_collate)

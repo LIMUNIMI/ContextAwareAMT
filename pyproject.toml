@@ -16,7 +16,10 @@ essentia = "^2.1b6.dev184"
 plotly = "^4.12.0"
 torch = "^1.7.0"
 # TODO: change this when this branch is merged!
-scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
+# scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
+scikit-optimize = "^0.8.1"
+# errors with most recent version of sicki-learn and scikit-optimize
+scikit-learn = "<1.0"
 jack-client = "^0.5.2"
 pysoundfile = "^0.9.0"
 PyQt5 = "^5.15.2"
@@ -29,12 +32,15 @@ matplotlib = "^3.3.4"
 kaleido = "0.1.0"
 pytorch-lightning = "^1.2.6"
 mlflow = "^1.15.0"
+psutil = "^5.8.0"
+torchinfo = "^1.5.3"
 
 [tool.poetry.dev-dependencies]
 jedi = "<0.18.0"
 ipdb = "^0.13.4"
 pydeps = "^1.9.13"
 wily = "^1.19.0"
+heartrate = "^0.2.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

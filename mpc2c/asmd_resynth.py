@@ -1,16 +1,19 @@
 import json
+import os
 import shutil
 import time
 import typing as t
 from pathlib import Path
+from tqdm import tqdm
 
 import mido
 import numpy as np
-from tqdm import tqdm
 
 from .asmd.asmd import asmd, dataset_utils
-from .clustering import cluster_choice
 from .pycarla import pycarla
+from .clustering import cluster_choice
+
+SAVED_ = "asmd_resynth.txt"
 
 
 def group_split(datasets: t.List[str],
@@ -25,12 +28,11 @@ def group_split(datasets: t.List[str],
 
     `cluster_func` is a function which takes a dataset and the number of
     clusters and returns a list of clusters; each cluster is a List[int].
-    For each group, the group of the whole dataset is clustered; then, for each
-    context/group combination, one song is taken from each cluster of that
-    group to form the context-specific group. This means that each group is
-    clustered with `context_splits` clusters.
+    Each group of the dataset is clustered in `len(contexts)` sets.
+    One song is taken from each new set so that each group is split in
+    contexts.
 
-    N.B. the `orig` context, if used,must come after everything!
+    N.B. the `orig` context, if used, must come after everything!
 
     Returns a new dict object representing an ASMD definition with the new
     groups.
@@ -88,32 +90,74 @@ def group_split(datasets: t.List[str],
 
 
 def synthesize_song(midi_path: str, audio_path: str,
-                    server: pycarla.JackServer, final_decay: float) -> bool:
+                    final_decay: float) -> bool:
     """
     Given a path to a midi file, synthesize it and returns the numpy array
 
     `final_decay` is the time that is waited before of stopping the recording
     (e.g. if there is a long reverb)
 
-    Return `True` if timeout was reachd while recording (probably some frame
+    Return `True` if timeout was reached while recording (probably some frame
     was lost!)
     """
-    recorder = pycarla.AudioRecorder(blocksize=server.client.blocksize)
-    player = pycarla.MIDIPlayer()
-    print("Playing and recording " + midi_path + "...")
-    midifile = mido.MidiFile(midi_path)
-    print("Total duration: ", midifile.length)
-    server.toggle_freewheel()
-    recorder.start(midifile.length + final_decay)
-    player.synthesize_midi_file(midifile, sync=True, progress=False)
-    timeout = recorder.wait(midifile.length + final_decay + 1)
-    server.toggle_freewheel()
-    print()
-    if np.all(recorder.recorded == 0):
-        raise RuntimeWarning("Recorded file is empty!")
-    recorder.save_recorded(audio_path)
-    del player, recorder
-    return timeout
+    with pycarla.AudioRecorder() as recorder, pycarla.MIDIPlayer() as player:
+        # activating clients need to be done without freewheeling
+        print("Playing and recording " + midi_path + "...")
+        midifile = mido.MidiFile(midi_path)
+        print("Total duration: ", midifile.length)
+        recorder.start(midifile.length + final_decay,
+                       condition=player.is_ready)
+        player.synthesize_midi_file(midifile,
+                                    sync=False,
+                                    condition=recorder.is_ready)
+        success1 = player.wait(in_fw=True, out_fw=False)
+        success2 = recorder.wait(in_fw=True, out_fw=False)
+        print()
+        if np.all(recorder.recorded == 0):
+            raise RuntimeWarning("Recorded file is empty!")
+        recorder.save_recorded(audio_path)
+    return success1 and success2
+
+
+class BackupManager():
+    def __init__(self, save_path: str):
+        # loading data about already synthesized songs
+        self.save_path = save_path
+        if os.path.exists(save_path):
+            with open(save_path, "rt") as f:
+                lines = f.readlines()
+                self.backup_i = int(lines[0])
+                self.backup_j = int(lines[1])
+        else:
+            self.backup_i, self.backup_j = -1, -1
+            self.write()
+
+    def add_song(self, j: int):
+        self.backup_j = j
+        self.write()
+
+    def write(self):
+        with open(self.save_path, "wt") as f:
+            f.writelines(
+                [str(self.backup_i) + "\n",
+                 str(self.backup_j) + "\n"])
+
+    def add_group(self, i: int):
+        self.backup_i = i
+        self.backup_j = -1
+        self.write()
+
+    def test_song(self, j: int):
+        if j < self.backup_j:
+            return True
+        else:
+            return False
+
+    def test_group(self, i: int):
+        if i <= self.backup_i:
+            return True
+        else:
+            return False
 
 
 def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
@@ -123,61 +167,67 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
     Try to synthesize the provided contexts from dataset. If success returns
     True, otherwise False.
     """
+    backup = BackupManager(SAVED_)
     try:
-        for group, proj in contexts.items():
+        for i, (group, proj) in enumerate(contexts.items()):
+            if backup.test_group(i):
+                print(f"`{group}` was already synthesized")
+                continue
             print("\n------------------------------------")
             print("Working on context ", group)
             print("------------------------------------\n")
             # for each context
             # load the preset in Carla
             if group != "orig":
-                # if this is a new context, start Carla
-                server = pycarla.JackServer([
+                # if this is a new context, start Carla and jack
+                carla = pycarla.Carla(proj, [
                     '-d', 'alsa', '-n', '2', '-r', '48000', '-p', '256', '-X',
                     'seq'
-                ])
-                server.start()
-                carla = pycarla.Carla(proj, server, min_wait=8)
+                ],
+                                      min_wait=8)
                 carla.start()
 
             # get the songs with this context
             d = dataset_utils.filter(dataset, groups=[group], copy=True)
             for j in range(len(d)):
+                if backup.test_song(j):
+                    print(f"song `{j}` was already synthesized")
+                    continue
 
                 # for each song in this context, get the new audio_path
                 audio_path = output_path / d.paths[j][0][0]
                 if audio_path.exists() and audio_path.stat().st_size > 0:
                     if correctly_synthesized(j, d):
-                        print(f"{audio_path} already exists")
+                        backup.add_song(j)
+                        print(
+                            f"song `{j}` was already synthesized but not in the BackupManager"
+                        )
                         continue
                 audio_path.parent.mkdir(parents=True, exist_ok=True)
                 if group != "orig":
                     # if this is a new context, resynthesize...
                     midi_path = (old_install_dir /
                                  d.paths[j][0][0]).with_suffix('.midi')
-                    timeout = False
-                    while not correctly_synthesized(j, d) or timeout:
+                    success = True
+                    while not correctly_synthesized(j, d) or not success:
                         # delete file if it exists (only python >= 3.8)
-                        audio_path.unlink(missing_ok=True)
-                        # check that Carla is still alive..
-                        if not carla.exists():
-                            print(
-                                "Carla doesn't exists... restarting everything"
-                            )
-                            carla.restart()
-                        timeout = synthesize_song(str(midi_path),
-                                                  str(audio_path), server,
-                                                  final_decay)
+                        success = resynthesize(audio_path, carla, midi_path,
+                                               final_decay)
                 else:
                     old_audio_path = str(old_install_dir / d.paths[j][0][0])
                     print(f"Orig context, {old_audio_path} > {audio_path}")
                     shutil.copy(old_audio_path, audio_path)
+
+                # saving this song as synthesized
+                backup.add_song(j)
+            # saving this group as synthesized
+            backup.add_group(i)
             if group != "orig":
-                # if this is a new context, close Carla
+                # if this is a new context, close Carla and jack
                 carla.kill()
     except Exception as e:
         print("Exception occured while processing group " + group)
-        print(e)
+        print("    ", e)
         if group != "orig":
             print(
                 "There was an error while synthesizing, restarting the procedure"
@@ -188,20 +238,29 @@ def trial(contexts: t.Mapping[str, t.Optional[Path]], dataset: asmd.Dataset,
         return True
 
 
-def get_contexts(carla_proj: Path) -> t.Dict[str, t.Optional[Path]]:
+def resynthesize(audio_path, carla, midi_path, final_decay):
+    # delete file if it exists (only python >= 3.8)
+    audio_path.unlink(missing_ok=True)
+    success = synthesize_song(str(midi_path), str(audio_path), final_decay)
+    time.sleep(2)
+    return success and not carla.error
+
+
+def get_contexts(carla_proj: t.Union[Path, str]) -> t.Dict[str, t.Optional[Path]]:
     """
     Loads contexts and Carla project files from the provided directory
 
     Returns a dictionary which maps context names to the corresponding carla
-    project file. The additional context 'orig' with project `None` is added.
+    project file.
     """
-    glob = list(carla_proj.glob("**/*.carxp"))
+    if type(carla_proj) is str:
+        carla_proj = Path(carla_proj)
+    glob = list(carla_proj.glob("**/*.carxp")) # type: ignore
 
     # take the name of the contexts
     contexts: t.Dict[str, t.Optional[Path]] = {}
     for p in glob:
         contexts[p.stem] = p
-    contexts['orig'] = None
     return contexts
 
 
@@ -273,33 +332,38 @@ def split_resynth(datasets: t.List[str], carla_proj: Path, output_path: Path,
     contexts = get_contexts(carla_proj)
 
     # split the dataset in contexts and save the new definition
-    new_def = group_split(datasets, contexts, context_splits, cluster_choice)
+    new_def_fname = output_path / "new_dataset.json"
+    if not os.path.exists(new_def_fname):
+        new_def = group_split(datasets, contexts, context_splits,
+                              cluster_choice)
 
-    # create output_path if it doesn't exist and save the new_def
-    output_path.mkdir(parents=True, exist_ok=True)
-    json.dump(new_def, open(output_path / "new_dataset.json", "wt"))
+        # create output_path if it doesn't exist and save the new_def
+        output_path.mkdir(parents=True, exist_ok=True)
+        json.dump(new_def, open(new_def_fname, "wt"))
 
-    # load the new dataset
-    dataset = asmd.Dataset(paths=[output_path])
+    # load the new definition while retaining the old install_dir
+    dataset = asmd.Dataset(definitions=[output_path])
+    # update the install_dir
     old_install_dir = Path(dataset.install_dir)
-
-    # prepare and save the new metadataset
     dataset.install_dir = str(output_path)
     dataset.metadataset['install_dir'] = str(output_path)
+
+    # save the new metadataset
     json.dump(dataset.metadataset, open(metadataset_path, "wt"))
 
-    print("Copying ground-truth files...")
+    # print("Copying ground-truth files...")
     for dataset_name in datasets:
         for old_file in tqdm(
                 old_install_dir.glob(f"{dataset_name}/**/*.json.gz")):
             new_file = output_path / old_file.relative_to(old_install_dir)
             new_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(old_file, new_file)
+            if not os.path.exists(new_file):
+                shutil.copy(old_file, new_file)
 
     print("Synthesizing contexts")
-    for i in range(10):
+    for i in range(4):
         if not trial(contexts, dataset, output_path, old_install_dir,
                      final_decay):
-            time.sleep(2)
+            time.sleep(4)
         else:
             break

@@ -1,37 +1,31 @@
 import argparse
 import pickle
 from pathlib import Path
+import subprocess
+from logging import error
 
-import torch
-from Cython.Build import Cythonize
+import mlflow # type: ignore
 
-from mpc2c import create_midi_scale, data_management, evaluate, make_template
+import skopt  # type: ignore
+
+from mpc2c import create_template, data_management, evaluate
 from mpc2c import settings as s
 from mpc2c import training
-from mpc2c.asmd_resynth import split_resynth
+from mpc2c.asmd_resynth import split_resynth, get_contexts
 from mpc2c.mytorchutils import hyperopt
+from mpc2c import build
 
-# from cylang import cylang
-# cylang.compile()
-
-if s.BUILD:
-    Cythonize.main(["mpc2c/[!data_management.py]**.py", "-3", "--inplace"])
+build.build()
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="CLI for running experiments")
     parser.add_argument(
-        "--template",
-        action="store_true",
-        help=
-        "Create the initial template from `pianoteq_scales.mp3` and `scales.mid`"
-    )
-    parser.add_argument(
         "-sc",
         "--scale",
         action="store_true",
         help=
-        "Create the midi file that must be synthesized for creating the template."
+        "Create the midi file containing the scales for the template; syntehsize it and make the template."
     )
     parser.add_argument(
         "-d",
@@ -49,12 +43,21 @@ def parse_args():
         "-p",
         "--pedaling",
         action="store_true",
-        help="Perform actions for pedaling estimation (frame-wise prediction)."
+        help=
+        "TODO Perform actions for pedaling estimation (frame-wise prediction)."
     )
     parser.add_argument("-t",
                         "--train",
                         action="store_true",
                         help="Train a model.")
+    parser.add_argument(
+        "-cs",
+        "--contextspecific",
+        action="store_true",
+        help=
+        "Train a specializer against context specificity on the same latent space used for performance regression"
+    )
+
     parser.add_argument(
         "-sk",
         "--skopt",
@@ -67,60 +70,10 @@ def parse_args():
                         action="store_true",
                         help="Pre-process the full dataset and dumps it")
     parser.add_argument(
-        "-c",
-        "--context",
-        action="store",
-        type=str,
-        default=None,
-        help=
-        "Limit the action to only the specified context (e.g. `-c pianoteq0`, `-c salamander1`, `-c orig`)"
-    )
-    parser.add_argument(
-        "-pt",
-        "--checkpoint",
-        action="store",
-        type=str,
-        default=None,
-        help=
-        "Load parameters from this checkpoint and freeze the initial weights if training."
-    )
-    parser.add_argument(
-        "-e",
-        "--evaluate",
-        action="store",
-        type=str,
-        default=None,
-        nargs='+',
-        help=
-        "Evaluate the error distribution of model checkpoints given as argument. All contexts available in `settings.CARLA_PROJ` will be used, plus the 'orig' context. All models are evaluated on all contexts."
-    )
-    parser.add_argument(
-        "-cp",
-        "--compare",
+        "-pc",
+        "--printcontexts",
         action="store_true",
-        help=
-        "Only valid if `--evaluate` is used. Using this option, you can name your models starting with the context on which they were trained (e.g. `pianoteq0_vel.pt`); in this way, one more plot is created, representing the `orig` model compared to the other models on their specific context."
-    )
-    parser.add_argument(
-        "-i",
-        "--input",
-        action="store",
-        type=str,
-        default=None,
-        nargs=2,
-        help=
-        "Expects two inputs, namely a path to MIDI file and a path to audio file."
-    )
-    parser.add_argument(
-        "-cf",
-        "--csv-file",
-        action="store",
-        type=str,
-        default=None,
-        nargs='+',
-        help=
-        "Expects at least one input, namely paths to csv files containing the saved tests that should be plotted"
-    )
+        help="Print contexts in the order with the labels shown in mlflow log")
     return parser.parse_args()
 
 
@@ -135,14 +88,8 @@ def main():
 
     args = parse_args()
 
-    if args.input:
-        raise NotImplementedError(
-            "Not yet implemented transcription from files")
-
-    if args.template:
-        make_template.main()
     if args.scale:
-        create_midi_scale.main()
+        create_template.main()
     if args.datasets:
 
         split_resynth(s.DATASETS,
@@ -150,112 +97,79 @@ def main():
                       Path(s.METADATASET_PATH), s.CONTEXT_SPLITS,
                       s.RESYNTH_FINAL_DECAY)
 
-    if args.checkpoint:
-        checkpoint = torch.load(args.checkpoint)['state_dict']
-        s.VEL_BATCH_SIZE = s.TRANSFER_VEL_BATCH_SIZE
+    contexts = list(get_contexts(s.CARLA_PROJ).keys())
+
+    if args.printcontexts:
+        for i, c in enumerate(contexts):
+            print(f"{i}: {c}")
+
+    if args.pedaling:
+        mode = 'pedaling'
+        hpar = s.PED_HYPERPARAMS
+    elif args.velocity:
+        mode = 'velocity'
+        hpar = s.VEL_HYPERPARAMS
     else:
-        checkpoint = None
+        error("Please specify -p or -v")
+        return
 
     nmf_params = load_nmf_params()
     if args.skopt:
-        s.PLOT_LOSSES = False
+
+        def objective(x):
+            l1 = training.train(x, mode, False, test=True)
+            l2 = training.train(x, mode, True, test=True)
+            # l3 = training.train(x, mode, independence='generic', test=True)
+            # return (l1 + l2 + l3) / 3
+            return (l1 + l2) / 2
 
         if args.pedaling:
-            s.DATASET_LEN = 0.1
-            space = s.PED_SKSPACE
-            space_constraint = training.model_test(
-                training.build_pedaling_model, torch.rand(1, s.BINS, 100))
+            # test_sample = torch.rand(1, s.BINS, 100)
             checkpoint_path = "ped_skopt.pt"
 
-            def objective(x):
-                return training.skopt_objective(x, 'pedaling')
-
         elif args.velocity:
-            s.DATASET_LEN = 0.03
-            space = s.VEL_SKSPACE
-            space_constraint = training.model_test(
-                training.build_velocity_model,
-                torch.rand(1, s.BINS, s.MINI_SPEC_SIZE))
+            # test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
             checkpoint_path = "vel_skopt.pt"
+        else:
+            return # not reachable, here to shutup the pyright
 
-            def objective(x):
-                return training.skopt_objective(x, 'velocity')
+        # space_constraint = training.model_test(
+        #     lambda x: training.build_model(x, contexts), test_sample)
+        exp = mlflow.get_experiment_by_name(mode)
+        if exp:
+            mlflow.delete_experiment(exp.experiment_id)
 
-        hyperopt(space,
-                 checkpoint_path,
-                 s.SKITERATIONS,
-                 objective,
-                 space_constraint=space_constraint,
-                 plot_graphs=True)
+        hyperopt(
+            s.SKSPACE,
+            checkpoint_path,
+            s.SKITERATIONS,
+            objective,
+            skoptimizer_kwargs=dict(
+                # space_constraint=space_constraint,
+                plot_graphs=False,
+                optimization_method=skopt.dummy_minimize),
+            optimize_kwargs=dict(max_loss=20.0,
+                                 initial_point_generator="grid"))
+        if not exp:
+            exp = mlflow.get_experiment_by_name(mode)
+        subprocess.run(['mlflow', 'experiments', 'csv', '-x', exp.experiment_id, '-o', f'{mode}_results.csv'])
 
     if args.train:
-        if args.pedaling:
-            mode = 'pedaling'
-            hpar = s.PED_HYPERPARAMS
-            if args.checkpoint:
-                steps = s.PED_STEP
-            else:
-                steps = [None]
 
-        elif args.velocity:
-            mode = 'velocity'
-            hpar = s.VEL_HYPERPARAMS
-            if args.checkpoint:
-                # each step is a different size of transferred/freezed layers
-                steps = s.VEL_STEP
-            else:
-                # in this case the steps will only be used for the filename
-                steps = [None]
-
-        for step in steps:
-            print("----------------")
-            print(f"Training by freezing/transferring {step} layers")
-            fname = 'models/' + args.context + '_' + mode[:3] + '_' + str(
-                step) + '.pt'
-            training.train(hpar,
-                           mode,
-                           step,
-                           context=args.context,
-                           state_dict=checkpoint,
-                           copy_checkpoint=fname)
+        print("----------------")
+        training.train(hpar,
+                       mode,
+                       args.contextspecific,
+                       copy_checkpoint=Path("models") / f"{mode}.pt")
 
     if args.redump:
-        if args.pedaling:
-            data_management.multiple_splits_one_context(
-                ['train', 'validation', 'test'],
-                args.context,
-                'pedaling',
-                True,
-                nmf_params=nmf_params)
-        elif args.velocity:
-            data_management.multiple_splits_one_context(
-                ['train', 'validation', 'test'],
-                args.context,
-                'velocity',
-                True,
-                nmf_params=nmf_params)
-
-    if args.evaluate or args.csv_file:
-        if args.pedaling:
-            mode = 'pedaling'
-        elif args.velocity:
-            mode = 'velocity'
-        compare = args.compare
-        if args.csv_file:
-            for fname in args.csv_file:
-                evaluate.plot_from_file(fname,
-                                        compare=compare,
-                                        mode=mode,
-                                        ext='.svg')
-        else:
-
-            dfs = evaluate.evaluate(args.evaluate, mode, Path(s.RESULT_PATH))
-
-            for i, df in enumerate(dfs):
-                evaluate.plot(df,
-                              compare,
-                              mode=mode,
-                              save=Path(s.IMAGES_PATH) / f"{mode}_eval.{i}")
+        contexts = list(get_contexts(s.CARLA_PROJ).keys())
+        for split in ['train', 'validation', 'test']:
+            data_management.get_loader(split,
+                                       redump=True,
+                                       contexts=contexts,
+                                       mode=mode,
+                                       nmf_params=nmf_params)
 
 
 if __name__ == "__main__":

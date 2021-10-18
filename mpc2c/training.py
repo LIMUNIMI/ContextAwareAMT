@@ -1,23 +1,25 @@
 # from memory_profiler import profile
 
 import os
-from copy import deepcopy
-from pathlib import Path
 from pprint import pprint
+from Cython.Compiler.Errors import context
 
-import mlflow
-import numpy as np
-import torch
-import torch.nn.functional as F
-from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import MLFlowLogger
+from sklearn.metrics.pairwise import cosine_distances
 
-from . import data_management, feature_extraction
+import torch.nn.functional as F  # type: ignore
+from torch import nn  # type: ignore
+import torch  # type: ignore
+import torchinfo  # type: ignore
+from pytorch_lightning import Trainer  # type: ignore
+from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging  # type: ignore
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping  # type: ignore
+from pytorch_lightning.loggers import MLFlowLogger  # type: ignore
+
+from . import feature_extraction
 from . import settings as s
 from .asmd_resynth import get_contexts
-from .mytorchutils import (VL_MM_Trainable, best_checkpoint_saver,
-                           checkpoint_saver, compute_average, count_params,
-                           early_stopping, make_loss_func)
+
+RANDGEN = torch.Generator()
 
 
 def model_test(model_build_func, test_sample):
@@ -33,10 +35,22 @@ def model_test(model_build_func, test_sample):
         allowed = True
 
         if allowed:
+            model = None
             try:
-                model = model_build_func(hpar, s.TRAIN_DROPOUT)
+                model = model_build_func(hpar)
                 print("model created")
-                model(test_sample.to(s.DEVICE).to(s.DTYPE))
+                model.eval()
+                with torch.no_grad():
+                    model.to(s.DEVICE).validation_step(
+                        {
+                            'x': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'y': torch.tensor(0.5).to(s.DEVICE).to(s.DTYPE),
+                            'cont_diff': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'cont_same': test_sample.to(s.DEVICE).to(s.DTYPE),
+                            'c': '0'
+                        },
+                        0,
+                        log=False)
                 print("model tested")
             # except Exception as e:
             #     import traceback
@@ -44,6 +58,8 @@ def model_test(model_build_func, test_sample):
             except Exception as e:
                 print(e)
                 allowed = False
+            finally:
+                del model
 
         print(f"hyper-parameters allowed: {allowed}")
         return allowed
@@ -51,198 +67,233 @@ def model_test(model_build_func, test_sample):
     return constraint
 
 
-def build_velocity_model(hpar, dropout):
-    m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, s.MINI_SPEC_SIZE),
-        output_features=1,
-        note_level=True,
-        max_layers=s.MAX_LAYERS,
+def cosine_distance(x, y, reduction='none'):
+    out = 1 - F.cosine_similarity(x, y)
+    if reduction == 'none':
+        return out
+    elif reduction == 'sum':
+        return out.sum(axis=-1)
+
+
+def specific_loss(pred, same_pred, diff_pred):
+    return F.triplet_margin_with_distance_loss(
+        pred,
+        same_pred,
+        diff_pred,
+        distance_function=cosine_distance,
+        margin=1,
+        swap=True,
+        reduction='sum')
+
+
+def generic_loss(pred, same_pred, diff_pred):
+    if torch.randint(6, (1, ), generator=RANDGEN) > 0:
+        return cosine_distance(pred, diff_pred, reduction='sum')
+    else:
+        return cosine_distance(pred, same_pred, reduction='sum')
+
+
+def build_encoder(hpar, dropout):
+
+    k1, k2, activation, kernel = get_hpar(hpar)
+
+    m = feature_extraction.Encoder(
+        insize=(
+            s.BINS,
+            s.MINI_SPEC_SIZE),  # mini_spec_size should change for pedaling...
         dropout=dropout,
-        hyperparams=((hpar['kernel_0'], hpar['kernel_1']), (1, 1), (1, 1),
-                     hpar['lstm_hidden_size'], hpar['lstm_layers'],
-                     hpar['middle_features'], hpar['middle_activation'],
-                     1)).to(s.DEVICE).to(s.DTYPE)
+        k1=k1,
+        k2=k2,
+        activation=activation,
+        kernel=2 * kernel + 1).to(s.DEVICE).to(s.DTYPE)
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
-def build_pedaling_model(hpar, dropout):
-    m = feature_extraction.MIDIParameterEstimation(
-        input_size=(s.BINS, 1),
-        output_features=3,
-        note_level=False,
-        max_layers=s.MAX_LAYERS,
-        dropout=dropout,
-        hyperparams=((hpar['kernel_0'],
-                      1), (1, 1), (1, 1), hpar['lstm_hidden_size'],
-                     hpar['lstm_layers'], hpar['middle_features'],
-                     hpar['middle_activation'], 3)).to(s.DEVICE).to(s.DTYPE)
-    # feature_extraction.init_weights(m, s.INIT_PARAMS)
+def get_hpar(hpar):
+    return (hpar['enc_k1'], hpar['enc_k2'], hpar['activation'],
+            hpar['kernel'])
+
+
+def build_specializer_model(hpar, infeatures, loss, nout):
+    m = feature_extraction.Specializer(
+        (hpar['performer_features'], hpar['performer_layers'], infeatures,
+         hpar['activation'], 1), loss, nout)
+
     return m
 
 
-def train(
-        hpar,
-        mode,
-        # TODO: remove transfer_step param
-        transfer_step=None,
-        # TODO: remove context param
-        context=None,
-        # TODO: remove state_dict param
-        state_dict=None,
-        copy_checkpoint='',
-        return_model=False):
+def build_model(hpar,
+                mode,
+                dropout=s.TRAIN_DROPOUT,
+                context_specific=True):
+
+    contexts = list(get_contexts(s.CARLA_PROJ).keys())
+    encoder = build_encoder(hpar, dropout)
+    performer = build_specializer_model(hpar, encoder.outchannels,
+                                        nn.L1Loss(reduction='sum'),
+                                        1)
+    cont_classifier = build_specializer_model(
+        hpar, encoder.outchannels,
+        nn.CrossEntropyLoss(reduction='sum'), len(contexts))
+    model = feature_extraction.EncoderPerformer(encoder,
+                                                performer,
+                                                cont_classifier,
+                                                contexts,
+                                                mode,
+                                                context_specific,
+                                                ema_period=s.EMA_PERIOD)
+    return model
+
+
+def my_train(mode,
+             copy_checkpoint,
+             logger,
+             model,
+             context_specific,
+             cont_train=True,
+             perfm_train=True):
+    """
+    Creates callbacks, train and freeze the part that raised an early-stop.
+    Return the best loss of that one and 0 for the other.
+    """
+    # stopped_epoch = 9999  # let's enter the while the first time
+    # while stopped_epoch > s.EARLY_STOP:
+    # setup callbacks
+    checkpoint_saver = ModelCheckpoint(
+        f"checkpoint_{mode}_context={context_specific}",
+        filename='{epoch}-{cont_loss:.2f}',
+        monitor='val_loss',
+        save_top_k=1,
+        mode='min',
+        save_weights_only=True)
+    callbacks = [checkpoint_saver]
+    cont_stopper = perfm_stopper = None
+    if cont_train:
+        cont_stopper = EarlyStopping(monitor='cont_val_loss_avg',
+                                     min_delta=s.EARLY_RANGE,
+                                     check_finite=False,
+                                     patience=s.EARLY_STOP)
+        callbacks.append(cont_stopper)
+    if perfm_train:
+        perfm_stopper = EarlyStopping(monitor='perfm_val_loss_avg',
+                                      min_delta=s.EARLY_RANGE,
+                                      check_finite=False,
+                                      patience=s.EARLY_STOP)
+        callbacks.append(perfm_stopper)
+    # if copy_checkpoint:
+    #     callbacks.append(best_checkpoint_saver(copy_checkpoint))
+
+    if s.SWA:
+        callbacks.append(
+            StochasticWeightAveraging(swa_epoch_start=int(0.8 * s.EPOCHS),
+                                      annealing_epochs=int(0.2 * s.EPOCHS)))
+
+    # training!
+    trainer = Trainer(
+        callbacks=callbacks,
+        precision=s.PRECISION,
+        max_epochs=s.EPOCHS,
+        logger=logger,
+        auto_lr_find=True,
+        reload_dataloaders_every_n_epochs=1,
+        num_sanity_val_steps=0,
+        # weights_summary="full",
+        # log_every_n_steps=1,
+        # log_gpu_memory=True,
+        # track_grad_norm=2,
+        # overfit_batches=2,
+        # fast_dev_run=True,
+        gpus=s.GPUS)
+
+    model.njobs = 1  # there's some leak when using njobs > 0
+    if os.path.exists("lr_find_temp_model.ckpt"):
+        os.remove("lr_find_temp_model.ckpt")
+    d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
+    if d['lr_find'] is None or d['lr_find'].suggestion() is None:
+        model.lr = 1
+        model.learning_rate = 1
+    model.njobs = s.NJOBS
+    # need to reload dataloaders for using multiple jobs
+    trainer.train_dataloader = model.train_dataloader()
+    trainer.val_dataloader = model.val_dataloader()
+    trainer.test_dataloader = model.test_dataloader()
+    print("Fitting the model!")
+    trainer.fit(model)
+    # if cont_train:
+    #     stopped_epoch = cont_stopper.stopped_epoch  # type: ignore
+    # else:
+    #     stopped_epoch = 0
+    # if perfm_train:
+    #     stopped_epoch = max(stopped_epoch,
+    #                         perfm_stopper.stopped_epoch)  # type: ignore
+
+    return cont_stopper, perfm_stopper
+
+
+def train(hpar, mode, context_specific, copy_checkpoint='', test=True):
     """
     1. Builds a model given `hpar` and `mode`
-    2. Transfer knowledge from `state_dict` if provided
-    3. Freeze first `transfer_step` layers
-    4. Train the model on `context`
-    5. Saves the trained model weights to `copy_checkpoint`
-    6. Returns the best validation loss function + the complexity penalty set
-       in `settings`
-    7. Also returns the model checkpoint if `return_model` is True
+    2. Train the model
+    3. Saves the trained model weights to `copy_checkpoint`
+    4. Test the trained model if `test is True`
+    4. Returns the best validation loss (or test loss if `test` is True)
     """
-    # loaders
-    # TODO: get loaders for all the contexts
-    trainloader, validloader = data_management.multiple_splits_one_context(
-        ['train', 'validation'], context, mode, False)
-    logger = MLFlowLogger(experiment_name=f'{mode}_{context}_{transfer_step}',
+    # the logger
+    logger = MLFlowLogger(experiment_name=f'{mode}',
                           tracking_uri=os.environ.get('MLFLOW_TRACKING_URI'))
 
-    # building model
-    if state_dict is not None:
-        dropout = s.TRANSFER_DROPOUT
-        wd = s.TRANSFER_WD
-        transfer_layers = None
-        freeze_layers = transfer_step
-        lr_k = s.TRANSFER_LR_K
-    else:
-        wd = s.WD
-        dropout = s.TRAIN_DROPOUT
-        lr_k = s.LR_K
+    logger.log_hyperparams(hpar)
+    logger.log_hyperparams({"mode": mode, "context_specific": context_specific})
 
-    # TODO: get 3 models (encoder, decoder, performer)
-    # TODO: copy the performer to all the contexts
-    if mode == 'velocity':
-        model = build_velocity_model(hpar, dropout)
-        axes = []
-    elif mode == 'pedaling':
-        model = build_pedaling_model(hpar, dropout)
-        axes = [-1]
-
-    # TODO: remove
-    if state_dict is not None:
-        model.load_state_dict(state_dict, end=transfer_layers)
-        model.freeze(freeze_layers)
-
-    # TODO: remove this
-    n_params_free = count_params(model, requires_grad=True)
-    # n_params_all = count_params(model, requires_grad=False)
-    print(model)
-    print("Total number of parameters: ", n_params_free)
-
-    # learning rate
-    # lr = s.TRANSFER_LR_K * (s.LR_K / len(trainloader)) * (n_params_all /
-    #                                                       n_params_free)
-    lr = lr_k / len(trainloader)
-
-    # dummy model (baseline)
-    dummy_avg = compute_average(trainloader.dataset,
-                                *axes,
-                                n_jobs=-1,
-                                backend='threading')
-
-    # loss functions
-    trainloss_fn = make_loss_func(F.l1_loss)
-    validloss_fn = make_loss_func(F.l1_loss)
-    dummyloss_fn = make_loss_func(lambda x, y: F.l1_loss(dummy_avg, y))
-
-    model = VL_MM_Trainable(
-        model, (trainloss_fn, validloss_fn, dummyloss_fn),
-        (torch.optim.Adadelta, lr, wd))
-    # logging initial stuffs
-    logger.log_graph(model)
-    logger.log_metrics({
-        "initial_lr": lr,
-        "train_batches": len(trainloader),
-        "valid_batches": len(validloader)
-    })
+    model = build_model(hpar, mode, context_specific=context_specific)
+    # torchinfo.summary(model)
 
     # training
-    # TODO: train epoch by epoch on each different context (and different model
-    early_stopper = early_stopping(s.EARLY_STOP, s.EARLY_RANGE)
-    callbacks = [
-        best_checkpoint_saver(copy_checkpoint), early_stopper,
-        checkpoint_saver(f"checkpoint_{mode}")
-    ]
-    trainer = Trainer(callbacks=callbacks,
-                      precision=s.PRECISION,
-                      max_epochs=s.EPOCHS,
-                      logger=logger,
-                      gpus=s.GPUS)
-    trainer.fit(model, trainloader, validloader)
+    # this loss is also the same used for hyper-parameters tuning
+    cont_stopper, perfm_stopper = my_train(mode, copy_checkpoint, logger,
+                                           model, context_specific)
+    cont_loss, perfm_loss = cont_stopper.best_score, perfm_stopper.best_score  # type: ignore
+    print(f"First-training losses: {cont_loss:.2e}, {perfm_loss:.2e}")
 
-    complexity_loss = count_params(model) * s.COMPLEXITY_PENALIZER
-    loss = early_stopper.best_score + complexity_loss
+    # cases:
+    # A: encoder was stopped
+    # B: performers were stopped
+    # C: none was stopped
+
+    if cont_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
+        # case A
+        for p in model.performers.values():
+            p.freeze()
+        for c in model.context_classifiers.values():
+            c.freeze()
+        print("Continuing training encoder...")
+        cont_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
+                                   context_specific, True, False)
+    if cont_stopper.stopped_epoch > 0:  # type: ignore
+        # case A and B
+        model.encoder.freeze()
+        print("Continuing training performers...")
+        _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
+                                    context_specific, False, True)
+
+    cont_loss, perfm_loss = cont_stopper.best_score, perfm_stopper.best_score  # type: ignore
+    print(f"Final losses: {cont_loss:.2e}, {perfm_loss:.2e}")
+
+    if test:
+        trainer = Trainer(precision=s.PRECISION, logger=logger, gpus=s.GPUS)
+        loss = trainer.test(model)[0]["perfm_test_avg"]
+    else:
+        loss = cont_loss + perfm_loss
+
     logger.log_metrics({
-        "best_validation_loss": float(early_stopper.best_score),
-        "total_loss": float(loss)
+        "best_cont_val_loss": float(cont_loss),  # type: ignore
+        "best_perfm_val_loss": float(perfm_loss)  # type: ignore
+    })
+    logger.log_metrics({
+        "final_weight_variance_" + k: float(v)
+        for k, v in model.performer_weight_moments().items()
     })
 
-    mlflow.end_run()
-    if return_model:
-        return loss, model
-    else:
-        del model
-        return loss
-
-
-def skopt_objective(hpar: dict, mode: str):
-    """
-    Runs a training on `orig` context and then retrain the model on each
-    specific context.
-
-    Returns the average loss function of the training on the
-    specific contexts, including the complexity penalty.
-    """
-
-    contexts = get_contexts(Path(s.CARLA_PROJ))
-    # train on orig
-    print("\n============================\n")
-    print("----------------------------")
-    print("training on orig")
-    print("----------------------------\n")
-    _, orig_model = train(hpar,
-                          mode,
-                          context='orig',
-                          state_dict=None,
-                          copy_checkpoint='',
-                          transfer_step=None,
-                          return_model=True)
-
-    # train on the other contexts
-    state_dict = orig_model.state_dict()
-    del orig_model
-    losses = []
-    for context in contexts.keys():
-        if context == 'orig':
-            # skip the `orig` context
-            continue
-
-        print("\n----------------------------")
-        print(f"testing tl on {context}")
-        print("----------------------------\n")
-        losses.append(
-            train(hpar,
-                  mode,
-                  context=context,
-                  state_dict=deepcopy(state_dict),
-                  transfer_step=0,
-                  copy_checkpoint='',
-                  return_model=False))
-        # if losses[-1] > 1:
-        #     # if loss was an error, e.g. a nan
-        #     return 9999.0
-
-    print("\n============================\n")
-    return np.mean(losses)
+    # this is the loss used by hyper-parameters optimization
+    return float(loss)

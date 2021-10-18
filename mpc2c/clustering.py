@@ -1,5 +1,6 @@
 import typing as t
 
+import mlflow
 import numpy as np
 import plotly.express as px
 from scipy.stats import entropy, gennorm
@@ -7,7 +8,6 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-import mlflow
 
 from .asmd.asmd import asmd, dataset_utils
 
@@ -34,7 +34,7 @@ def parallel_feature_extraction(i, dataset):
         dataset, i, score_type=['precise_alignment', 'broad_alignment'])[:, 3]
     vel_data = extract_velocity_features(velocities)
 
-    pedaling = dataset.get_pedaling(i, frame_based=True)[0]
+    pedaling = dataset_utils.get_pedaling_mat(dataset, i, frame_based=True)[0]
     ped_data1 = extract_pedaling_features(pedaling[:, 1])
     ped_data2 = extract_pedaling_features(pedaling[:, 2])
     ped_data3 = extract_pedaling_features(pedaling[:, 3])
@@ -202,7 +202,7 @@ def robinhood(
     clusters = [
         i for i in range(n_clusters) if cardinalities[i] < target_cardinality
     ]
-    counters = [0] * n_clusters
+    counters = np.zeros(n_clusters, dtype=np.int16)
     not_used = np.ones(n_samples, dtype=np.bool8)
     not_used[poors_points] = False
 
@@ -210,6 +210,7 @@ def robinhood(
     while np.any(cardinalities < target_cardinality):
         np.random.seed(seed + np.sum(counters))
         np.random.shuffle(clusters)
+        changed = False
         for cluster in clusters:
             if cardinalities[cluster] >= target_cardinality:
                 # don't add points to rich clusters
@@ -226,10 +227,15 @@ def robinhood(
                     cardinalities[cluster] += 1
                     counters[cluster] += 1
                     not_used[sample_idx] = False
+                    changed = True
                     break
                 else:
                     # skip it
                     counters[cluster] += 1
+        if not changed:
+            raise RuntimeError("""
+Cannot completely distribute clusters: cardinalities are not changing anymore!
+Cardinalities: """ + str(cardinalities))
 
     # creating list of clusters
     out: t.List[t.List[int]] = [[] for i in range(n_clusters)]
