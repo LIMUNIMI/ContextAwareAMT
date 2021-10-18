@@ -249,8 +249,10 @@ class Specializer(LightningModule):
             nn.BatchNorm1d(middle_features,
                            affine=True,
                            track_running_stats=True), middle_activation,
-            *stack, nn.Linear(middle_features, nout),
-            nn.Sigmoid() if nout == 1 else nn.Identity())
+            *stack, 
+            nn.Linear(middle_features, nout),
+            nn.Identity() if nout > 1 else nn.Sigmoid())
+
         self.maxloss = -99999
 
     def forward(self, x):
