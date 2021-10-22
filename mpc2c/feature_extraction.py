@@ -330,6 +330,7 @@ class EncoderPerformer(LightningModule):
 
     def training_step(self, batch, batch_idx):
 
+        out = dict()
         context_s = batch['c'][0]
         context_i = int(context_s)
         enc_out = self.encoder.forward(batch['x'])
@@ -339,7 +340,9 @@ class EncoderPerformer(LightningModule):
                 'y': batch['y']
             }, batch_idx)
         loss = perfm_out['loss']
-        out = {'loss': loss, 'perfm_train_loss': perfm_out['loss'].detach()}
+        out['perfm_train_loss'] = perfm_out['loss'].detach()
+        self.losslog('perfm_train_loss', perfm_out['loss'])
+
         if self.context_specific:
             cont_out = self.context_classifier.training_step(
                 {
@@ -353,13 +356,14 @@ class EncoderPerformer(LightningModule):
             loss = loss + cont_out['loss']
             self.losslog('cont_train_loss', cont_out['loss'])
             out['cont_train_loss'] = cont_out['loss'].detach()
+            self.losslog('cont_train_loss', cont_out['loss'])
 
         lr_scheduler = self.lr_schedulers()
         if lr_scheduler is not None:
             lr_scheduler.step()
 
+        out['loss'] = loss
         self.losslog('train_loss', loss)
-        self.losslog('perfm_train_loss', perfm_out['loss'])
         return out
 
     def validation_step(self, batch, batch_idx):
@@ -373,7 +377,8 @@ class EncoderPerformer(LightningModule):
                 'y': batch['y']
             }, batch_idx)
         loss = perfm_out['loss']
-        out = {'loss': loss, 'perfm_val_loss': perfm_out['loss'].detach()}
+        out = {'perfm_val_loss': perfm_out['loss'].detach()}
+        self.losslog('perfm_val_loss', perfm_out['loss'])
         if self.context_specific:
             cont_out = self.context_classifier.validation_step(
                 {
@@ -389,10 +394,10 @@ class EncoderPerformer(LightningModule):
             self.loss_pool["cont"].append(
                 cont_out["loss"].cpu().numpy().tolist())
 
+        out['loss'] = loss
         self.loss_pool["perfm"].append(
             perfm_out["loss"].cpu().numpy().tolist())
         self.losslog('val_loss', loss)
-        self.losslog('perfm_val_loss', perfm_out['loss'])
         if self.context_specific:
             self.losslog('cont_val_loss', cont_out['loss'])
         return out
