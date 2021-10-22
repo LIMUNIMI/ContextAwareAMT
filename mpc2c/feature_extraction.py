@@ -253,7 +253,7 @@ class Specializer(LightningModule):
             nn.Linear(middle_features, nout),
             nn.Identity() if nout > 1 else nn.Sigmoid())
 
-        self.maxloss = -99999
+        # self.maxloss = -99999
 
     def forward(self, x):
         return self.stack(x[:, :, 0, 0])
@@ -266,10 +266,10 @@ class Specializer(LightningModule):
         else:
             loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
 
-        # autoweight the loss in respect to the maximum ever seen
-        if loss > self.maxloss:
-            self.maxloss = loss.detach()
-        loss = loss / self.maxloss
+        # # autoweight the loss in respect to the maximum ever seen
+        # if loss > self.maxloss:
+        #     self.maxloss = loss.detach()
+        # loss = loss / self.maxloss
         return {'loss': loss}
 
     def validation_step(self, batch, batch_idx):

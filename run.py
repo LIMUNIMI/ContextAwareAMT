@@ -1,5 +1,6 @@
 import argparse
 import pickle
+import shutil
 from pathlib import Path
 import subprocess
 from logging import error
@@ -137,7 +138,11 @@ def main():
         #     lambda x: training.build_model(x, contexts), test_sample)
         exp = mlflow.get_experiment_by_name(mode)
         if exp:
-            mlflow.delete_experiment(exp.experiment_id)
+            if exp.lifecycle_stage == 'deleted':
+                exp_path = Path(mlflow.get_registry_uri()) / '.trash' / exp.experiment_id
+            else:
+                exp_path = exp.artifact_location
+            shutil.rmtree(exp_path)
 
         hyperopt(
             s.SKSPACE,
@@ -150,8 +155,7 @@ def main():
                 optimization_method=skopt.dummy_minimize),
             optimize_kwargs=dict(max_loss=20.0,
                                  initial_point_generator="grid"))
-        if not exp:
-            exp = mlflow.get_experiment_by_name(mode)
+        exp = mlflow.get_experiment_by_name(mode)
         subprocess.run(['mlflow', 'experiments', 'csv', '-x', exp.experiment_id, '-o', f'{mode}_results.csv'])
 
     if args.train:

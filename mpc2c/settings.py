@@ -97,8 +97,8 @@ VEL_HYPERPARAMS = {
     "enc_k2": 5,
     "activation": nn.ReLU(),
     "kernel": 2,
-    'performer_features': 3,
-    'performer_layers': 2
+    'performer_features': 5,
+    'performer_layers': 4
 }
 # TODO: redo pedaling
 PED_HYPERPARAMS = {
@@ -129,7 +129,7 @@ SKSPACE = [
         [nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
     space.Integer(2, 5, name='kernel'),
     space.Integer(0, 8, name='performer_features'),
-    space.Integer(1, 3, name='performer_layers'),
+    space.Integer(1, 5, name='performer_layers'),
 ]
 SKITERATIONS = (0, 10)
 PLOT_GRAPHS = True
