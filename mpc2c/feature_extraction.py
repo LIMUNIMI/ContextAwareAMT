@@ -226,10 +226,10 @@ class ContextClassifier(LightningModule):
         super().__init__()
 
         stack, outchannels, insize = make_stack(
-            (middle_features, 1), 5, 2, activation, (5, 1), lambda x, y: x[0] > y[0])
+            (middle_features, 1), 5, 2, activation, (kernel, 1), lambda x, y: x[0] > y[0])
 
         stack.append(
-            nn.Sequential(nn.Conv2d(outchannels, nout, insize)))
+            nn.Sequential(nn.Conv2d(outchannels, nout, insize), nn.BatchNorm2d(nout), activation))
 
         self.stack = nn.Sequential(*stack)
         self.loss_fn = loss_fn
@@ -257,7 +257,7 @@ class ContextClassifier(LightningModule):
         return {'out': out, 'loss': loss}
 
 
-class Specializer(LightningModule):
+class Performer(LightningModule):
     def __init__(self, hparams, loss_fn, nout):
         """
         A stack of linear layers that transform `features` into only one
@@ -427,6 +427,7 @@ class EncoderPerformer(LightningModule):
             }, batch_idx)
         loss = perfm_out['loss']
         out = {'perfm_val_loss': perfm_out['loss'].detach()}
+        self.losslog('perfm_val_loss', perfm_out['loss'])
         if self.context_specific:
             cont_out = self.context_classifier.validation_step(
                 {
@@ -446,7 +447,6 @@ class EncoderPerformer(LightningModule):
         self.loss_pool["perfm"].append(
             perfm_out["loss"].cpu().numpy().tolist())
         self.losslog('val_loss', loss)
-        self.losslog('perfm_val_loss', perfm_out['loss'])
         if self.context_specific:
             self.losslog('cont_val_loss', cont_out['loss'])
         return out

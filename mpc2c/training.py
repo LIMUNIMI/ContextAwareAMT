@@ -121,7 +121,7 @@ def get_hpar(hpar):
 
 
 def build_specializer_model(hpar, infeatures, loss, nout):
-    m = feature_extraction.Specializer(
+    m = feature_extraction.Performer(
         (
             hpar["performer_features"],
             hpar["performer_layers"],
@@ -231,7 +231,7 @@ def my_train(
         # log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
-        overfit_batches=6,
+        overfit_batches=60,
         # fast_dev_run=True,
         gpus=s.GPUS,
     )
@@ -239,10 +239,10 @@ def my_train(
     # model.njobs = 1  # there's some leak when using njobs > 0
     # if os.path.exists("lr_find_temp_model.ckpt"):
     #     os.remove("lr_find_temp_model.ckpt")
-    # d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
+    # d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=1))
     # if d["lr_find"] is None or d["lr_find"].suggestion() is None:
-    model.lr = 1e-6
-    model.learning_rate = 1e-6
+    model.lr = 1
+    model.learning_rate = 1
     model.njobs = s.NJOBS
     # need to reload dataloaders for using multiple jobs
     # trainer.train_dataloader = model.train_dataloader()

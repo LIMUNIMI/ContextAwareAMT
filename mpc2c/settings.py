@@ -93,11 +93,11 @@ DEVICE = 'cuda'
 GPUS = 1
 EPOCHS = 50
 VEL_HYPERPARAMS = {
-    "enc_k1": 5,
-    "enc_k2": 5,
+    "enc_k1": 6,
+    "enc_k2": 8,
     "activation": nn.ReLU(),
-    "kernel": 2,
-    'performer_features': 5,
+    "kernel": 3,
+    'performer_features': 4,
     'performer_layers': 4
 }
 # TODO: redo pedaling
@@ -123,8 +123,8 @@ SWA = False
 
 # SKOPT
 SKSPACE = [
-    space.Integer(0, 7, name='enc_k1'),
-    space.Integer(2, 6, name='enc_k2'),
+    space.Integer(0, 8, name='enc_k1'),
+    space.Integer(2, 9, name='enc_k2'),
     space.Categorical(
         [nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
     space.Integer(2, 5, name='kernel'),
