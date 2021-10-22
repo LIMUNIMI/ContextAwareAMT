@@ -228,8 +228,11 @@ class Specializer(LightningModule):
         stack, outchannels, insize = make_stack(
             (middle_features, 1), k1, k2, activation, (kernel, 1), lambda x, y: x[0] > y[0])
 
-        stack.append(
-            nn.Sequential(nn.Conv2d(outchannels, nout, insize), nn.BatchNorm2d(nout), activation))
+        stack.append( 
+            nn.Sequential(nn.Conv2d(outchannels, nout, insize), 
+                nn.BatchNorm2d(nout) if nout > 1 else nn.Identity(), 
+                activation if nout > 1 else nn.Sigmoid())
+        )
 
         self.stack = nn.Sequential(*stack)
         self.loss_fn = loss_fn
@@ -256,82 +259,6 @@ class Specializer(LightningModule):
 
         return {'out': out, 'loss': loss}
 
-
-class Performer(LightningModule):
-    def __init__(self, hparams, loss_fn, nout):
-        """
-        A stack of linear layers that transform `features` into only one
-        feature.
-
-        Accept the output of the decoder, having shape: (batches,
-        features, 1, 1).
-
-        Returns a tensor with shape (batches, 1)
-
-        * `hyperparams` must contains the following values:
-
-            * middle_features: int [x in k*(2^x)]
-            * num_layers: int
-            * input_features: int [x in k*(2^x)]
-            * middle_activation: callable
-            * k: int
-        """
-        super().__init__()
-
-        self.loss_fn = loss_fn
-        middle_features, num_layers, input_features,\
-            middle_activation, k = hparams
-
-        middle_features = k * (2**middle_features)
-        # input_features = k * (2**input_features)
-
-        stack = []
-        for _ in range(num_layers - 2):
-            stack.append(nn.Linear(middle_features, middle_features))
-            stack.append(
-                nn.BatchNorm1d(middle_features,
-                               affine=True,
-                               track_running_stats=True))
-            stack.append(middle_activation)
-        self.stack = nn.Sequential(
-            nn.Linear(input_features, middle_features),
-            nn.BatchNorm1d(middle_features,
-                           affine=True,
-                           track_running_stats=True), middle_activation,
-            *stack, 
-            nn.Linear(middle_features, nout),
-            nn.Sigmoid()
-        )
-
-        # self.maxloss = -99999
-
-    def forward(self, x):
-        return self.stack(x[:, :, 0, 0])
-
-    def training_step(self, batch, batch_idx):
-
-        out = self.forward(batch['x'])
-        # if out.shape[1] > 1:
-        #     loss = self.loss_fn(out, batch['y'])
-        # else:
-        loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
-
-        # # autoweight the loss in respect to the maximum ever seen
-        # if loss > self.maxloss:
-        #     self.maxloss = loss.detach()
-        # loss = loss / self.maxloss
-        return {'loss': loss}
-
-    def validation_step(self, batch, batch_idx):
-
-        out = self.forward(batch['x'])
-        # if out.shape[1] > 1:
-        #     loss = self.loss_fn(out, batch['y'])
-        #     out = torch.argmax(out, 1)
-        # else:
-        loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
-
-        return {'out': out, 'loss': loss}
 
 
 class EncoderPerformer(LightningModule):

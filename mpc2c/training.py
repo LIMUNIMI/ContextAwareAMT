@@ -273,8 +273,6 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
         perfm_train=True,
     )
 
-    return 1.0
-
     if cont_stopper and perfm_stopper:
         # cases:
         # A: encoder was stopped
