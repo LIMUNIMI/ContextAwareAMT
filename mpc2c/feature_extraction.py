@@ -221,12 +221,12 @@ class Encoder(LightningModule):
         return out
 
 
-class ContextClassifier(LightningModule):
-    def __init__(self, middle_features, activation, kernel, nout, loss_fn):
+class Specializer(LightningModule):
+    def __init__(self, middle_features, k1, k2, activation, kernel, nout, loss_fn):
         super().__init__()
 
         stack, outchannels, insize = make_stack(
-            (middle_features, 1), 5, 2, activation, (kernel, 1), lambda x, y: x[0] > y[0])
+            (middle_features, 1), k1, k2, activation, (kernel, 1), lambda x, y: x[0] > y[0])
 
         stack.append(
             nn.Sequential(nn.Conv2d(outchannels, nout, insize), nn.BatchNorm2d(nout), activation))
@@ -524,42 +524,14 @@ class EncoderPerformer(LightningModule):
     def performer_weight_moments(self):
         """
         Computes the average variance of the weights of the performers
-        after having put the weights tensors in the same order as the first
-        performer
-        
-        see https://math.stackexchange.com/questions/3225410/find-a-permutation-of-the-rows-of-a-matrix-that-minimizes-the-sum-of-squared-err
         """
-        # get the number of tensor weights in the performers
-        N = len(list(self.performers['0'].parameters()))
-        permutations = [None] * len(self.performers)
+        # get all the parameters of the performers
+        params = [list(perf.parameters()) for perf in self.performers.values()]
         s = []
-        for i in range(N):
-            # get the list of the i-th layer parameters
-            params = [
-                list(perf.parameters())[i]
-                for perf in self.performers.values()
-            ]
-            for j in range(len(self.performers)):
-                if j > 0:
-                    # retrieving last permutation
-                    perm_cols = permutations[j]
-                    if params[0].data.ndim > 1:
-                        # a new linear layer
-                        # computing and updating row permutation
-                        perm_rows = utils.permute_tensors(params[0], params[j])
-                        permutations[j] = perm_rows
-                        if params[0].shape[0] > 1:
-                            # apply row permutation
-                            params[j] = params[j][perm_rows]
-                        if perm_cols is not None:
-                            # apply row permutation of the previous layer to the columns of this layer
-                            params[j] = params[j][:, perm_cols]
-                    elif perm_cols is not None:
-                        # this is bias or batch normalization
-                        # apply row permutation of the previous layer to this array
-                        params[j] = params[j][perm_cols]
+        for i in range(len(params[0])):
+            # for each performer parameter
             # compute point-wise variances
-            v = torch.var(torch.stack(params), dim=(0, ), unbiased=True)
+            v = torch.var(torch.stack([p[i] for p in params]), dim=(0, ), unbiased=True)
             # append to the list the average variance
             s.append(torch.mean(v))
         return utils.torch_moments(torch.stack(s))
