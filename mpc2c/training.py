@@ -136,6 +136,12 @@ def build_specializer_model(hpar, infeatures, loss, nout):
     return m
 
 
+def build_context_classifier(hpar, infeatures, loss, nout):
+    m = feature_extraction.ContextClassifier(
+        infeatures, hpar['activation'], hpar['kernel'], nout, loss)
+    return m
+
+
 def build_model(hpar, mode, dropout=s.TRAIN_DROPOUT, context_specific=True):
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
@@ -143,7 +149,7 @@ def build_model(hpar, mode, dropout=s.TRAIN_DROPOUT, context_specific=True):
     performer = build_specializer_model(
         hpar, encoder.outchannels, nn.L1Loss(reduction="sum"), 1
     )
-    cont_classifier = build_specializer_model(
+    cont_classifier = build_context_classifier(
         hpar, encoder.outchannels, nn.CrossEntropyLoss(reduction="sum"), len(contexts)
     )
     model = feature_extraction.EncoderPerformer(
@@ -220,36 +226,30 @@ def my_train(
         auto_lr_find=True,
         reload_dataloaders_every_n_epochs=1,
         num_sanity_val_steps=0,
+        gradient_clip_val=0.5,
         # weights_summary="full",
-        # log_every_n_steps=1,
+        log_every_n_steps=1,
         # log_gpu_memory=True,
-        # track_grad_norm=2,
-        # overfit_batches=2,
+        track_grad_norm=2,
+        overfit_batches=1,
         # fast_dev_run=True,
         gpus=s.GPUS,
     )
 
-    model.njobs = 1  # there's some leak when using njobs > 0
-    if os.path.exists("lr_find_temp_model.ckpt"):
-        os.remove("lr_find_temp_model.ckpt")
-    d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
-    if d["lr_find"] is None or d["lr_find"].suggestion() is None:
-        model.lr = 1
-        model.learning_rate = 1
+    # model.njobs = 1  # there's some leak when using njobs > 0
+    # if os.path.exists("lr_find_temp_model.ckpt"):
+    #     os.remove("lr_find_temp_model.ckpt")
+    # d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=10))
+    # if d["lr_find"] is None or d["lr_find"].suggestion() is None:
+    model.lr = 1e-6
+    model.learning_rate = 1e-6
     model.njobs = s.NJOBS
     # need to reload dataloaders for using multiple jobs
-    trainer.train_dataloader = model.train_dataloader()
-    trainer.val_dataloader = model.val_dataloader()
-    trainer.test_dataloader = model.test_dataloader()
+    # trainer.train_dataloader = model.train_dataloader()
+    # trainer.val_dataloader = model.val_dataloader()
+    # trainer.test_dataloader = model.test_dataloader()
     print("Fitting the model!")
     trainer.fit(model)
-    # if cont_train:
-    #     stopped_epoch = cont_stopper.stopped_epoch  # type: ignore
-    # else:
-    #     stopped_epoch = 0
-    # if perfm_train:
-    #     stopped_epoch = max(stopped_epoch,
-    #                         perfm_stopper.stopped_epoch)  # type: ignore
 
     return cont_stopper, perfm_stopper
 
@@ -284,6 +284,8 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
         cont_train=context_specific,
         perfm_train=True,
     )
+
+    return 1.0
 
     if cont_stopper and perfm_stopper:
         # cases:

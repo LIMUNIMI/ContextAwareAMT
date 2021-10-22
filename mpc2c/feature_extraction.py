@@ -1,14 +1,14 @@
 from copy import deepcopy
 
+import numpy as np
+import pandas as pd
 # import plotly.express as px
 import torch  # type: ignore
-from torch import nn  # type: ignore
 from pytorch_lightning import LightningModule  # type: ignore
-import pandas as pd
-import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.metrics.cluster import adjusted_mutual_info_score
 from sklearn.metrics import recall_score
+from sklearn.metrics.cluster import adjusted_mutual_info_score
+from torch import nn  # type: ignore
 
 from . import data_management, utils
 
@@ -67,7 +67,10 @@ class ResidualBlock(nn.Module):
             activation,
         )
 
-        self.kernel = (kernel, kernel)
+        if type(kernel) is not tuple:
+            self.kernel = (kernel, kernel)
+        else:
+            self.kernel = kernel
         if not reduce:
             if inchannels == outchannels:
                 self.proj = None
@@ -152,6 +155,28 @@ class ResidualStack(nn.Module):
             out.append(block.out)
         return out
 
+def make_stack(insize, k1, k2, activation, kernel, condition):
+    """
+    The initial number of blocks is 2**k1 and channels are 1.
+    The i-th stack has number of channels equal to k2**i
+    In general the number of blocks is (2**k1)/(k2**i) and the number of channels is k2**i
+    """
+    stack = []
+    outchannels = 1
+    while condition(insize, kernel):
+        inchannels = outchannels
+        nblocks = max(1, round(2**k1 / outchannels))
+        outchannels = round(outchannels * k2)
+        blocks = ResidualStack(nblocks,
+                               inchannels,
+                               outchannels,
+                               activation,
+                               transposed=False,
+                               kernel=kernel)
+        stack.append(blocks)
+        insize = blocks.outsize(insize)
+    return stack, outchannels, insize
+
 
 class Encoder(LightningModule):
     def __init__(self, insize, dropout, k1, k2, activation, kernel):
@@ -163,20 +188,8 @@ class Encoder(LightningModule):
         self.kernel = kernel
 
         # make the stack
-        stack = []
-        outchannels = 1
-        while insize[0] > kernel and insize[1] > kernel:
-            inchannels = outchannels
-            nblocks = max(1, int(2**k1 / outchannels))
-            outchannels *= k2
-            blocks = ResidualStack(nblocks,
-                                   inchannels,
-                                   outchannels,
-                                   activation,
-                                   transposed=False,
-                                   kernel=kernel)
-            stack.append(blocks)
-            insize = blocks.outsize(insize)
+        stack, outchannels, insize = make_stack(
+            insize, k1, k2, activation, kernel, lambda x, y: x[0] > y and x[1] > y)
 
         # add one convolution to reduce the size to 1x1
         stack.append(
@@ -206,6 +219,42 @@ class Encoder(LightningModule):
             if type(layer) == ResidualStack:
                 out += layer.get_outputs()
         return out
+
+
+class ContextClassifier(LightningModule):
+    def __init__(self, middle_features, activation, kernel, nout, loss_fn):
+        super().__init__()
+
+        stack, outchannels, insize = make_stack(
+            (middle_features, 1), 5, 2, activation, (5, 1), lambda x, y: x[0] > y[0])
+
+        stack.append(
+            nn.Sequential(nn.Conv2d(outchannels, nout, insize)))
+
+        self.stack = nn.Sequential(*stack)
+        self.loss_fn = loss_fn
+
+    def forward(self, x):
+        return self.stack(torch.transpose(x, 1, 2))[:, :, 0, 0]
+
+    def training_step(self, batch, batch_idx):
+
+        out = self.forward(batch['x'])
+        loss = self.loss_fn(out, batch['y'])
+
+        # # autoweight the loss in respect to the maximum ever seen
+        # if loss > self.maxloss:
+        #     self.maxloss = loss.detach()
+        # loss = loss / self.maxloss
+        return {'loss': loss}
+
+    def validation_step(self, batch, batch_idx):
+
+        out = self.forward(batch['x'])
+        loss = self.loss_fn(out, batch['y'])
+        out = torch.argmax(out, 1)
+
+        return {'out': out, 'loss': loss}
 
 
 class Specializer(LightningModule):
@@ -251,7 +300,8 @@ class Specializer(LightningModule):
                            track_running_stats=True), middle_activation,
             *stack, 
             nn.Linear(middle_features, nout),
-            nn.Identity() if nout > 1 else nn.Sigmoid())
+            nn.Sigmoid()
+        )
 
         # self.maxloss = -99999
 
@@ -261,10 +311,10 @@ class Specializer(LightningModule):
     def training_step(self, batch, batch_idx):
 
         out = self.forward(batch['x'])
-        if out.shape[1] > 1:
-            loss = self.loss_fn(out, batch['y'])
-        else:
-            loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
+        # if out.shape[1] > 1:
+        #     loss = self.loss_fn(out, batch['y'])
+        # else:
+        loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
 
         # # autoweight the loss in respect to the maximum ever seen
         # if loss > self.maxloss:
@@ -275,11 +325,11 @@ class Specializer(LightningModule):
     def validation_step(self, batch, batch_idx):
 
         out = self.forward(batch['x'])
-        if out.shape[1] > 1:
-            loss = self.loss_fn(out, batch['y'])
-            out = torch.argmax(out, 1)
-        else:
-            loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
+        # if out.shape[1] > 1:
+        #     loss = self.loss_fn(out, batch['y'])
+        #     out = torch.argmax(out, 1)
+        # else:
+        loss = self.loss_fn(out, batch['y'].unsqueeze(-1))
 
         return {'out': out, 'loss': loss}
 
@@ -303,13 +353,13 @@ class EncoderPerformer(LightningModule):
                  njobs=0,
                  perfm_testloss=nn.L1Loss(reduction='none')):
         super().__init__()
+        self.context_specific = context_specific
         self.encoder = encoder
+        if self.context_specific:
+            self.context_classifier = cont_classifier
         self.performers = nn.ModuleDict(
             {str(c): deepcopy(performer)
              for c in range(len(contexts))})
-        self.context_specific = context_specific
-        if self.context_specific:
-            self.context_classifier = cont_classifier
         self.lr = lr
         self.wd = wd
         self.mode = mode
@@ -354,7 +404,6 @@ class EncoderPerformer(LightningModule):
                                  dtype=torch.long).expand(enc_out.shape[0])
                 }, batch_idx)
             loss = loss + cont_out['loss']
-            self.losslog('cont_train_loss', cont_out['loss'])
             out['cont_train_loss'] = cont_out['loss'].detach()
             self.losslog('cont_train_loss', cont_out['loss'])
 
@@ -378,7 +427,6 @@ class EncoderPerformer(LightningModule):
             }, batch_idx)
         loss = perfm_out['loss']
         out = {'perfm_val_loss': perfm_out['loss'].detach()}
-        self.losslog('perfm_val_loss', perfm_out['loss'])
         if self.context_specific:
             cont_out = self.context_classifier.validation_step(
                 {
@@ -398,6 +446,7 @@ class EncoderPerformer(LightningModule):
         self.loss_pool["perfm"].append(
             perfm_out["loss"].cpu().numpy().tolist())
         self.losslog('val_loss', loss)
+        self.losslog('perfm_val_loss', perfm_out['loss'])
         if self.context_specific:
             self.losslog('cont_val_loss', cont_out['loss'])
         return out
