@@ -236,9 +236,14 @@ class Specializer(LightningModule):
 
         self.stack = nn.Sequential(*stack)
         self.loss_fn = loss_fn
+        self.nout = nout
 
     def forward(self, x):
-        return self.stack(torch.transpose(x, 1, 2))[:, :, 0, 0]
+        x = self.stack(torch.transpose(x, 1, 2))[:, :, 0, 0]
+        if self.nout == 1:
+            return x[:, 0]
+        else:
+            return x
 
     def training_step(self, batch, batch_idx):
 
