@@ -284,8 +284,7 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
             # case A
             for p in model.performers.values():
                 p.freeze()
-            for c in model.context_classifiers.values():
-                c.freeze()
+            model.context_classifier.freeze()
             print("Continuing training encoder...")
             cont_stopper, _ = my_train(
                 mode, copy_checkpoint, logger, model, context_specific, True, False
