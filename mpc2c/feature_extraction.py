@@ -157,11 +157,13 @@ class ResidualStack(nn.Module):
             out.append(block.out)
         return out
 
+
 def make_stack(insize, k1, k2, activation, kernel, condition):
     """
     The initial number of blocks is 2**k1 and channels are 1.
     The i-th stack has number of channels equal to k2**i
-    In general the number of blocks is (2**k1)/(k2**i) and the number of channels is k2**i
+    In general the number of blocks is (2**k1)/(k2**i) and the number of
+    channels is k2**i
     """
     stack = []
     outchannels = 1
@@ -191,14 +193,20 @@ class Encoder(LightningModule):
 
         # make the stack
         stack, outchannels, insize = make_stack(
-            insize, k1, k2, activation, kernel, lambda x, y: x[0] > y and x[1] > y)
+            insize, k1, k2, activation, kernel,
+            lambda x, y: x[0] > y and x[1] > y)
 
         # add one convolution to reduce the size to 1x1
         stack.append(
             nn.Sequential(nn.Conv2d(outchannels, outchannels, insize),
                           nn.BatchNorm2d(outchannels), activation))
 
-        self.stack = nn.Sequential(*stack)
+        self.stack = nn.Sequential(
+            *stack,
+            nn.Conv2d(outchannels,
+                      outchannels,
+                      kernel_size=1,
+                      groups=outchannels), activation)
         self.outchannels = outchannels
 
     def forward(self, x):
@@ -224,16 +232,20 @@ class Encoder(LightningModule):
 
 
 class Specializer(LightningModule):
-    def __init__(self, middle_features, k1, k2, activation, kernel, nout, loss_fn):
+    def __init__(self, middle_features, k1, k2, activation, kernel, nout,
+                 loss_fn):
         super().__init__()
 
-        stack, outchannels, insize = make_stack(
-            (middle_features, 1), k1, k2, activation, (kernel, 1), lambda x, y: x[0] > y[0])
+        stack, outchannels, insize = make_stack((middle_features, 1), k1, k2,
+                                                activation, (kernel, 1),
+                                                lambda x, y: x[0] > y[0])
 
-        stack.append( 
-            nn.Sequential(nn.Conv2d(outchannels, nout, insize), 
+        stack.append(
+            nn.Sequential(
+                nn.Conv2d(outchannels, nout, insize),
+                nn.Conv2d(nout, nout, kernel_size=1, groups=outchannels),
                 nn.Sigmoid())
-                # nn.Sigmoid() if nout == 1 else nn.Identity())
+            # nn.Sigmoid() if nout == 1 else nn.Identity())
         )
 
         self.stack = nn.Sequential(*stack)
@@ -283,8 +295,8 @@ class EncoderPerformer(LightningModule):
                  context_specific,
                  lr=1,
                  wd=0,
-                 ema_period=20,
-                 ema_alpha=0.5,
+                 ema_period=None,
+                 ema_alpha=None,
                  njobs=0,
                  perfm_testloss=nn.L1Loss(reduction='none')):
         super().__init__()
@@ -299,8 +311,8 @@ class EncoderPerformer(LightningModule):
         self.wd = wd
         self.mode = mode
         self.contexts = contexts
-        self.loss_pool = {"cont": [], "perfm": []}
-        self.ema_loss_pool = {"cont": [], "perfm": []}
+        self._reset_loss_pool()
+        self.reset_ema()
         self.ema_period = ema_period
         self.ema_alpha = ema_alpha
         self.njobs = njobs
@@ -308,6 +320,16 @@ class EncoderPerformer(LightningModule):
         self.test_latent_x = []
         self.test_latent_y = []
         self.use_rotograd = False
+
+    @property
+    def use_ema(self):
+        return self.ema_period is not None and self.ema_alpha is not None
+
+    def reset_ema(self):
+        self.ema_loss_pool = {"cont": [], "perfm": []}
+
+    def _reset_loss_pool(self):
+        self.loss_pool = {"cont": [], "perfm": []}
 
     @property
     def use_rotograd(self):
@@ -406,12 +428,10 @@ class EncoderPerformer(LightningModule):
                 }, batch_idx)
             loss = loss + cont_out['loss']
             out['cont_val_loss'] = cont_out['loss'].detach()
-            self.loss_pool["cont"].append(
-                cont_out["loss"].cpu().numpy().tolist())
+            self.loss_pool["cont"].append(cont_out["loss"].cpu().numpy())
 
         out['loss'] = loss
-        self.loss_pool["perfm"].append(
-            perfm_out["loss"].cpu().numpy().tolist())
+        self.loss_pool["perfm"].append(perfm_out["loss"].cpu().numpy())
         self.losslog('val_loss', loss)
         if self.context_specific:
             self.losslog('cont_val_loss', cont_out['loss'])
@@ -419,15 +439,23 @@ class EncoderPerformer(LightningModule):
 
     def on_validation_epoch_end(self):
         # compute loss average and log ema
-        self.ema_loss_pool["cont"].append(np.mean(self.loss_pool["cont"]))
-        self.ema_loss_pool["perfm"].append(np.mean(
-            self.loss_pool["perfm"]))
-        cont_ema = ema(self.ema_loss_pool["cont"], self.ema_period,
-                       self.ema_alpha)
-        perfm_ema = ema(self.ema_loss_pool["perfm"], self.ema_period,
-                        self.ema_alpha)
-        self.losslog('cont_val_loss_avg', cont_ema)
-        self.losslog('perfm_val_loss_avg', perfm_ema)
+        if self.use_ema:
+            # loss_pool contains the losses from this epoch
+            self.ema_loss_pool["cont"].append(np.mean(self.loss_pool["cont"]))
+            self.ema_loss_pool["perfm"].append(np.mean(
+                self.loss_pool["perfm"]))
+            cont_ema = ema(self.ema_loss_pool["cont"], self.ema_period,
+                           self.ema_alpha)
+            perfm_ema = ema(self.ema_loss_pool["perfm"], self.ema_period,
+                            self.ema_alpha)
+            self.losslog('cont_val_loss_early_stop', cont_ema)
+            self.losslog('perfm_val_loss_early_stop', perfm_ema)
+            self._reset_loss_pool()
+        else:
+            self.losslog('cont_val_loss_early_stop',
+                         self.ema_loss_pool["cont"][-1])
+            self.losslog('perfm_val_loss_early_stop',
+                         self.ema_loss_pool["perfm"][-1])
         for key, val in self.performer_weight_moments().items():
             self.losslog("weight_variance_" + key, val)
 
@@ -499,7 +527,9 @@ class EncoderPerformer(LightningModule):
         for i in range(len(params[0])):
             # for each performer parameter
             # compute point-wise variances
-            v = torch.var(torch.stack([p[i] for p in params]), dim=(0, ), unbiased=True)
+            v = torch.var(torch.stack([p[i] for p in params]),
+                          dim=(0, ),
+                          unbiased=True)
             # append to the list the average variance
             s.append(torch.mean(v))
         return utils.torch_moments(torch.stack(s))
@@ -522,10 +552,12 @@ class EncoderPerformer(LightningModule):
 
         self.rotograd_model = rotograd.RotoGrad(
             self.encoder, [self.performers, self.context_classifier],
-            self.encoder.outchannels, alpha=1., burn_in_period=10)
+            self.encoder.outchannels,
+            alpha=1.,
+            burn_in_period=10)
 
-        optim_rotograd = torch.optim.Adadelta(
-            self.rotograd_model.parameters(), lr=self.lr / 2)
+        optim_rotograd = torch.optim.Adadelta(self.rotograd_model.parameters(),
+                                              lr=self.lr / 2)
 
         return optim_rotograd, optimizer
 

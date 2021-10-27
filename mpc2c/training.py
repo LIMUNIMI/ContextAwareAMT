@@ -6,7 +6,8 @@ from pprint import pprint
 import torch
 import torch.nn.functional as F
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging
+from pytorch_lightning.callbacks import (ModelCheckpoint,
+                                         StochasticWeightAveraging)
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import MLFlowLogger
 from torch import nn
@@ -24,7 +25,6 @@ def model_test(model_build_func, test_sample):
     tries to build the model and to use it with a give ntest sample (can be
     created randomly, but shapes must be similar to a real case)
     """
-
     def constraint(hpar):
         print("----------")
         print("checking this set of hpar: ")
@@ -86,7 +86,7 @@ def specific_loss(pred, same_pred, diff_pred):
 
 
 def generic_loss(pred, same_pred, diff_pred):
-    if torch.randint(6, (1,), generator=RANDGEN) > 0:
+    if torch.randint(6, (1, ), generator=RANDGEN) > 0:
         return cosine_distance(pred, diff_pred, reduction="sum")
     else:
         return cosine_distance(pred, same_pred, reduction="sum")
@@ -107,16 +107,14 @@ def build_encoder(hpar, dropout):
             k2=k2,
             activation=activation,
             kernel=2 * kernel + 1,
-        )
-        .to(s.DEVICE)
-        .to(s.DTYPE)
-    )
+        ).to(s.DEVICE).to(s.DTYPE))
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 
 
 def get_hpar(hpar):
-    return (hpar["enc_k1"], hpar["enc_k2"], hpar["activation"], hpar["enc_kernel"])
+    return (hpar["enc_k1"], hpar["enc_k2"], hpar["activation"],
+            hpar["enc_kernel"])
 
 
 def build_specializer_model(hpar, infeatures, loss, nout):
@@ -136,12 +134,11 @@ def build_model(hpar, mode, dropout=s.TRAIN_DROPOUT, context_specific=True):
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
     encoder = build_encoder(hpar, dropout)
-    performer = build_specializer_model(
-        hpar, encoder.outchannels, nn.L1Loss(reduction="mean"), 1
-    )
-    cont_classifier = build_specializer_model(
-        hpar, encoder.outchannels, nn.L1Loss(reduction="mean"), len(contexts)
-    )
+    performer = build_specializer_model(hpar, encoder.outchannels,
+                                        nn.L1Loss(reduction="mean"), 1)
+    cont_classifier = build_specializer_model(hpar, encoder.outchannels,
+                                              nn.L1Loss(reduction="mean"),
+                                              len(contexts))
     model = feature_extraction.EncoderPerformer(
         encoder,
         performer,
@@ -150,6 +147,7 @@ def build_model(hpar, mode, dropout=s.TRAIN_DROPOUT, context_specific=True):
         mode,
         context_specific,
         ema_period=s.EMA_PERIOD,
+        ema_alpha=0.5,
     )
     return model
 
@@ -182,7 +180,7 @@ def my_train(
     cont_stopper = perfm_stopper = None
     if cont_train:
         cont_stopper = EarlyStopping(
-            monitor="cont_val_loss_avg",
+            monitor="cont_val_loss_early_stop",
             min_delta=s.EARLY_RANGE,
             check_finite=False,
             patience=s.EARLY_STOP,
@@ -190,7 +188,7 @@ def my_train(
         callbacks.append(cont_stopper)
     if perfm_train:
         perfm_stopper = EarlyStopping(
-            monitor="perfm_val_loss_avg",
+            monitor="perfm_val_loss_early_stop",
             min_delta=s.EARLY_RANGE,
             check_finite=False,
             patience=s.EARLY_STOP,
@@ -204,8 +202,7 @@ def my_train(
             StochasticWeightAveraging(
                 swa_epoch_start=int(0.8 * s.EPOCHS),
                 annealing_epochs=int(0.2 * s.EPOCHS),
-            )
-        )
+            ))
 
     # training!
     trainer = Trainer(
@@ -255,12 +252,14 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
     4. Returns the best validation loss (or test loss if `test` is True)
     """
     # the logger
-    logger = MLFlowLogger(
-        experiment_name=f"{mode}", tracking_uri=os.environ.get("MLFLOW_TRACKING_URI")
-    )
+    logger = MLFlowLogger(experiment_name=f"{mode}",
+                          tracking_uri=os.environ.get("MLFLOW_TRACKING_URI"))
 
     logger.log_hyperparams(hpar)
-    logger.log_hyperparams({"mode": mode, "context_specific": context_specific})
+    logger.log_hyperparams({
+        "mode": mode,
+        "context_specific": context_specific
+    })
 
     model = build_model(hpar, mode, context_specific=context_specific)
     # torchinfo.summary(model)
@@ -292,26 +291,22 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
                 p.freeze()
             model.context_classifier.freeze()
             print("Continuing training encoder...")
-            cont_stopper, _ = my_train(
-                mode, copy_checkpoint, logger, model, context_specific, True, False
-            )
+            cont_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
+                                       context_specific, True, False)
         if cont_stopper.stopped_epoch > 0:  # type: ignore
             # case A and B
             model.encoder.freeze()
             print("Continuing training performers...")
-            _, perfm_stopper = my_train(
-                mode, copy_checkpoint, logger, model, context_specific, False, True
-            )
+            _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
+                                        context_specific, False, True)
 
         cont_loss, perfm_loss = cont_stopper.best_score, perfm_stopper.best_score  # type: ignore
 
         loss = cont_loss + perfm_loss
         print(f"Final losses: {cont_loss:.2e}, {perfm_loss:.2e}")
-        logger.log_metrics(
-            {
-                "best_cont_val_loss": float(cont_loss),  # type: ignore
-            }
-        )
+        logger.log_metrics({
+            "best_cont_val_loss": float(cont_loss),  # type: ignore
+        })
     elif perfm_stopper:
         print(f"First-training loss: {perfm_stopper.best_score:.2e}")
         perfm_loss = loss = perfm_stopper.best_score
@@ -319,22 +314,18 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
         # not reachable here only to shutup the linter
         loss = 0.0
 
-    logger.log_metrics(
-        {
-            "best_perfm_val_loss": float(perfm_loss),  # type: ignore
-        }
-    )
+    logger.log_metrics({
+        "best_perfm_val_loss": float(perfm_loss),  # type: ignore
+    })
 
     if test:
         trainer = Trainer(precision=s.PRECISION, logger=logger, gpus=s.GPUS)
         loss = trainer.test(model)[0]["perfm_test_avg"]
 
-    logger.log_metrics(
-        {
-            "final_weight_variance_" + k: float(v)
-            for k, v in model.performer_weight_moments().items()
-        }
-    )
+    logger.log_metrics({
+        "final_weight_variance_" + k: float(v)
+        for k, v in model.performer_weight_moments().items()
+    })
 
     # this is the loss used by hyper-parameters optimization
     return float(loss)
