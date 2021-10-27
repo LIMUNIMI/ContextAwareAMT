@@ -1,7 +1,7 @@
+import numpy as np
 import torch
 from skopt import space
 from torch import nn
-import numpy as np
 
 from . import essentiaspec
 

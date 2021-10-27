@@ -1,20 +1,18 @@
 import argparse
 import pickle
 import shutil
-from pathlib import Path
 import subprocess
 from logging import error
+from pathlib import Path
 
-import mlflow # type: ignore
-
+import mlflow  # type: ignore
 import skopt  # type: ignore
 
-from mpc2c import create_template, data_management, evaluate
+from mpc2c import build, create_template, data_management, evaluate
 from mpc2c import settings as s
 from mpc2c import training
-from mpc2c.asmd_resynth import split_resynth, get_contexts
+from mpc2c.asmd_resynth import get_contexts, split_resynth
 from mpc2c.mytorchutils import hyperopt
-from mpc2c import build
 
 build.build()
 
@@ -118,10 +116,8 @@ def main():
     if args.skopt:
 
         def objective(x):
-            l1 = training.train(x, mode, False, test=True)
             l2 = training.train(x, mode, True, test=True)
-            # l3 = training.train(x, mode, independence='generic', test=True)
-            # return (l1 + l2 + l3) / 3
+            l1 = training.train(x, mode, False, test=True)
             return (l1 + l2) / 2
 
         if args.pedaling:
