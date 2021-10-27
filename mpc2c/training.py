@@ -6,8 +6,7 @@ from pprint import pprint
 import torch
 import torch.nn.functional as F
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import (ModelCheckpoint,
-                                         StochasticWeightAveraging)
+from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import MLFlowLogger
 from torch import nn
@@ -122,11 +121,14 @@ def get_hpar(hpar):
 
 def build_specializer_model(hpar, infeatures, loss, nout):
     m = feature_extraction.Specializer(
-            infeatures,
-            hpar['spec_k1'],
-            hpar['spec_k2'],
-            hpar['activation'],
-            hpar['spec_kernel'], nout, loss)
+        infeatures,
+        hpar["spec_k1"],
+        hpar["spec_k2"],
+        hpar["activation"],
+        hpar["spec_kernel"],
+        nout,
+        loss,
+    )
     return m
 
 
@@ -219,7 +221,7 @@ def my_train(
         # log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
-        # overfit_batches=1,
+        # overfit_batches=10,
         # fast_dev_run=True,
         gpus=s.GPUS,
     )
@@ -227,11 +229,13 @@ def my_train(
     model.njobs = 1  # there's some leak when using njobs > 0
     if os.path.exists("lr_find_temp_model.ckpt"):
         os.remove("lr_find_temp_model.ckpt")
+    model.use_rotograd = False
     d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=1))
     if d["lr_find"] is None or d["lr_find"].suggestion() is None:
         model.lr = 1
         model.learning_rate = 1
     model.njobs = s.NJOBS
+    model.use_rotograd = True
     # need to reload dataloaders for using multiple jobs
     trainer.train_dataloader = model.train_dataloader()
     trainer.val_dataloader = model.val_dataloader()
@@ -279,7 +283,9 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
         # B: performers were stopped
         # C: none was stopped
 
-        print(f"First-training losses: {cont_stopper.best_score:.2e}, {perfm_stopper.best_score:.2e}")
+        print(
+            f"First-training losses: {cont_stopper.best_score:.2e}, {perfm_stopper.best_score:.2e}"
+        )
         if cont_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
             # case A
             for p in model.performers.values():

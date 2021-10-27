@@ -1,14 +1,16 @@
+from contextlib import nullcontext
 from copy import deepcopy
 
 import numpy as np
 import pandas as pd
+import rotograd
 # import plotly.express as px
-import torch  # type: ignore
-from pytorch_lightning import LightningModule  # type: ignore
+import torch
+from pytorch_lightning import LightningModule
 from sklearn.cluster import KMeans
 from sklearn.metrics import recall_score
 from sklearn.metrics.cluster import adjusted_mutual_info_score
-from torch import nn  # type: ignore
+from torch import nn
 
 from . import data_management, utils
 
@@ -230,8 +232,7 @@ class Specializer(LightningModule):
 
         stack.append( 
             nn.Sequential(nn.Conv2d(outchannels, nout, insize), 
-                nn.BatchNorm2d(nout) if nout > 1 else nn.Identity(), 
-                activation if nout > 1 else nn.Sigmoid())
+                nn.Sigmoid() if nout == 1 else nn.Identity())
         )
 
         self.stack = nn.Sequential(*stack)
@@ -260,10 +261,11 @@ class Specializer(LightningModule):
 
         out = self.forward(batch['x'])
         loss = self.loss_fn(out, batch['y'])
-        out = torch.argmax(out, 1)
+
+        if self.nout > 1:
+            out = torch.argmax(out, 1)
 
         return {'out': out, 'loss': loss}
-
 
 
 class EncoderPerformer(LightningModule):
@@ -289,6 +291,7 @@ class EncoderPerformer(LightningModule):
         self.encoder = encoder
         if self.context_specific:
             self.context_classifier = cont_classifier
+        import ipdb; ipdb.set_trace()
         self.performers = nn.ModuleDict(
             {str(c): deepcopy(performer)
              for c in range(len(contexts))})
@@ -304,6 +307,16 @@ class EncoderPerformer(LightningModule):
         self.perfm_testloss = perfm_testloss
         self.test_latent_x = []
         self.test_latent_y = []
+        self.use_rotograd = False
+
+    @property
+    def use_rotograd(self):
+        return self.multiple_optimizers and not self.automatic_optimization
+
+    @use_rotograd.setter
+    def use_rotograd(self, v):
+        self.automatic_optimization = not v
+        self.multiple_optimizers = v
 
     def forward(self, x, context):
         enc_out = self.encoder.forward(x)
@@ -315,36 +328,61 @@ class EncoderPerformer(LightningModule):
         out = dict()
         context_s = batch['c'][0]
         context_i = int(context_s)
-        enc_out = self.encoder.forward(batch['x'])
-        perfm_out = self.performers[context_s].training_step(
-            {
-                'x': enc_out,
-                'y': batch['y']
-            }, batch_idx)
-        loss = perfm_out['loss']
-        out['perfm_train_loss'] = perfm_out['loss'].detach()
-        self.losslog('perfm_train_loss', perfm_out['loss'])
+        if self.use_rotograd:
+            opts = self.optimizers()
+            if type(opts) in [list, tuple]:
+                for opt in opts:  # type: ignore
+                    opt.zero_grad()
+            else:
+                opts.zero_grad()
 
-        if self.context_specific:
-            cont_out = self.context_classifier.training_step(
+        if self.use_rotograd:
+            context = rotograd.cached()
+        else:
+            context = nullcontext()
+
+        with context:  # Speeds-up computations by caching Rotograd's parameters
+            enc_out = self.encoder.forward(batch['x'])
+            perfm_out = self.performers[context_s].training_step(
                 {
-                    'x':
-                    enc_out,
-                    'y':
-                    torch.tensor(context_i,
-                                 device=enc_out.device,
-                                 dtype=torch.long).expand(enc_out.shape[0])
+                    'x': enc_out,
+                    'y': batch['y']
                 }, batch_idx)
-            loss = loss + cont_out['loss']
-            out['cont_train_loss'] = cont_out['loss'].detach()
-            self.losslog('cont_train_loss', cont_out['loss'])
+            loss = perfm_out['loss']
+            out['perfm_train_loss'] = perfm_out['loss'].detach()
+            self.losslog('perfm_train_loss', perfm_out['loss'])
 
-        lr_scheduler = self.lr_schedulers()
-        if lr_scheduler is not None:
-            lr_scheduler.step()
+            if self.context_specific:
+                cont_out = self.context_classifier.training_step(
+                    {
+                        'x':
+                        enc_out,
+                        'y':
+                        torch.tensor(context_i,
+                                     device=enc_out.device,
+                                     dtype=torch.long).expand(enc_out.shape[0])
+                    }, batch_idx)
+                loss = loss + cont_out['loss']
+                out['cont_train_loss'] = cont_out['loss'].detach()
+                self.losslog('cont_train_loss', cont_out['loss'])
 
-        out['loss'] = loss
-        self.losslog('train_loss', loss)
+            lr_scheduler = self.lr_schedulers()
+            if lr_scheduler is not None:
+                lr_scheduler.step()
+
+            out['loss'] = loss
+            self.losslog('train_loss', loss)
+
+            if self.use_rotograd:
+                self.manual_backward(loss)
+
+        if self.use_rotograd:
+            if type(opts) in [list, tuple]:
+                for opt in opts:  # type: ignore
+                    opt.step()
+            else:
+                opts.step()
+
         return out
 
     def validation_step(self, batch, batch_idx):
@@ -424,7 +462,7 @@ class EncoderPerformer(LightningModule):
         self.test_latent_y.append(batch_y.cpu().numpy())
         # * add test_epoch_end in which latent variables are clusterized
         return self.perfm_testloss(batch['y'],
-                                   perfm_out[:, 0]).cpu().numpy(), cont_out
+                                   perfm_out).cpu().numpy(), cont_out
 
     def test_epoch_end(self, outputs, log=True):
         perfm_outputs = np.concatenate([o[0] for o in outputs])
@@ -477,9 +515,21 @@ class EncoderPerformer(LightningModule):
                  logger=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adadelta(self.parameters(),
-                                    lr=self.lr,
-                                    weight_decay=0)
+        optimizer = torch.optim.Adadelta(self.parameters(),
+                                         lr=self.lr,
+                                         weight_decay=0)
+
+        if not self.multiple_optimizers:
+            return optimizer
+
+        self.rotograd_model = rotograd.RotoGradNorm(
+            self.encoder, [self.performers, self.context_classifier],
+            self.encoder.outchannels, alpha=1.)
+
+        optim_rotograd = torch.optim.Adadelta(
+            self.rotograd_model.parameters(), lr=self.lr / 2)
+
+        return optim_rotograd, optimizer
 
     def train_dataloader(self):
         dataloader = data_management.get_loader(['train'],

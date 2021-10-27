@@ -14,7 +14,7 @@ joblib = "^0.17.0"
 pretty_midi = "^0.2.9"
 essentia = "^2.1b6.dev184"
 plotly = "^4.12.0"
-torch = "^1.7.0"
+torch = "<1.10.0"
 # TODO: change this when this branch is merged!
 # scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
 scikit-optimize = "^0.8.1"
@@ -34,6 +34,7 @@ pytorch-lightning = "^1.2.6"
 mlflow = "^1.15.0"
 psutil = "^5.8.0"
 torchinfo = "^1.5.3"
+rotograd = "^0.1.4"
 
 [tool.poetry.dev-dependencies]
 jedi = "<0.18.0"
