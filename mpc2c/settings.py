@@ -114,7 +114,6 @@ PED_BATCH_SIZE = 1
 EARLY_STOP = 20
 EARLY_RANGE = 1e-4
 EMA_PERIOD = 15
-EMA_ALPHA = 0.6
 TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
@@ -130,8 +129,7 @@ SKSPACE = [
     space.Integer(0, 6, name='spec_k1'),
     space.Integer(2, 7, name='spec_k2'),
     space.Integer(3, 8, name='spec_kernel'),
-    space.Categorical(
-        [nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
+    space.Categorical([nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
 ]
 SKITERATIONS = (0, 10)
 PLOT_GRAPHS = True

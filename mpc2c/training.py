@@ -130,14 +130,18 @@ def build_specializer_model(hpar, infeatures, loss, nout):
     return m
 
 
-def build_model(hpar, mode, dropout=s.TRAIN_DROPOUT, context_specific=True):
+def build_model(hpar,
+                mode,
+                dropout=s.TRAIN_DROPOUT,
+                context_specific=True,
+                multiple_performers=True):
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
     encoder = build_encoder(hpar, dropout)
     performer = build_specializer_model(hpar, encoder.outchannels,
-                                        nn.L1Loss(reduction="mean"), 1)
+                                        nn.MSELoss(reduction="mean"), 1)
     cont_classifier = build_specializer_model(hpar, encoder.outchannels,
-                                              nn.L1Loss(reduction="mean"),
+                                              nn.MSELoss(reduction="mean"),
                                               len(contexts))
     model = feature_extraction.EncoderPerformer(
         encoder,
@@ -146,8 +150,8 @@ def build_model(hpar, mode, dropout=s.TRAIN_DROPOUT, context_specific=True):
         contexts,
         mode,
         context_specific,
+        multiple_performers,
         ema_period=s.EMA_PERIOD,
-        ema_alpha=0.5,
     )
     return model
 
@@ -232,7 +236,8 @@ def my_train(
         model.lr = 1
         model.learning_rate = 1
     model.njobs = s.NJOBS
-    model.use_rotograd = True
+    if context_specific:
+        model.use_rotograd = True
     # need to reload dataloaders for using multiple jobs
     trainer.train_dataloader = model.train_dataloader()
     trainer.val_dataloader = model.val_dataloader()
@@ -243,7 +248,12 @@ def my_train(
     return cont_stopper, perfm_stopper
 
 
-def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
+def train(hpar,
+          mode,
+          context_specific,
+          multiple_performers,
+          copy_checkpoint="",
+          test=True):
     """
     1. Builds a model given `hpar` and `mode`
     2. Train the model
@@ -258,10 +268,14 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
     logger.log_hyperparams(hpar)
     logger.log_hyperparams({
         "mode": mode,
-        "context_specific": context_specific
+        "context_specific": context_specific,
+        "multiple_performers": multiple_performers
     })
 
-    model = build_model(hpar, mode, context_specific=context_specific)
+    model = build_model(hpar,
+                        mode,
+                        context_specific=context_specific,
+                        multiple_performers=multiple_performers)
     # torchinfo.summary(model)
 
     # training
@@ -285,7 +299,7 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
         print(
             f"First-training losses: {cont_stopper.best_score:.2e}, {perfm_stopper.best_score:.2e}"
         )
-        if cont_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:  # type: ignore
+        if cont_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:
             # case A
             for p in model.performers.values():
                 p.freeze()
@@ -293,19 +307,19 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
             print("Continuing training encoder...")
             cont_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
                                        context_specific, True, False)
-        if cont_stopper.stopped_epoch > 0:  # type: ignore
+        if cont_stopper.stopped_epoch > 0:
             # case A and B
             model.encoder.freeze()
             print("Continuing training performers...")
             _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
                                         context_specific, False, True)
 
-        cont_loss, perfm_loss = cont_stopper.best_score, perfm_stopper.best_score  # type: ignore
+        cont_loss, perfm_loss = cont_stopper.best_score, perfm_stopper.best_score
 
         loss = cont_loss + perfm_loss
         print(f"Final losses: {cont_loss:.2e}, {perfm_loss:.2e}")
         logger.log_metrics({
-            "best_cont_val_loss": float(cont_loss),  # type: ignore
+            "best_cont_val_loss": float(cont_loss),
         })
     elif perfm_stopper:
         print(f"First-training loss: {perfm_stopper.best_score:.2e}")
@@ -315,7 +329,7 @@ def train(hpar, mode, context_specific, copy_checkpoint="", test=True):
         loss = 0.0
 
     logger.log_metrics({
-        "best_perfm_val_loss": float(perfm_loss),  # type: ignore
+        "best_perfm_val_loss": float(perfm_loss),
     })
 
     if test:

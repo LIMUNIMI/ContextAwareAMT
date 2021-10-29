@@ -15,8 +15,8 @@ from torch import nn
 from . import data_management, utils
 
 
-def ema(values: list, min_periods: int, alpha: float):
-    ema = pd.DataFrame(values).ewm(alpha=alpha,
+def ema(values: list, min_periods: int, span: float):
+    ema = pd.DataFrame(values).ewm(span=span,
                                    min_periods=min_periods).mean().values[-1,
                                                                           0]
     return ema
@@ -91,7 +91,7 @@ class ResidualBlock(nn.Module):
             else:
                 out = _x + self.proj(x)
         else:
-            out = self.stack(x) + self.proj(x)  # type: ignore
+            out = self.stack(x) + self.proj(x)
         self.out = out
         return out
 
@@ -143,8 +143,8 @@ class ResidualStack(nn.Module):
 
     def outsize(self, insize):
         outsize = insize
-        for l in self.stack:
-            outsize = l.outsize(outsize)
+        for layer in self.stack:
+            outsize = layer.outsize(outsize)
         return outsize
 
     def forward(self, x):
@@ -241,10 +241,10 @@ class Specializer(LightningModule):
                                                 lambda x, y: x[0] > y[0])
 
         stack.append(
-            nn.Sequential(
-                nn.Conv2d(outchannels, nout, insize),
-                nn.Conv2d(nout, nout, kernel_size=1, groups=outchannels),
-                nn.Sigmoid())
+            nn.Sequential(nn.Conv2d(outchannels, nout, insize),
+                          nn.BatchNorm2d(nout), activation,
+                          nn.Conv2d(nout, nout, kernel_size=1, groups=nout),
+                          nn.Sigmoid() if nout == 1 else nn.Tanh())
             # nn.Sigmoid() if nout == 1 else nn.Identity())
         )
 
@@ -262,7 +262,7 @@ class Specializer(LightningModule):
     def training_step(self, batch, batch_idx):
 
         out = self.forward(batch['x'])
-        loss = self.loss_fn(out, batch['y'])
+        loss = self.loss_fn(out.float(), batch['y'].float())
 
         # # autoweight the loss in respect to the maximum ever seen
         # if loss > self.maxloss:
@@ -273,7 +273,7 @@ class Specializer(LightningModule):
     def validation_step(self, batch, batch_idx):
 
         out = self.forward(batch['x'])
-        loss = self.loss_fn(out, batch['y'])
+        loss = self.loss_fn(out.float(), batch['y'].float())
 
         if self.nout > 1:
             out = torch.argmax(out, 1)
@@ -293,10 +293,10 @@ class EncoderPerformer(LightningModule):
                  contexts,
                  mode,
                  context_specific,
+                 multiple_performers,
                  lr=1,
                  wd=0,
                  ema_period=None,
-                 ema_alpha=None,
                  njobs=0,
                  perfm_testloss=nn.L1Loss(reduction='none')):
         super().__init__()
@@ -305,16 +305,15 @@ class EncoderPerformer(LightningModule):
         if self.context_specific:
             self.context_classifier = cont_classifier
         self.performers = nn.ModuleDict(
-            {str(c): deepcopy(performer)
+            {str(c): deepcopy(performer) if multiple_performers else performer
              for c in range(len(contexts))})
+        self.contexts = contexts
         self.lr = lr
         self.wd = wd
         self.mode = mode
-        self.contexts = contexts
         self._reset_loss_pool()
         self.reset_ema()
         self.ema_period = ema_period
-        self.ema_alpha = ema_alpha
         self.njobs = njobs
         self.perfm_testloss = perfm_testloss
         self.test_latent_x = []
@@ -323,7 +322,7 @@ class EncoderPerformer(LightningModule):
 
     @property
     def use_ema(self):
-        return self.ema_period is not None and self.ema_alpha is not None
+        return self.ema_period is not None
 
     def reset_ema(self):
         self.ema_loss_pool = {"cont": [], "perfm": []}
@@ -353,7 +352,7 @@ class EncoderPerformer(LightningModule):
         if self.use_rotograd:
             opts = self.optimizers()
             if type(opts) in [list, tuple]:
-                for opt in opts:  # type: ignore
+                for opt in opts:
                     opt.zero_grad()
             else:
                 opts.zero_grad()
@@ -363,7 +362,8 @@ class EncoderPerformer(LightningModule):
         else:
             context = nullcontext()
 
-        with context:  # Speeds-up computations by caching Rotograd's parameters
+        # Speeds-up computations by caching Rotograd's parameters
+        with context:
             enc_out = self.encoder.forward(batch['x'])
             perfm_out = self.performers[context_s].training_step(
                 {
@@ -375,7 +375,10 @@ class EncoderPerformer(LightningModule):
             self.losslog('perfm_train_loss', perfm_out['loss'])
 
             if self.context_specific:
-                new_y = torch.zeros_like(enc_out[..., 0, 0])
+                new_y = torch.zeros(enc_out.shape[0],
+                                    len(self.contexts),
+                                    dtype=enc_out.dtype,
+                                    device=enc_out.device) - 1
                 new_y[:, context_i] = 1
                 cont_out = self.context_classifier.training_step(
                     {
@@ -390,6 +393,7 @@ class EncoderPerformer(LightningModule):
             if lr_scheduler is not None:
                 lr_scheduler.step()
 
+            loss = loss.float()
             out['loss'] = loss
             self.losslog('train_loss', loss)
 
@@ -398,7 +402,7 @@ class EncoderPerformer(LightningModule):
 
         if self.use_rotograd:
             if type(opts) in [list, tuple]:
-                for opt in opts:  # type: ignore
+                for opt in opts:
                     opt.step()
             else:
                 opts.step()
@@ -419,7 +423,10 @@ class EncoderPerformer(LightningModule):
         out = {'perfm_val_loss': perfm_out['loss'].detach()}
         self.losslog('perfm_val_loss', perfm_out['loss'])
         if self.context_specific:
-            new_y = torch.zeros_like(enc_out[..., 0, 0])
+            new_y = torch.zeros(enc_out.shape[0],
+                                len(self.contexts),
+                                dtype=enc_out.dtype,
+                                device=enc_out.device) - 1
             new_y[:, context_i] = 1
             cont_out = self.context_classifier.validation_step(
                 {
@@ -445,9 +452,9 @@ class EncoderPerformer(LightningModule):
             self.ema_loss_pool["perfm"].append(np.mean(
                 self.loss_pool["perfm"]))
             cont_ema = ema(self.ema_loss_pool["cont"], self.ema_period,
-                           self.ema_alpha)
+                           self.ema_period)
             perfm_ema = ema(self.ema_loss_pool["perfm"], self.ema_period,
-                            self.ema_alpha)
+                            self.ema_period)
             self.losslog('cont_val_loss_early_stop', cont_ema)
             self.losslog('perfm_val_loss_early_stop', perfm_ema)
             self._reset_loss_pool()
@@ -470,7 +477,10 @@ class EncoderPerformer(LightningModule):
                 'y': batch['y']
             }, batch_idx)['out']
         if self.context_specific:
-            new_y = torch.zeros_like(enc_out[..., 0, 0])
+            new_y = torch.zeros(enc_out.shape[0],
+                                len(self.contexts),
+                                dtype=enc_out.dtype,
+                                device=enc_out.device) - 1
             new_y[:, context_i] = 1
             cont_out = self.context_classifier.validation_step(
                 {

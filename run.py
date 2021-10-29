@@ -5,8 +5,8 @@ import subprocess
 from logging import error
 from pathlib import Path
 
-import mlflow  # type: ignore
-import skopt  # type: ignore
+import mlflow
+import skopt
 
 from mpc2c import build, create_template, data_management, evaluate
 from mpc2c import settings as s
@@ -116,9 +116,11 @@ def main():
     if args.skopt:
 
         def objective(x):
-            l2 = training.train(x, mode, True, test=True)
-            l1 = training.train(x, mode, False, test=True)
-            return (l1 + l2) / 2
+            l1 = training.train(x, mode, False, False, test=True)
+            l3 = training.train(x, mode, True, True, test=True)
+            l2 = training.train(x, mode, True, False, test=True)
+            l4 = training.train(x, mode, False, True, test=True)
+            return (l1 + l2 + l3 + l4) / 4
 
         if args.pedaling:
             # test_sample = torch.rand(1, s.BINS, 100)
@@ -128,14 +130,15 @@ def main():
             # test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
             checkpoint_path = "vel_skopt.pt"
         else:
-            return # not reachable, here to shutup the pyright
+            return  # not reachable, here to shutup the pyright
 
         # space_constraint = training.model_test(
         #     lambda x: training.build_model(x, contexts), test_sample)
         exp = mlflow.get_experiment_by_name(mode)
         if exp:
             if exp.lifecycle_stage == 'deleted':
-                exp_path = Path(mlflow.get_registry_uri()) / '.trash' / exp.experiment_id
+                exp_path = Path(
+                    mlflow.get_registry_uri()) / '.trash' / exp.experiment_id
             else:
                 exp_path = exp.artifact_location
             shutil.rmtree(exp_path)
@@ -152,7 +155,10 @@ def main():
             optimize_kwargs=dict(max_loss=20.0,
                                  initial_point_generator="grid"))
         exp = mlflow.get_experiment_by_name(mode)
-        subprocess.run(['mlflow', 'experiments', 'csv', '-x', exp.experiment_id, '-o', f'{mode}_results.csv'])
+        subprocess.run([
+            'mlflow', 'experiments', 'csv', '-x', exp.experiment_id, '-o',
+            f'{mode}_results.csv'
+        ])
 
     if args.train:
 
