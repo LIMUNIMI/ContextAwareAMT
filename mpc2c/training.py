@@ -12,6 +12,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import MLFlowLogger
 from torch import nn
 
+from .mytorchutils import context
 from . import feature_extraction
 from . import settings as s
 from .asmd_resynth import get_contexts
@@ -139,9 +140,9 @@ def build_model(hpar,
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
     encoder = build_encoder(hpar, dropout)
     performer = build_specializer_model(hpar, encoder.outchannels,
-                                        nn.MSELoss(reduction="mean"), 1)
+                                        nn.L1Loss(reduction="mean"), 1)
     cont_classifier = build_specializer_model(hpar, encoder.outchannels,
-                                              nn.MSELoss(reduction="mean"),
+                                              nn.L1Loss(reduction="mean"),
                                               len(contexts))
     model = feature_extraction.EncoderPerformer(
         encoder,
@@ -166,8 +167,8 @@ def my_train(
     perfm_train=True,
 ):
     """
-    Creates callbacks, train and freeze the part that raised an early-stop.
-    Return the best loss of that one and 0 for the other.
+    Create callbacks and train.
+    Return the early stop objects for performers and context classifier.
     """
     # stopped_epoch = 9999  # let's enter the while the first time
     # while stopped_epoch > s.EARLY_STOP:
@@ -209,6 +210,10 @@ def my_train(
             ))
 
     # training!
+    if context.DEBUG:
+        overfit_batches = 2
+    else:
+        overfit_batches = 0.0
     trainer = Trainer(
         callbacks=callbacks,
         precision=s.PRECISION,
@@ -222,26 +227,26 @@ def my_train(
         # log_every_n_steps=1,
         # log_gpu_memory=True,
         # track_grad_norm=2,
-        # overfit_batches=10,
+        overfit_batches=overfit_batches,
         # fast_dev_run=True,
         gpus=s.GPUS,
     )
 
-    model.njobs = 1  # there's some leak when using njobs > 0
-    if os.path.exists("lr_find_temp_model.ckpt"):
-        os.remove("lr_find_temp_model.ckpt")
-    model.use_rotograd = False
-    d = trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=1))
-    if d["lr_find"] is None or d["lr_find"].suggestion() is None:
-        model.lr = 1
-        model.learning_rate = 1
-    model.njobs = s.NJOBS
-    if context_specific:
-        model.use_rotograd = True
-    # need to reload dataloaders for using multiple jobs
-    trainer.train_dataloader = model.train_dataloader()
-    trainer.val_dataloader = model.val_dataloader()
-    trainer.test_dataloader = model.test_dataloader()
+    model.lr = 1
+    model.learning_rate = 1
+    if not context.DEBUG:
+        model.njobs = 1  # there's some leak when using njobs > 0
+        if os.path.exists("lr_find_temp_model.ckpt"):
+            os.remove("lr_find_temp_model.ckpt")
+        model.use_rotograd = False
+        trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=1))
+        model.njobs = s.NJOBS
+        if context_specific:
+            model.use_rotograd = True
+        # need to reload dataloaders for using multiple jobs
+        trainer.train_dataloader = model.train_dataloader()
+        trainer.val_dataloader = model.val_dataloader()
+        trainer.test_dataloader = model.test_dataloader()
     print("Fitting the model!")
     trainer.fit(model)
 
@@ -290,29 +295,24 @@ def train(hpar,
         perfm_train=True,
     )
 
-    if cont_stopper and perfm_stopper:
+    assert perfm_stopper is not None
+    if context_specific:
+        assert cont_stopper is not None
         # cases:
-        # A: encoder was stopped
-        # B: performers were stopped
-        # C: none was stopped
+        # A: only context was stopped -> continue performers
+        # B: only performers were stopped -> stop
+        # C: none was stopped -> maximum numer of epochs reached
 
-        print(
-            f"First-training losses: {cont_stopper.best_score:.2e}, {perfm_stopper.best_score:.2e}"
-        )
-        if cont_stopper.stopped_epoch == 0 and perfm_stopper.stopped_epoch > 0:
+        if cont_stopper.stopped_epoch > 0 and perfm_stopper.stopped_epoch == 0:
+            print(
+                f"First-training losses: {cont_stopper.best_score:.2e}, {perfm_stopper.best_score:.2e}"
+            )
             # case A
-            for p in model.performers.values():
-                p.freeze()
             model.context_classifier.freeze()
-            print("Continuing training encoder...")
-            cont_stopper, _ = my_train(mode, copy_checkpoint, logger, model,
-                                       context_specific, True, False)
-        if cont_stopper.stopped_epoch > 0:
-            # case A and B
-            model.encoder.freeze()
             print("Continuing training performers...")
             _, perfm_stopper = my_train(mode, copy_checkpoint, logger, model,
-                                        context_specific, False, True)
+                                        False, False, True)
+            assert perfm_stopper is not None
 
         cont_loss, perfm_loss = cont_stopper.best_score, perfm_stopper.best_score
 
@@ -321,12 +321,9 @@ def train(hpar,
         logger.log_metrics({
             "best_cont_val_loss": float(cont_loss),
         })
-    elif perfm_stopper:
-        print(f"First-training loss: {perfm_stopper.best_score:.2e}")
-        perfm_loss = loss = perfm_stopper.best_score
     else:
-        # not reachable here only to shutup the linter
-        loss = 0.0
+        print(f"Final loss: {perfm_stopper.best_score:.2e}")
+        perfm_loss = loss = perfm_stopper.best_score
 
     logger.log_metrics({
         "best_perfm_val_loss": float(perfm_loss),
