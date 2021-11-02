@@ -243,8 +243,9 @@ class Specializer(LightningModule):
         stack.append(
             nn.Sequential(nn.Conv2d(outchannels, nout, insize),
                           nn.BatchNorm2d(nout), activation,
-                          nn.Conv2d(nout, nout, kernel_size=1, groups=nout),
-                          nn.Sigmoid() if nout == 1 else nn.Tanh())
+                          nn.Conv2d(nout, nout, kernel_size=1,
+                                    groups=nout) if nout == 1 else nn.Identity(),
+                          nn.Sigmoid() if nout == 1 else nn.Softmax())
             # nn.Sigmoid() if nout == 1 else nn.Identity())
         )
 
@@ -286,6 +287,7 @@ class EncoderPerformer(LightningModule):
     An iterative transfer-learning LightningModule for
     context-aware transcription
     """
+
     def __init__(self,
                  encoder,
                  performer,
