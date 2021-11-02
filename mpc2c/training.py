@@ -140,9 +140,9 @@ def build_model(hpar,
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
     encoder = build_encoder(hpar, dropout)
     performer = build_specializer_model(hpar, encoder.outchannels,
-                                        nn.L1Loss(reduction="mean"), 1)
+                                        nn.MSELoss(reduction="mean"), 1)
     cont_classifier = build_specializer_model(hpar, encoder.outchannels,
-                                              nn.L1Loss(reduction="mean"),
+                                              nn.MSELoss(reduction="mean"),
                                               len(contexts))
     model = feature_extraction.EncoderPerformer(
         encoder,
