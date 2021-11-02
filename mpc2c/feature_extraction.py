@@ -245,7 +245,7 @@ class Specializer(LightningModule):
                           nn.BatchNorm2d(nout), activation,
                           nn.Conv2d(nout, nout, kernel_size=1,
                                     groups=nout) if nout == 1 else nn.Identity(),
-                          nn.Sigmoid() if nout == 1 else nn.Softmax())
+                          nn.Sigmoid() if nout == 1 else nn.Softmax(dim=1))
             # nn.Sigmoid() if nout == 1 else nn.Identity())
         )
 
@@ -380,7 +380,7 @@ class EncoderPerformer(LightningModule):
                 new_y = torch.zeros(enc_out.shape[0],
                                     len(self.contexts),
                                     dtype=enc_out.dtype,
-                                    device=enc_out.device) - 1
+                                    device=enc_out.device)
                 new_y[:, context_i] = 1
                 cont_out = self.context_classifier.training_step(
                     {
@@ -428,7 +428,7 @@ class EncoderPerformer(LightningModule):
             new_y = torch.zeros(enc_out.shape[0],
                                 len(self.contexts),
                                 dtype=enc_out.dtype,
-                                device=enc_out.device) - 1
+                                device=enc_out.device)
             new_y[:, context_i] = 1
             cont_out = self.context_classifier.validation_step(
                 {
@@ -482,7 +482,7 @@ class EncoderPerformer(LightningModule):
             new_y = torch.zeros(enc_out.shape[0],
                                 len(self.contexts),
                                 dtype=enc_out.dtype,
-                                device=enc_out.device) - 1
+                                device=enc_out.device)
             new_y[:, context_i] = 1
             cont_out = self.context_classifier.validation_step(
                 {
