@@ -111,10 +111,10 @@ def main():
     if args.skopt:
 
         def objective(x):
-            l3 = training.train(x, mode, True, True, test=True)
             l1 = training.train(x, mode, False, False, test=True)
             l2 = training.train(x, mode, True, False, test=True)
             l4 = training.train(x, mode, False, True, test=True)
+            l3 = training.train(x, mode, True, True, test=True)
             return (l1 + l2 + l3 + l4) / 4
 
         if args.pedaling:

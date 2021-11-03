@@ -303,6 +303,7 @@ class EncoderPerformer(LightningModule):
                  perfm_testloss=nn.L1Loss(reduction='none')):
         super().__init__()
         self.context_specific = context_specific
+        self.multiple_performers = multiple_performers
         self.encoder = encoder
         if self.context_specific:
             self.context_classifier = cont_classifier
@@ -539,9 +540,13 @@ class EncoderPerformer(LightningModule):
         for i in range(len(params[0])):
             # for each performer parameter
             # compute point-wise variances
-            v = torch.var(torch.stack([p[i] for p in params]),
-                          dim=(0, ),
-                          unbiased=True)
+            v = torch.var(
+                # double() is needed because when everything is the same
+                # (variance=0) there is some issue with precision and variance
+                # would appear to be > 0
+                torch.stack([p[i].detach().double() for p in params]),
+                dim=(0, ),
+                unbiased=True)
             # append to the list the average variance
             s.append(torch.mean(v))
         return utils.torch_moments(torch.stack(s))
