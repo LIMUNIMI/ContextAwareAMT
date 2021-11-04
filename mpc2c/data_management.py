@@ -148,7 +148,8 @@ class AEBatchSampler(Sampler):
 
     def __next__(self):
         c = self.enc_dataset.contexts.index(next(self.contexts))
-        # find the first `self.batch_size` samples not used and having context `c`
+        # find the first `self.batch_size` samples not used and having context
+        # `c`
         if self.one_context_per_batch:
             batch = np.argwhere(
                 np.logical_and(

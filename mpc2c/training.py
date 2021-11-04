@@ -118,11 +118,11 @@ def get_hpar(hpar):
             hpar["enc_kernel"])
 
 
-def build_specializer_model(hpar, infeatures, loss, nout):
+def build_specializer_model(hpar, infeatures, loss, nout, alpha=1):
     m = feature_extraction.Specializer(
         infeatures,
-        hpar["spec_k1"],
-        hpar["spec_k2"],
+        alpha*hpar["spec_k1"],
+        alpha*hpar["spec_k2"],
         hpar["activation"],
         hpar["spec_kernel"],
         nout,
@@ -140,10 +140,12 @@ def build_model(hpar,
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
     encoder = build_encoder(hpar, dropout)
     performer = build_specializer_model(hpar, encoder.outchannels,
-                                        nn.L1Loss(reduction="mean"), 1)
+                                        nn.L1Loss(reduction="mean"),
+                                        nout=1, alpha=1)
     cont_classifier = build_specializer_model(hpar, encoder.outchannels,
                                               nn.L1Loss(reduction="mean"),
-                                              len(contexts))
+                                              nout=len(contexts),
+                                              alpha=2)
     model = feature_extraction.EncoderPerformer(
         encoder,
         performer,
