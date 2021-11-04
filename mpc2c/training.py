@@ -107,7 +107,7 @@ def build_encoder(hpar, dropout):
             k1=k1,
             k2=k2,
             activation=activation,
-            kernel=2 * kernel + 1,
+            kernel=kernel,
         ).to(s.DEVICE).to(s.DTYPE))
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m

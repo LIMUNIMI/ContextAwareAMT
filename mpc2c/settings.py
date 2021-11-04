@@ -123,11 +123,11 @@ SWA = False
 
 # SKOPT
 SKSPACE = [
-    space.Integer(0, 8, name='enc_k1'),
-    space.Integer(2, 9, name='enc_k2'),
+    space.Integer(0, 4, name='enc_k1'),
+    space.Integer(2, 5, name='enc_k2'),
     space.Integer(3, 8, name='enc_kernel'),
-    space.Integer(0, 6, name='spec_k1'),
-    space.Integer(2, 7, name='spec_k2'),
+    space.Integer(0, 4, name='spec_k1'),
+    space.Integer(2, 5, name='spec_k2'),
     space.Integer(3, 8, name='spec_kernel'),
     space.Categorical([nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
 ]
