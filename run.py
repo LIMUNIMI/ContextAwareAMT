@@ -169,6 +169,7 @@ def main():
             data_management.get_loader(split,
                                        redump=True,
                                        contexts=contexts,
+                                       one_context_per_batch=False,
                                        mode=mode,
                                        nmf_params=nmf_params)
 

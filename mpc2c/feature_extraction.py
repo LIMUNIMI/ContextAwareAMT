@@ -582,6 +582,7 @@ class EncoderPerformer(LightningModule):
         dataloader = data_management.get_loader(['train'],
                                                 False,
                                                 self.contexts,
+                                                self.multiple_performers,
                                                 self.mode,
                                                 njobs=self.njobs)
         return dataloader
@@ -590,6 +591,7 @@ class EncoderPerformer(LightningModule):
         dataloader = data_management.get_loader(['validation'],
                                                 False,
                                                 self.contexts,
+                                                self.multiple_performers,
                                                 self.mode,
                                                 njobs=self.njobs)
         return dataloader
@@ -598,6 +600,7 @@ class EncoderPerformer(LightningModule):
         dataloader = data_management.get_loader(['test'],
                                                 False,
                                                 self.contexts,
+                                                self.multiple_performers,
                                                 self.mode,
                                                 njobs=1)
         # for some reason there are leakings with njobs > 1
