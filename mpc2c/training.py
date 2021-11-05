@@ -135,17 +135,27 @@ def build_model(hpar,
                 mode,
                 dropout=s.TRAIN_DROPOUT,
                 context_specific=True,
-                multiple_performers=True):
+                multiple_performers=True,
+                start_from_model=None):
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
-    encoder = build_encoder(hpar, dropout)
-    performer = build_specializer_model(hpar, encoder.outchannels,
-                                        nn.L1Loss(reduction="mean"),
-                                        nout=1, alpha=1)
-    cont_classifier = build_specializer_model(hpar, encoder.outchannels,
-                                              nn.L1Loss(reduction="mean"),
-                                              nout=len(contexts),
-                                              alpha=2)
+    if start_from_model is not None:
+        encoder = start_from_model.encoder
+    else:
+        encoder = build_encoder(hpar, dropout)
+    if start_from_model is not None:
+        performer = start_from_model.performers['0']
+    else:
+        performer = build_specializer_model(hpar, encoder.outchannels,
+                                            nn.L1Loss(reduction="mean"),
+                                            nout=1, alpha=1)
+    if start_from_model is not None:
+        cont_classifier = start_from_model.context_classifier
+    else:
+        cont_classifier = build_specializer_model(hpar, encoder.outchannels,
+                                                  nn.L1Loss(reduction="mean"),
+                                                  nout=len(contexts),
+                                                  alpha=2)
     model = feature_extraction.EncoderPerformer(
         encoder,
         performer,
@@ -260,7 +270,8 @@ def train(hpar,
           context_specific,
           multiple_performers,
           copy_checkpoint="",
-          test=True):
+          test=True,
+          start_from_model=None):
     """
     1. Builds a model given `hpar` and `mode`
     2. Train the model
@@ -282,7 +293,8 @@ def train(hpar,
     model = build_model(hpar,
                         mode,
                         context_specific=context_specific,
-                        multiple_performers=multiple_performers)
+                        multiple_performers=multiple_performers,
+                        start_from_model=start_from_model)
     # torchinfo.summary(model)
 
     # training
@@ -341,4 +353,4 @@ def train(hpar,
     })
 
     # this is the loss used by hyper-parameters optimization
-    return float(loss)
+    return float(loss), model
