@@ -241,11 +241,12 @@ class Specializer(LightningModule):
                                                 lambda x, y: x[0] > y[0])
 
         stack.append(
-            nn.Sequential(nn.Conv2d(outchannels, nout, insize),
-                          nn.BatchNorm2d(nout), activation,
-                          nn.Conv2d(nout, nout, kernel_size=1,
-                                    groups=nout) if nout == 1 else nn.Identity(),
-                          nn.Sigmoid() if nout == 1 else nn.Softmax(dim=1))
+            nn.Sequential(
+                nn.Conv2d(outchannels, nout, insize), nn.BatchNorm2d(nout),
+                activation,
+                nn.Conv2d(nout, nout, kernel_size=1, groups=nout)
+                if nout == 1 else nn.Identity(),
+                nn.Sigmoid() if nout == 1 else nn.Softmax(dim=1))
             # nn.Sigmoid() if nout == 1 else nn.Identity())
         )
 
@@ -287,7 +288,6 @@ class EncoderPerformer(LightningModule):
     An iterative transfer-learning LightningModule for
     context-aware transcription
     """
-
     def __init__(self,
                  encoder,
                  performer,
@@ -307,9 +307,10 @@ class EncoderPerformer(LightningModule):
         self.encoder = encoder
         if self.context_specific:
             self.context_classifier = cont_classifier
-        self.performers = nn.ModuleDict(
-            {str(c): deepcopy(performer) if multiple_performers else performer
-             for c in range(len(contexts))})
+        self.performers = nn.ModuleDict({
+            str(c): deepcopy(performer) if multiple_performers else performer
+            for c in range(len(contexts))
+        })
         self.contexts = contexts
         self.lr = lr
         self.wd = wd

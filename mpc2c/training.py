@@ -121,8 +121,8 @@ def get_hpar(hpar):
 def build_specializer_model(hpar, infeatures, loss, nout, alpha=1):
     m = feature_extraction.Specializer(
         infeatures,
-        alpha*hpar["spec_k1"],
-        alpha*hpar["spec_k2"],
+        alpha * hpar["spec_k1"],
+        alpha * hpar["spec_k2"],
         hpar["activation"],
         hpar["spec_kernel"],
         nout,
@@ -146,16 +146,20 @@ def build_model(hpar,
     if start_from_model is not None:
         performer = start_from_model.performers['0']
     else:
-        performer = build_specializer_model(hpar, encoder.outchannels,
+        performer = build_specializer_model(hpar,
+                                            encoder.outchannels,
                                             nn.L1Loss(reduction="mean"),
-                                            nout=1, alpha=1)
-    if start_from_model is not None:
+                                            nout=1,
+                                            alpha=1)
+    if start_from_model is not None and hasattr(start_from_model,
+                                                "context_classifier"):
         cont_classifier = start_from_model.context_classifier
     else:
-        cont_classifier = build_specializer_model(hpar, encoder.outchannels,
+        cont_classifier = build_specializer_model(hpar,
+                                                  encoder.outchannels,
                                                   nn.L1Loss(reduction="mean"),
                                                   nout=len(contexts),
-                                                  alpha=2)
+                                                  alpha=1.25)
     model = feature_extraction.EncoderPerformer(
         encoder,
         performer,
@@ -289,6 +293,8 @@ def train(hpar,
         "context_specific": context_specific,
         "multiple_performers": multiple_performers
     })
+
+    hpar["activation"] = nn.ReLU()
 
     model = build_model(hpar,
                         mode,

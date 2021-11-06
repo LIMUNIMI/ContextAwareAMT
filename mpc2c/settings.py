@@ -91,7 +91,7 @@ PREPROCESSING = "pad"
 MAX_LAYERS = 30
 DEVICE = 'cuda'
 GPUS = 1
-EPOCHS = 50
+EPOCHS = 2
 VEL_HYPERPARAMS = {
     "enc_k1": 6,
     "enc_k2": 8,
@@ -129,7 +129,7 @@ SKSPACE = [
     space.Integer(0, 4, name='spec_k1'),
     space.Integer(2, 5, name='spec_k2'),
     space.Integer(3, 8, name='spec_kernel'),
-    space.Categorical([nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
+    # space.Categorical([nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
 ]
 SKITERATIONS = (0, 10)
 PLOT_GRAPHS = True

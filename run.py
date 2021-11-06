@@ -24,13 +24,15 @@ def parse_args():
         "-sc",
         "--scale",
         action="store_true",
-        help="Create the midi file containing the scales for the template; syntehsize it and make the template."
+        help=
+        "Create the midi file containing the scales for the template; syntehsize it and make the template."
     )
     parser.add_argument(
         "-d",
         "--datasets",
         action="store_true",
-        help="Prepare the datasets by splitting the various contexts and resynthesizing them"
+        help=
+        "Prepare the datasets by splitting the various contexts and resynthesizing them"
     )
     parser.add_argument(
         "-v",
@@ -41,7 +43,8 @@ def parse_args():
         "-p",
         "--pedaling",
         action="store_true",
-        help="TODO Perform actions for pedaling estimation (frame-wise prediction)."
+        help=
+        "TODO Perform actions for pedaling estimation (frame-wise prediction)."
     )
     parser.add_argument("-t",
                         "--train",
@@ -51,14 +54,16 @@ def parse_args():
         "-cs",
         "--contextspecific",
         action="store_true",
-        help="Train a specializer against context specificity on the same latent space used for performance regression"
+        help=
+        "Train a specializer against context specificity on the same latent space used for performance regression"
     )
 
     parser.add_argument(
         "-sk",
         "--skopt",
         action="store_true",
-        help="Perform various little training cycles to look  for hyper-parameters using skopt."
+        help=
+        "Perform various little training cycles to look  for hyper-parameters using skopt."
     )
     parser.add_argument("-r",
                         "--redump",
@@ -113,12 +118,30 @@ def main():
 
         def objective(x):
             l1, model = training.train(x, mode, False, False, test=True)
-            l3, _ = training.train(x, mode, True, True,
-                                   test=True, start_from_model=deepcopy(model))
-            l2, _ = training.train(x, mode, True, False,
-                                   test=True, start_from_model=deepcopy(model))
-            l4, _ = training.train(x, mode, False, True,
-                                   test=True, start_from_model=deepcopy(model))
+            # note: deepcopy causes some weakref errors...
+            # saving a copy to disk instead
+            pickle.dump(model, open("_model.pkl", "wb"))
+            model = pickle.load(open("_model.pkl", "rb"))
+            l3, _ = training.train(x,
+                                   mode,
+                                   True,
+                                   True,
+                                   test=True,
+                                   start_from_model=model)
+            model = pickle.load(open("_model.pkl", "rb"))
+            l2, _ = training.train(x,
+                                   mode,
+                                   True,
+                                   False,
+                                   test=True,
+                                   start_from_model=model)
+            model = pickle.load(open("_model.pkl", "rb"))
+            l4, _ = training.train(x,
+                                   mode,
+                                   False,
+                                   True,
+                                   test=True,
+                                   start_from_model=model)
             return (l1 + l2 + l3 + l4) / 4
 
         if args.pedaling:
