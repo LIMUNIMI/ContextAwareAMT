@@ -91,7 +91,7 @@ PREPROCESSING = "pad"
 MAX_LAYERS = 30
 DEVICE = 'cuda'
 GPUS = 1
-EPOCHS = 2
+EPOCHS = 50
 VEL_HYPERPARAMS = {
     "enc_k1": 6,
     "enc_k2": 8,
@@ -118,20 +118,20 @@ TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
 #: percentage of the dataset to use
-DATASET_LEN = 1e-3
+DATASET_LEN = 3e-3
 SWA = False
 
 # SKOPT
 SKSPACE = [
     space.Integer(0, 4, name='enc_k1'),
     space.Integer(2, 5, name='enc_k2'),
-    space.Integer(3, 8, name='enc_kernel'),
+    space.Integer(2, 7, name='enc_kernel'),
     space.Integer(0, 4, name='spec_k1'),
     space.Integer(2, 5, name='spec_k2'),
-    space.Integer(3, 8, name='spec_kernel'),
+    space.Integer(2, 7, name='spec_kernel'),
     # space.Categorical([nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
 ]
-SKITERATIONS = (0, 10)
+SKITERATIONS = (0, 50)
 PLOT_GRAPHS = True
 
 #: If compiling code with cython in pure-python mode
