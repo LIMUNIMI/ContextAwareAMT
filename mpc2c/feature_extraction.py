@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 from copy import deepcopy
+from time import time
 
 import numpy as np
 import pandas as pd
@@ -167,6 +168,7 @@ def make_stack(insize, k1, k2, activation, kernel, condition):
     """
     stack = []
     outchannels = 1
+    ttt = time()
     while condition(insize, kernel):
         inchannels = outchannels
         nblocks = max(1, round(2**k1 / outchannels))
@@ -179,6 +181,9 @@ def make_stack(insize, k1, k2, activation, kernel, condition):
                                kernel=kernel)
         stack.append(blocks)
         insize = blocks.outsize(insize)
+        if time() - ttt > 20:
+            raise RuntimeError(
+                "More than 30 seconds needed to build a conv stack")
     return stack, outchannels, insize
 
 
