@@ -14,6 +14,7 @@ from sklearn.metrics.cluster import adjusted_mutual_info_score
 from torch import nn
 
 from . import data_management, utils
+from . import settings as s
 
 
 def ema(values: list, min_periods: int, span: float):
@@ -181,9 +182,9 @@ def make_stack(insize, k1, k2, activation, kernel, condition):
                                kernel=kernel)
         stack.append(blocks)
         insize = blocks.outsize(insize)
-        if time() - ttt > 20:
+        if time() - ttt > s.MAX_TIME_CONV_STACK:
             raise RuntimeError(
-                "More than 30 seconds needed to build a conv stack")
+                f"More than {s.MAX_TIME_CONV_STACK} seconds needed to build a conv stack")
     return stack, outchannels, insize
 
 
@@ -293,6 +294,7 @@ class EncoderPerformer(LightningModule):
     An iterative transfer-learning LightningModule for
     context-aware transcription
     """
+
     def __init__(self,
                  encoder,
                  performer,

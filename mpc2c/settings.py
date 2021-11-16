@@ -118,7 +118,8 @@ TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
 #: percentage of the dataset to use
-DATASET_LEN = 3e-3
+DATASET_LEN = 1e-3
+MAX_TIME_CONV_STACK = 40
 SWA = False
 
 # SKOPT
