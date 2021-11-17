@@ -91,7 +91,7 @@ PREPROCESSING = "pad"
 MAX_LAYERS = 30
 DEVICE = 'cuda'
 GPUS = 1
-EPOCHS = 50
+EPOCHS = 40
 VEL_HYPERPARAMS = {
     "enc_k1": 6,
     "enc_k2": 8,
@@ -119,10 +119,20 @@ DTYPE = torch.float32
 PRECISION = 32
 #: percentage of the dataset to use
 DATASET_LEN = 1e-3
-MAX_TIME_CONV_STACK = 40
+MAX_TIME_CONV_STACK = 30
+MAX_SIZE_CONV_STACK = 1 * 2**30 // 4  # ~ 1 GB
 SWA = False
 
-# SKOPT
+GRIDSPACE = {
+    'enc_k1': [4],
+    'enc_k2': [1, 2, 4],
+    'enc_kernel': [3, 5],
+    'spec_k1': [4],
+    'spec_k2': [1, 2, 4],
+    'spec_kernel': [3, 5],
+}
+
+# SKOPT not used anymore
 SKSPACE = [
     space.Integer(0, 4, name='enc_k1'),
     space.Integer(2, 5, name='enc_k2'),

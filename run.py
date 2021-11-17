@@ -21,6 +21,12 @@ build.build()
 def parse_args():
     parser = argparse.ArgumentParser(description="CLI for running experiments")
     parser.add_argument(
+        "-cm",
+        "--clean-mlflow",
+        action="store_true",
+        help=
+        "If used, mlflow experiment is cleaned before of running experiments")
+    parser.add_argument(
         "-sc",
         "--scale",
         action="store_true",
@@ -146,18 +152,18 @@ def main():
 
         if args.pedaling:
             # test_sample = torch.rand(1, s.BINS, 100)
-            checkpoint_path = "ped_skopt.pt"
+            checkpoint_path = "ped_grid.pt"
 
         elif args.velocity:
             # test_sample = torch.rand(1, s.BINS, s.MINI_SPEC_SIZE)
-            checkpoint_path = "vel_skopt.pt"
+            checkpoint_path = "vel_grid.pt"
         else:
             return  # not reachable, here to shutup the pyright
 
         # space_constraint = training.model_test(
         #     lambda x: training.build_model(x, contexts), test_sample)
         exp = mlflow.get_experiment_by_name(mode)
-        if exp:
+        if exp and args.clean_mlflow:
             if exp.lifecycle_stage == 'deleted':
                 exp_path = Path(
                     mlflow.get_registry_uri()) / '.trash' / exp.experiment_id
@@ -165,17 +171,8 @@ def main():
                 exp_path = exp.artifact_location
             shutil.rmtree(exp_path)
 
-        hyperopt(
-            s.SKSPACE,
-            checkpoint_path,
-            s.SKITERATIONS,
-            objective,
-            skoptimizer_kwargs=dict(
-                # space_constraint=space_constraint,
-                plot_graphs=False,
-                optimization_method=skopt.dummy_minimize),
-            optimize_kwargs=dict(max_loss=20.0,
-                                 initial_point_generator="grid"))
+        training.grid_search(s.GRIDSPACE, objective, checkpoint_path)
+
         exp = mlflow.get_experiment_by_name(mode)
         subprocess.run([
             'mlflow', 'experiments', 'csv', '-x', exp.experiment_id, '-o',

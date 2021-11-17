@@ -169,6 +169,7 @@ def make_stack(insize, k1, k2, activation, kernel, condition):
     """
     stack = []
     outchannels = 1
+    num_params = 0
     ttt = time()
     while condition(insize, kernel):
         inchannels = outchannels
@@ -182,9 +183,11 @@ def make_stack(insize, k1, k2, activation, kernel, condition):
                                kernel=kernel)
         stack.append(blocks)
         insize = blocks.outsize(insize)
-        if time() - ttt > s.MAX_TIME_CONV_STACK:
+        num_params += len([p for p in blocks.parameters()])
+        if time() - ttt > s.MAX_TIME_CONV_STACK or num_params > s.MAX_SIZE_CONV_STACK:
             raise RuntimeError(
-                f"More than {s.MAX_TIME_CONV_STACK} seconds needed to build a conv stack")
+                "Model exceeded max size for a conv stack"
+            )
     return stack, outchannels, insize
 
 
@@ -294,7 +297,6 @@ class EncoderPerformer(LightningModule):
     An iterative transfer-learning LightningModule for
     context-aware transcription
     """
-
     def __init__(self,
                  encoder,
                  performer,

@@ -360,3 +360,31 @@ def train(hpar,
 
     # this is the loss used by hyper-parameters optimization
     return float(loss), model
+
+
+def grid_search(hyperparams, objective, checkpoint="grid_tested.txt"):
+    from sklearn.model_selection import ParameterGrid
+
+    hyperparams = ParameterGrid(hyperparams)
+
+    if checkpoint is None or not os.path.exists(checkpoint):
+        start_from = 0
+    else:
+        with open(checkpoint, "r") as file:
+            start_from = int(file.readline()) + 1
+
+    for i, params in enumerate(hyperparams):
+        print("\n=======================")
+        print("Testing parameters:")
+        pprint(params)
+        print("=======================\n")
+        if i < start_from:
+            print(f"skipping {i}")
+            continue
+        objective(params)
+        with open(checkpoint, "w") as file:
+            try:
+                file.writelines(str(i))
+                print("Saved to file!")
+            except IOError:
+                print("\nERROR! Cannot write results to file!\n")
