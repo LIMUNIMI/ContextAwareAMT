@@ -54,46 +54,19 @@ Datasets
 #. Create the MIDI file for the template, synthesize and 
    compute the template: ``python run.py -sc``
 #. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r``
-.. #. Apply NMF and extract frames for pedaling estimation: ``python run.py -p -r``
 
 2. Training the models
 ----------------------
 
-N.B. TODO
+#. Evaluate velocity configurations using: ``python run.py -v -sk``.
+#. Option `-cm` cleans MLFlow runs, use it if the previous command fails for
+   some reason, because the final evaluation is based on MLFlow
 
-#. Look for hyper-parameters for velocity using the original context: ``python
-   run.py -v -sk``. We obtained hyperparams defined in ``settings.py``
-   and loss function of 0.1143.
-.. #. Look for hyper-parameters for pedaling using the original context: ``python
-..    run.py -p -sk``. We obtained hyperparams defined in ``settings.py``
-..    and loss function of 0.1803.
+Optionally:
+~~~~~~~~~~
+
 #. Fully train velocity models with specific independence: ``python run.py -v -t``
 #. Fully train velocity models with generic independence: ``python run.py -v -t -g``
-
-.. #. Fully train pedaling model on the original context: ``python run.py -p -t -c orig``
-
-..    * Dummy loss: 0.2578
-..    * Validation loss: 0.1963 (500 epochs)
-..    * 247 batches in training
-..    * 47 batches in validation
-..    * Learning rate: 2.02e-2
-..    * 6052 parameters::
-
-..       MIDIParameterEstimation(
-..         (dropout): Dropout(p=0.1, inplace=False)
-..         (lstm): LSTM(13, 32, batch_first=True)
-..         (stack): Sequential(
-..           (0): Conv2d(3, 3, kernel_size=(4, 1), stride=(1, 1), groups=3, bias=False)
-..           (1): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-..           (2): Tanh()
-..           (3): Conv2d(3, 3, kernel_size=(2, 1), stride=(1, 1), groups=3, bias=False)
-..           (4): InstanceNorm2d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
-..           (5): Tanh()
-..           (6): Conv2d(3, 3, kernel_size=(1, 1), stride=(1, 1), groups=3)
-..           (7): Sigmoid()
-..         )
-..       )
-
 #. After each training, you will find a few checkpoint files in the relative directory directory; find the most recent one with ``ls -l``
 
 ----
@@ -101,28 +74,11 @@ N.B. TODO
 * option ``-r`` preprocess the dataset using NMF; it should be used only once
   per each context; each subsequent runs will use the already dumped
   dataset
-* option ``-sk`` reduces the dataset to 10% of its total for pedaling and to
-  5% for velocity; thus, ``-sk -r`` would result in preprocessing only that
-  10% and 5%
 
-
-4. Evaluation
+3. Evaluation
 -------------
 
-#. MLFLow reports the average variance norm of the performers weight and the test loss
-
-.. #. Evaluate error distributions of velocity models whose checkpoints are in a
-..    given directory: ``python run.py -v -e <list of checkpoints> -cp``; you can
-..    use shell expansion like ``models/*vel*.pt``
-.. #. Evaluate error distributions of pedaling models whose checkpoints are in a
-..    given directory: ``python run.py -p -e <list of checkpoints> -cp``; you can
-..    use shell expansion like ``models/*ped*.pt``
-
-.. These commands will create a plotly plots with violin plots of generic and
-.. specific contexts and Wilcoxon p-values.
-
-.. You can plot the tests multiple times without retesting: ``python run.py -p -cp -cf
-.. results/*.csv``.
+Run `python -m mpc2c.evaluate` to evaluate the average L1 error in each configuration
 
 Notes
 -----

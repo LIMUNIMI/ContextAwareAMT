@@ -45,13 +45,6 @@ def parse_args():
         "--velocity",
         action="store_true",
         help="Perform actions for velocity estimation (note-wise prediction).")
-    parser.add_argument(
-        "-p",
-        "--pedaling",
-        action="store_true",
-        help=
-        "TODO Perform actions for pedaling estimation (frame-wise prediction)."
-    )
     parser.add_argument("-t",
                         "--train",
                         action="store_true",

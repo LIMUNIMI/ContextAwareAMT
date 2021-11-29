@@ -149,7 +149,7 @@ def analyze_wins(df, methods, var="perfm_test_avg"):
     return wins
 
 
-if __name__ == "__main__":
+def main()
     import sys
     if len(sys.argv) == 1:
         var = "perfm_test_avg"
@@ -172,3 +172,8 @@ if __name__ == "__main__":
     print("\n==============\n")
 
     analyze_methods(df, methods, var=var)
+
+
+if __name__ == "__main__":
+    main()
+
