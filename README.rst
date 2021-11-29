@@ -13,6 +13,9 @@ Setup
 #. Create a new venv with poetry and install the dependencies: ``poetry update``
 #. Start a new shell in this venv: ``poetry shell``
 
+N.B. While reading documentation and code in this repo, consider that some code
+for pedaling estimation is available, even if it is not used anymore.
+
 Config
 ------
 
