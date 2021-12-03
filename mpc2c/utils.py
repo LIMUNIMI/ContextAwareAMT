@@ -5,6 +5,15 @@ from scipy.optimize import linear_sum_assignment
 import torch
 
 
+def write_to_file(fname, string, success_msg, error_msg):
+    with open(fname, "w") as file:
+        try:
+            file.writelines(string)
+            print(success_msg)
+        except IOError:
+            print(error_msg)
+
+
 def torch_moments(t: list):
     """
     Computes moments on a list of tensors t

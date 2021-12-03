@@ -16,6 +16,7 @@ from .mytorchutils import context
 from . import feature_extraction
 from . import settings as s
 from .asmd_resynth import get_contexts
+from . import utils
 
 RANDGEN = torch.Generator()
 
@@ -381,10 +382,13 @@ def grid_search(hyperparams, objective, checkpoint="grid_tested.txt"):
         if i < start_from:
             print(f"skipping {i}")
             continue
-        objective(params)
-        with open(checkpoint, "w") as file:
-            try:
-                file.writelines(str(i))
-                print("Saved to file!")
-            except IOError:
-                print("\nERROR! Cannot write results to file!\n")
+        try:
+            objective(params)
+        except RuntimeError as e:
+            print(e)
+            print("--- skipping these parameters ---")
+            utils.write_to_file("exceptions.txt", f"{i} - {e}",
+                                "--- written exception ---",
+                                "\nERROR! Cannot write exception to file!\n")
+        utils.write_to_file(checkpoint, str(i), "Saved to file!",
+                            "\nERROR! Cannot write results to file!\n")
