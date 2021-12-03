@@ -57,6 +57,7 @@ class ResidualBlock(nn.Module):
         self.reduce = reduce
         self.transposed = transposed
         self.padding = 'valid' if reduce else 'same'
+
         self.stack = nn.Sequential(
             get_conv(inchannels,
                      outchannels,
@@ -173,8 +174,8 @@ def make_stack(insize, k1, k2, activation, kernel, condition):
     ttt = time()
     while condition(insize, kernel):
         inchannels = outchannels
-        nblocks = max(1, round(2**k1 / outchannels))
-        outchannels = round(outchannels * k2)
+        nblocks = max(1, round(2**k1 / inchannels))
+        outchannels = inchannels * round(k2)
         blocks = ResidualStack(nblocks,
                                inchannels,
                                outchannels,
@@ -184,10 +185,9 @@ def make_stack(insize, k1, k2, activation, kernel, condition):
         stack.append(blocks)
         insize = blocks.outsize(insize)
         num_params += len([p for p in blocks.parameters()])
-        if time() - ttt > s.MAX_TIME_CONV_STACK or num_params > s.MAX_SIZE_CONV_STACK:
-            raise RuntimeError(
-                "Model exceeded max size for a conv stack"
-            )
+        if time(
+        ) - ttt > s.MAX_TIME_CONV_STACK or num_params > s.MAX_SIZE_CONV_STACK:
+            raise RuntimeError("Model exceeded max size for a conv stack")
     return stack, outchannels, insize
 
 
