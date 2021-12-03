@@ -41,6 +41,12 @@ def parse_args():
         "Prepare the datasets by splitting the various contexts and resynthesizing them"
     )
     parser.add_argument(
+        "-p",
+        "--pedaling",
+        action="store_true",
+        help="Perform actions for pedaling estimation (window-wise prediction)."
+    )
+    parser.add_argument(
         "-v",
         "--velocity",
         action="store_true",

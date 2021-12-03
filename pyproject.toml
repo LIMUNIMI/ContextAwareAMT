@@ -14,18 +14,18 @@ joblib = "^0.17.0"
 pretty_midi = "^0.2.9"
 essentia = "^2.1b6.dev184"
 plotly = "^4.12.0"
-torch = "<1.10.0"
+torch = "1.9.1"
 # TODO: change this when this branch is merged!
 # scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
-scikit-optimize = "^0.8.1"
+# scikit-optimize = "^0.8.1"
 # errors with most recent version of sicki-learn and scikit-optimize
-scikit-learn = "<1.0"
+scikit-learn = "0.24.2"
 jack-client = "^0.5.2"
 pysoundfile = "^0.9.0"
 PyQt5 = "^5.15.2"
 sounddevice = "^0.4.1"
-mido = {git = "https://github.com/mido/mido.git", rev="2f53ba0bfa4c0fc5949bd5802d9cb03366e34317"}
-# mido = "^1.2.9"
+# mido = {git = "https://github.com/mido/mido.git", rev="2f53ba0bfa4c0fc5949bd5802d9cb03366e34317"}
+mido = "^1.2.10"
 python-rtmidi = "^1.4.6"
 pandas = "^1.2.1"
 matplotlib = "^3.3.4"
@@ -35,13 +35,10 @@ mlflow = "^1.15.0"
 psutil = "^5.8.0"
 torchinfo = "^1.5.3"
 rotograd = "^0.1.4"
+statsmodels = "^0.13.1"
 
 [tool.poetry.dev-dependencies]
-jedi = "<0.18.0"
 ipdb = "^0.13.4"
-pydeps = "^1.9.13"
-wily = "^1.19.0"
-heartrate = "^0.2.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
