@@ -5,8 +5,8 @@ from scipy.optimize import linear_sum_assignment
 import torch
 
 
-def write_to_file(fname, string, success_msg, error_msg):
-    with open(fname, "w") as file:
+def write_to_file(fname, string, success_msg, error_msg, filemode="w"):
+    with open(fname, filemode) as file:
         try:
             file.writelines(string)
             print(success_msg)

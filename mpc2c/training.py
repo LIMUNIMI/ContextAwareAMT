@@ -2,6 +2,7 @@
 
 import os
 from pprint import pprint
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -387,8 +388,12 @@ def grid_search(hyperparams, objective, checkpoint="grid_tested.txt"):
         except RuntimeError as e:
             print(e)
             print("--- skipping these parameters ---")
-            utils.write_to_file("exceptions.txt", f"{i} - {e}",
+            utils.write_to_file("exceptions.txt",
+                                f"{i} - {e}",
                                 "--- written exception ---",
-                                "\nERROR! Cannot write exception to file!\n")
+                                "\nERROR! Cannot write exception to file!\n",
+                                filemode="a")
+        for p in Path(".").glob("lr_find_temp_model_*.ckpt"):
+            os.remove(p)
         utils.write_to_file(checkpoint, str(i), "Saved to file!",
                             "\nERROR! Cannot write results to file!\n")
