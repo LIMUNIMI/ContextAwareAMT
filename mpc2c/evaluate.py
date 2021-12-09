@@ -9,8 +9,13 @@ import re
 OUTPUT_DIR = "imgs"
 
 
-def myviolin(title, *args, **kwargs):
-    return px.violin(*args, **kwargs, box=True, title=title, points='all')
+def myplot(title, *args, **kwargs):
+    return px.box(
+        *args,
+        **kwargs,
+        # box=True,
+        title=title,
+        points='all')
 
 
 def add_multi_index(df: pd.DataFrame):
@@ -27,6 +32,12 @@ def add_multi_index(df: pd.DataFrame):
     context_specific = df['context_specific'].astype('string')
     df['method'] = multiple_performers + '-' + context_specific
     methods = df['method'].unique()
+
+    # removing runs that have not ended
+    df = df[df['perfm_test_avg'].notna()]
+    # keep only the 4 most recent runs for each set of params
+    # (if one set had a stopped run, it is restarted from scratch)
+    df = df.groupby('params').head(4)
 
     df = df.set_index(['method', 'params'])
     return df, methods, hyperparams.unique()
@@ -91,11 +102,11 @@ def analyze_context_importance(df, methods, var="perfm_test_avg"):
 
     significance_analysis(dists)
 
-    fig = myviolin(title,
-                   pd.DataFrame(dists).melt(),
-                   x='variable',
-                   y='value',
-                   color='variable')
+    fig = myplot(title,
+                 pd.DataFrame(dists).melt(),
+                 x='variable',
+                 y='value',
+                 color='variable')
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
     fig.show()
 
@@ -111,7 +122,7 @@ def analyze_methods(df, methods, var="perfm_test_avg"):
 
     significance_analysis(distributions_by_method)
 
-    fig = myviolin(title, df.reset_index(), x='method', y=var, color='method')
+    fig = myplot(title, df.reset_index(), x='method', y=var, color='method')
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
     fig.show()
 
@@ -140,13 +151,29 @@ def analyze_wins(df, methods, var="perfm_test_avg"):
                 elif df_conf.loc[m2] < df_conf[m1]:
                     pass
                 else:
-                    print(f"Parity: {m1} {m2}!")
+                    print(f"Parity: {conf} - {m1} {m2}!")
             if df_conf.loc[m1] == df_conf.min():
                 wins.loc[m1]['all'] += 1
 
     print("Wins analysis:\n")
     print(wins)
     return wins
+
+
+def find_best_method(df, methods, var='perfm_test_avg', lower_is_better=True):
+    print(f"Method         {var:<9} test_avg test_std")
+    for method in methods:
+        df_method = df.loc[method]
+        if lower_is_better:
+            i = df_method[var].argmin()
+        else:
+            i = df_method[var].argmax()
+        best_var = df_method.iloc[i][var]
+        best_test_avg = df_method.iloc[i]['perfm_test_avg']
+        best_test_std = df_method.iloc[i]['perfm_test_std']
+        print(
+            f"{method:<11}:        {best_var:.2e}  {best_test_avg:.2e}  {best_test_std:.2e}"
+        )
 
 
 def main():
@@ -156,8 +183,7 @@ def main():
     else:
         var = sys.arg[1]
 
-    df = pd.read_csv("velocity_results_1.back.csv")
-    df = df.loc[2:]  # TODO: remove this row!
+    df = pd.read_csv("velocity_results_2.back.csv")
 
     df, methods, params = add_multi_index(df)
 
@@ -172,6 +198,9 @@ def main():
     print("\n==============\n")
 
     analyze_methods(df, methods, var=var)
+
+    print("\n==============\n")
+    find_best_method(df, methods, var=var)
 
 
 if __name__ == "__main__":
