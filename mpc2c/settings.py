@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from skopt import space
 from torch import nn
@@ -125,7 +124,7 @@ SWA = False
 
 GRIDSPACE = {
     'enc_k1': [4],
-    'enc_k2': [1, 2, 4],
+    'enc_k2': [1, 2, 3],
     'enc_kernel': [3, 5],
     'spec_k1': [4],
     'spec_k2': [1, 2, 4],

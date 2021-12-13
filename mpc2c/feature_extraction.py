@@ -531,9 +531,12 @@ class EncoderPerformer(LightningModule):
                     self.losslog(f'rec_test_{i}', rec)
 
         cluster_computer = KMeans(n_clusters=len(self.contexts))
-        labels = cluster_computer.fit_predict(
-            np.concatenate(self.test_latent_x)[:, :, 0, 0])
-        ami = adjusted_mutual_info_score(cont_labels, labels)
+        try:
+            labels = cluster_computer.fit_predict(
+                np.concatenate(self.test_latent_x)[:, :, 0, 0])
+            ami = adjusted_mutual_info_score(cont_labels, labels)
+        except ValueError:
+            ami = -1
 
         if log:
             self.losslog('perfm_test_avg', perfm_out_avg)

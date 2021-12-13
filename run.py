@@ -4,16 +4,13 @@ import shutil
 import subprocess
 from logging import error
 from pathlib import Path
-from copy import deepcopy
 
 import mlflow
-import skopt
 
-from mpc2c import build, create_template, data_management, evaluate
+from mpc2c import build, create_template, data_management
 from mpc2c import settings as s
 from mpc2c import training
 from mpc2c.asmd_resynth import get_contexts, split_resynth
-from mpc2c.mytorchutils import hyperopt
 
 build.build()
 
@@ -125,7 +122,10 @@ def main():
             l1, model = training.train(x, mode, False, False, test=True)
             # note: deepcopy causes some weakref errors...
             # saving a copy to disk instead
-            pickle.dump(model, open("_model.pkl", "wb"))
+            try:
+                pickle.dump(model, open("_model.pkl", "wb"))
+            except Exception as e:
+                raise RuntimeError("Error pickling model:" + str(e))
             model = pickle.load(open("_model.pkl", "rb"))
             l3, _ = training.train(x,
                                    mode,

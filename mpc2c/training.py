@@ -12,6 +12,7 @@ from pytorch_lightning.callbacks import (ModelCheckpoint,
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import MLFlowLogger
 from torch import nn
+import timeout_decorator
 
 from .mytorchutils import context
 from . import feature_extraction
@@ -20,6 +21,26 @@ from .asmd_resynth import get_contexts
 from . import utils
 
 RANDGEN = torch.Generator()
+
+
+class LRException(Exception):
+    pass
+
+
+@timeout_decorator.timeout(60 * 60 * 4, timeout_exception=LRException)
+def lr_tuning(trainer, model, *args, **kwargs):
+    """
+    Sometimes the torch lightning lr_finder get stucked while resting the
+    checkpoint. I found no easy way to prevent such problem, just stop the
+    function when it takes too much time (> 4 hours)
+    """
+    trainer.tune(model, *args, **kwargs)
+    if model.lr is None and model.learning_rate is None:
+        raise LRException("Learning rate none")
+    elif model.lr is None:
+        model.lr = model.learning_rate
+    elif model.learning_rate is None:
+        model.learning_rate = model.lr
 
 
 def model_test(model_build_func, test_sample):
@@ -257,7 +278,14 @@ def my_train(
         if os.path.exists("lr_find_temp_model.ckpt"):
             os.remove("lr_find_temp_model.ckpt")
         model.use_rotograd = False
-        trainer.tune(model, lr_find_kwargs=dict(min_lr=1e-7, max_lr=1))
+        try:
+            lr_tuning(trainer,
+                      model,
+                      lr_find_kwargs=dict(min_lr=1e-7, max_lr=1))
+        except LRException:
+            # timeout
+            model.lr = 1e-5
+            model.learning_rate = 1e-5
         model.njobs = s.NJOBS
         if context_specific:
             model.use_rotograd = True
@@ -389,7 +417,7 @@ def grid_search(hyperparams, objective, checkpoint="grid_tested.txt"):
             print(e)
             print("--- skipping these parameters ---")
             utils.write_to_file("exceptions.txt",
-                                f"{i} - {e}",
+                                f"{i} - {e}\n",
                                 "--- written exception ---",
                                 "\nERROR! Cannot write exception to file!\n",
                                 filemode="a")
