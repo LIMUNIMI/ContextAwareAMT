@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from scipy.stats import wilcoxon, f_oneway
+from scipy.stats import wilcoxon, f_oneway, ttest_rel, kruskal, normaltest, median_test
 from statsmodels.stats.multitest import multipletests
 
 import re
@@ -10,12 +10,15 @@ OUTPUT_DIR = "imgs"
 
 
 def myplot(title, *args, **kwargs):
-    return px.box(
+
+    fig = px.box(
         *args,
         **kwargs,
         # box=True,
         title=title,
         points='all')
+    fig.update_traces(boxmean='sd')
+    return fig
 
 
 def add_multi_index(df: pd.DataFrame):
@@ -43,7 +46,7 @@ def add_multi_index(df: pd.DataFrame):
     return df, methods, hyperparams.unique()
 
 
-def corrected_pvals(distributions):
+def corrected_pvals(distributions, stat_test=wilcoxon):
     """
     Computes Wilcoxon p-values and correct them. Returns non-corrected p-values
     and rejection result with corrected pvalues.
@@ -58,7 +61,7 @@ def corrected_pvals(distributions):
             if m1 == m2:
                 pvals[m1].loc[m2] = np.nan
                 continue
-            _stat, pval = wilcoxon(vals1, vals2)
+            _stat, pval = stat_test(vals1, vals2)
             pvals[m1].loc[m2] = pval
     _pvals = pvals.to_numpy()
     reject, _, _, _ = multipletests(_pvals[_pvals != 0])
@@ -67,12 +70,30 @@ def corrected_pvals(distributions):
 
 
 def significance_analysis(distributions):
+    # Normality test
+    print("Normality tests:")
+    for key, dist in distributions.items():
+        _stat, pval = normaltest(dist)
+        print(f"{key}: {pval:.2e}")
+    print("-------")
+
+    # Multivariate tests
     _stat, f_pval = f_oneway(*distributions.values())
-
-    reject, pvals = corrected_pvals(distributions)
-
     print(f"One-way ANOVA: {f_pval:.2e}")
+
+    _stat, f_pval = kruskal(*distributions.values())
+    print(f"One-way Kruskal: {f_pval:.2e}")
+
+    print("-------")
+
+    # Pair-wise tests
+    reject, pvals = corrected_pvals(distributions, ttest_rel)
+    print("T-test p-values:\n")
+    print(pvals)
+    print(f"\nCorrection reject hypothesis: {reject}")
+
     print("Wilcoxon p-values:\n")
+    reject, pvals = corrected_pvals(distributions, wilcoxon)
     print(pvals)
     print(f"\nCorrection reject hypothesis: {reject}")
 
