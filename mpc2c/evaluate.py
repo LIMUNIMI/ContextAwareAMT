@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
-from scipy.stats import wilcoxon, f_oneway, ttest_rel, kruskal, normaltest, median_test
+from scipy.stats import wilcoxon, f_oneway, ttest_rel, kruskal, shapiro
 from statsmodels.stats.multitest import multipletests
 
 import re
@@ -63,17 +63,29 @@ def corrected_pvals(distributions, stat_test=wilcoxon):
                 continue
             _stat, pval = stat_test(vals1, vals2)
             pvals[m1].loc[m2] = pval
-    _pvals = pvals.to_numpy()
-    reject, _, _, _ = multipletests(_pvals[_pvals != 0])
 
-    return reject, pvals
+    # only keep upper triangular part
+    _pvals = np.triu(pvals.to_numpy())
+    _pvals[_pvals == 0] = np.nan
+    pvals = pd.DataFrame(data=_pvals, index=pvals.index, columns=pvals.columns)
+
+    # take valid p-values and correct them
+    print("Correcting pairwise p-values with confidence at 95%!")
+    idx = np.where(~np.isnan(_pvals))
+    _, _corrected, _, _ = multipletests(_pvals[idx].flatten(), method='holm')
+    _pvals[idx] = _corrected
+    corrected = pd.DataFrame(data=_pvals,
+                             index=pvals.index,
+                             columns=pvals.columns)
+
+    return corrected, pvals
 
 
 def significance_analysis(distributions):
     # Normality test
     print("Normality tests:")
     for key, dist in distributions.items():
-        _stat, pval = normaltest(dist)
+        _stat, pval = shapiro(dist)
         print(f"{key}: {pval:.2e}")
     print("-------")
 
@@ -88,14 +100,16 @@ def significance_analysis(distributions):
 
     # Pair-wise tests
     reject, pvals = corrected_pvals(distributions, ttest_rel)
-    print("T-test p-values:\n")
+    print("\nT-test p-values:\n")
     print(pvals)
-    print(f"\nCorrection reject hypothesis: {reject}")
+    print("\nCorrection reject hypothesis:\n")
+    print(reject)
 
-    print("Wilcoxon p-values:\n")
+    print("\nWilcoxon p-values:\n")
     reject, pvals = corrected_pvals(distributions, wilcoxon)
     print(pvals)
-    print(f"\nCorrection reject hypothesis: {reject}")
+    print("\nCorrection reject hypothesis:\n")
+    print(reject)
 
 
 def analyze_context_importance(df, methods, var="perfm_test_avg"):
