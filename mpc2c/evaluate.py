@@ -7,6 +7,7 @@ from statsmodels.stats.multitest import multipletests
 import re
 
 OUTPUT_DIR = "imgs"
+ip = im = ''
 
 
 def myplot(title, *args, **kwargs):
@@ -27,20 +28,26 @@ def add_multi_index(df: pd.DataFrame):
     """
 
     hyperparams = df[[
-        'enc_k1', 'enc_k2', 'enc_kernel', 'spec_k1', 'spec_k2', 'spec_kernel'
+        ip + 'enc_k1', ip + 'enc_k2', ip + 'enc_kernel', ip + 'spec_k1',
+        ip + 'spec_k2', ip + 'spec_kernel'
     ]].astype(str).apply(lambda x: '_'.join(x), axis=1)
     df['params'] = hyperparams
 
-    multiple_performers = df['multiple_performers'].astype('string')
-    context_specific = df['context_specific'].astype('string')
+    multiple_performers = df[ip + 'multiple_performers'].astype('string')
+    context_specific = df[ip + 'context_specific'].astype('string')
+    context_specific = context_specific.astype('string')
     df['method'] = multiple_performers + '-' + context_specific
     methods = df['method'].unique()
 
     # removing runs that have not ended
-    df = df[df['perfm_test_avg'].notna()]
+    df = df[df[im + 'perfm_test_avg'].notna()]
     # keep only the 4 most recent runs for each set of params
     # (if one set had a stopped run, it is restarted from scratch)
     df = df.groupby('params').head(4)
+    # remove params with less than 4 runs
+    params_ok = df.groupby('params')[im + 'perfm_test_avg'].count() == 4
+    runs_ok = df['params'].isin(params_ok[params_ok].index)
+    df = df[runs_ok]
 
     df = df.set_index(['method', 'params'])
     return df, methods, hyperparams.unique()
@@ -67,10 +74,12 @@ def corrected_pvals(distributions, stat_test=wilcoxon):
     # only keep upper triangular part
     _pvals = np.triu(pvals.to_numpy())
     _pvals[_pvals == 0] = np.nan
-    pvals = pd.DataFrame(data=_pvals, index=pvals.index, columns=pvals.columns)
+    pvals = pd.DataFrame(data=_pvals.copy(),
+                         index=pvals.index,
+                         columns=pvals.columns)
 
     # take valid p-values and correct them
-    print("Correcting pairwise p-values with confidence at 95%!")
+    # Correcting pairwise p-values with confidence at 95%!
     idx = np.where(~np.isnan(_pvals))
     _, _corrected, _, _ = multipletests(_pvals[idx].flatten(), method='holm')
     _pvals[idx] = _corrected
@@ -99,8 +108,8 @@ def significance_analysis(distributions):
     print("-------")
 
     # Pair-wise tests
-    reject, pvals = corrected_pvals(distributions, ttest_rel)
     print("\nT-test p-values:\n")
+    reject, pvals = corrected_pvals(distributions, ttest_rel)
     print(pvals)
     print("\nCorrection reject hypothesis:\n")
     print(reject)
@@ -112,7 +121,7 @@ def significance_analysis(distributions):
     print(reject)
 
 
-def analyze_context_importance(df, methods, var="perfm_test_avg"):
+def analyze_context_importance(df, methods, var=im + "perfm_test_avg"):
     """
     Analyze the importance of condidering context and not by taking the best
     value for each run among those configurations that consider context and
@@ -162,7 +171,7 @@ def analyze_methods(df, methods, var="perfm_test_avg"):
     fig.show()
 
 
-def analyze_wins(df, methods, var="perfm_test_avg"):
+def analyze_wins(df, methods, var=im + "perfm_test_avg"):
     """
     Analyze how many configuration each method is the best
 
@@ -195,7 +204,10 @@ def analyze_wins(df, methods, var="perfm_test_avg"):
     return wins
 
 
-def find_best_method(df, methods, var='perfm_test_avg', lower_is_better=True):
+def find_best_method(df,
+                     methods,
+                     var=im + 'perfm_test_avg',
+                     lower_is_better=True):
     print(f"Method         {var:<9} test_avg test_std")
     for method in methods:
         df_method = df.loc[method]
@@ -204,8 +216,8 @@ def find_best_method(df, methods, var='perfm_test_avg', lower_is_better=True):
         else:
             i = df_method[var].argmax()
         best_var = df_method.iloc[i][var]
-        best_test_avg = df_method.iloc[i]['perfm_test_avg']
-        best_test_std = df_method.iloc[i]['perfm_test_std']
+        best_test_avg = df_method.iloc[i][im + 'perfm_test_avg']
+        best_test_std = df_method.iloc[i][im + 'perfm_test_std']
         print(
             f"{method:<11}:        {best_var:.2e}  {best_test_avg:.2e}  {best_test_std:.2e}"
         )
@@ -213,12 +225,20 @@ def find_best_method(df, methods, var='perfm_test_avg', lower_is_better=True):
 
 def main():
     import sys
+
+    df = pd.read_csv("velocity_results.csv")
+
+    global ip, im
+    if 'enc_k1' in df.columns:
+        ip = im = ''
+    else:
+        ip = 'params.'
+        im = 'metrics.'
+
     if len(sys.argv) == 1:
-        var = "perfm_test_avg"
+        var = im + "perfm_test_avg"
     else:
         var = sys.arg[1]
-
-    df = pd.read_csv("velocity_results_2.back.csv")
 
     df, methods, params = add_multi_index(df)
 
