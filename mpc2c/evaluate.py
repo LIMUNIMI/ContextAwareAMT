@@ -50,6 +50,7 @@ def add_multi_index(df: pd.DataFrame):
     df = df[runs_ok]
 
     df = df.set_index(['method', 'params'])
+    print(f"Number of valid runs: {df.shape[0]}")
     return df, methods, hyperparams.unique()
 
 

@@ -1,3 +1,4 @@
+Number of valid runs: 104
 
 ==============
 
