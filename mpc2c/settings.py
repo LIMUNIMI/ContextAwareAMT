@@ -100,16 +100,17 @@ VEL_HYPERPARAMS = {
     "spec_kernel": 5,
     "activation": nn.ReLU(),
 }
-# TODO: redo pedaling
 PED_HYPERPARAMS = {
-    'lstm_layers': 1,
-    'lstm_hidden_size': 5,
-    'middle_features': 0,
-    "kernel_0": 4,
-    "middle_activation": nn.Tanh  # or AbsLayer?
+    "enc_k1": 6,
+    "enc_k2": 8,
+    "enc_kernel": 3,
+    "spec_k1": 6,
+    "spec_k2": 8,
+    "spec_kernel": 5,
+    "activation": nn.ReLU(),
 }
 VEL_BATCH_SIZE = 10
-PED_BATCH_SIZE = 1
+PED_BATCH_SIZE = 10
 EARLY_STOP = 20
 EARLY_RANGE = 1e-4
 EMA_PERIOD = 15

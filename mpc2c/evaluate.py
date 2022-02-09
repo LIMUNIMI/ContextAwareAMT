@@ -224,10 +224,10 @@ def find_best_method(df,
         )
 
 
-def main():
+def main(mode):
     import sys
 
-    df = pd.read_csv("velocity_results.csv")
+    df = pd.read_csv("{mode}_results.csv")
 
     global ip, im
     if 'enc_k1' in df.columns:
@@ -260,4 +260,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(sys.argv[1])

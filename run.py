@@ -9,7 +9,7 @@ import mlflow
 
 from mpc2c import build, create_template, data_management
 from mpc2c import settings as s
-from mpc2c import training
+from mpc2c import training, evaluate
 from mpc2c.asmd_resynth import get_contexts, split_resynth
 
 build.build()
@@ -76,6 +76,10 @@ def parse_args():
         "--printcontexts",
         action="store_true",
         help="Print contexts in the order with the labels shown in mlflow log")
+    parser.add_argument("-e",
+                        "--evaluate",
+                        action="store_true",
+                        help="Evaluate configurations")
     return parser.parse_args()
 
 
@@ -184,7 +188,10 @@ def main():
         training.train(hpar,
                        mode,
                        args.contextspecific,
-                       copy_checkpoint=Path("models") / f"{mode}.pt")
+                       True,
+                       copy_checkpoint=Path("models") /
+                       f"{mode}_{args.contextspecific}.pt",
+                       test=True)
 
     if args.redump:
         contexts = list(get_contexts(s.CARLA_PROJ).keys())
@@ -195,6 +202,10 @@ def main():
                                        one_context_per_batch=False,
                                        mode=mode,
                                        nmf_params=nmf_params)
+
+    if args.evaluate:
+        # TODO
+        evaluate.main(mode)
 
 
 if __name__ == "__main__":

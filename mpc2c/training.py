@@ -160,6 +160,9 @@ def build_model(hpar,
                 context_specific=True,
                 multiple_performers=True,
                 start_from_model=None):
+    """
+    `mode` is used to correctly set data loaders in `EncoderPerformer`
+    """
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
     if start_from_model is not None:
@@ -208,6 +211,7 @@ def my_train(
     """
     Create callbacks and train.
     Return the early stop objects for performers and context classifier.
+    `mode` is only used for giving name to the checkpoints
     """
     # stopped_epoch = 9999  # let's enter the while the first time
     # while stopped_epoch > s.EARLY_STOP:

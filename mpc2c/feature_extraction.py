@@ -296,6 +296,8 @@ class EncoderPerformer(LightningModule):
     """
     An iterative transfer-learning LightningModule for
     context-aware transcription
+
+    `mode` is used to correctly set data loaders.
     """
     def __init__(self,
                  encoder,

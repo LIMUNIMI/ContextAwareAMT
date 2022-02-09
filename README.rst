@@ -51,26 +51,27 @@ Datasets
 #. The datasets were split using PCA and retaining 0.89, 0.93, 0.91 of total
    variance for `train`, `validation` and `test` set respectively.
 
+Command-line options
+--------------------
+
+For all the available commands, using `-v` allows to extract velocity data,
+while using `-p` refers to pedaling.
+
+Other options are described below.
+
 1. Preprocess
 -------------
 
 #. Create the MIDI file for the template, synthesize and 
    compute the template: ``python run.py -sc``
-#. Apply NMF and extract notes for velocity estimation: ``python run.py -v -r``
+#. Apply NMF and extract notes for [velocity|pedaling] estimation: ``python run.py [-v|-p] -r``
 
 2. Training the models
 ----------------------
 
-#. Evaluate velocity configurations using: ``python run.py -v -sk``.
+#. Evaluate [velocity|pedaling] configurations using: ``python run.py [-v|-p] -sk``.
 #. Option `-cm` cleans MLFlow runs, use it if the previous command fails for
    some reason, because the final evaluation is based on MLFlow
-
-Optionally:
-~~~~~~~~~~
-
-#. Fully train velocity models with specific independence: ``python run.py -v -t``
-#. Fully train velocity models with generic independence: ``python run.py -v -t -g``
-#. After each training, you will find a few checkpoint files in the relative directory directory; find the most recent one with ``ls -l``
 
 ----
 
@@ -81,7 +82,7 @@ Optionally:
 3. Evaluation
 -------------
 
-Run `python -m mpc2c.evaluate` to evaluate the average L1 error in each configuration
+Run `python run.py -e [-v|-p]` to evaluate the average L1 error in each configuration
 
 Notes
 -----
@@ -107,6 +108,16 @@ The following table shows the differences among the 6 contexts:
 
 The Carla project files available in the repo allow to see each individual
 parameter of the contexts.
+
+Optional
+~~~~~~~~~~
+
+Fully train models with: ``-t`` option. After each training, you will find a
+few checkpoint files in the relative directory directory; find the most recent
+one with ``ls -t | head -1``. The hyperparameters used are not the best ones
+(you can change them in `settings.py`) and models are trained using multiple
+performers. Context specificity can be turned on with `-cs` option.
+
 
 =======
 Credits
