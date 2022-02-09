@@ -1,4 +1,4 @@
-from types import SimpleNamespace
+from collections.abc import Iterable
 
 import numpy as np
 
@@ -220,8 +220,8 @@ class NMFTools:
         assert self.initH.shape[0] == self.initW.shape[1],\
             "W, H have different ranks"
 
-        self.initV_sum = self.initV.sum()
-
+    def renormalizeV(self, arr, start, end):
+        return arr / (arr.sum() + s.EPS) * self.initV[start, end].sum()
 
     def perform_nmf(self, audio, score):
         self.to2d()
@@ -280,7 +280,7 @@ class NMFTools:
             self.initW = self.initW.reshape((-1, npitch * self.basis),
                                             order='C')
 
-    def generate_minispecs(self, onsets_from_H=False):
+    def minispecs(self, onsets_from_H=False):
         """
         Arguments
         ---------
@@ -292,51 +292,28 @@ class NMFTools:
         # use the updated H and W for computing mini-spectrograms
         # and predict velocities
         self.to3d()
-        for pitch, onset, offset in self.gen_notes_from_H(onsets_from_H):
+        for pitch, onset, offset, velocity in self.gen_notes_from_H(
+                onsets_from_H):
             # select the sorrounding space in H
             start = onset
             end = min(
-                start + s.MINI_SPEC_SIZE, self.H.shape[2], offset +
+                start + s.SPEC_LEN, self.H.shape[2], offset +
                 s.BASIS_FRAMES['release_b'] * s.BASIS_FRAMES['release_f'])
 
             # compute the mini_spec
             mini_spec = 1 - self.W[:, pitch, :] @ self.H[pitch, :, start:end]
 
             # padding
-            if mini_spec.shape[1] < s.MINI_SPEC_SIZE:
+            if mini_spec.shape[1] < s.SPEC_LEN:
                 mini_spec = np.pad(mini_spec,
                                    pad_width=[
                                        (0, 0),
-                                       (0,
-                                        s.MINI_SPEC_SIZE - mini_spec.shape[1])
+                                       (0, s.SPEC_LEN - mini_spec.shape[1])
                                    ],
                                    mode='constant',
                                    constant_values=s.PADDING_VALUE)
 
-            yield mini_spec
-
-    def get_minispecs(self, transform=None, onsets_from_H=False):
-        """
-        Arguments
-        ---------
-
-        `onsets_from_H` : bool
-            see `gen_notes_from_H`
-        `transform` : Optional[Callable]
-            a callable that is applied to each mini spec
-
-        Returns
-        -------
-
-        np.array:
-            3d array with shape (minispecs, H, W)
-        """
-        mini_specs = []
-        for mini_spec in self.generate_minispecs(onsets_from_H):
-            if transform is not None:
-                mini_spec = transform(mini_spec)
-            mini_specs.append(mini_spec)
-        return np.array(mini_specs)
+            yield mini_spec, velocity
 
     def gen_notes_from_H(self, onsets_from_H=False):
         """
@@ -363,6 +340,7 @@ class NMFTools:
         `int` : onset column index in the activation/spectrogram
         `int` : offset column index in the activation/spectrogram
         """
+        assert not onsets_from_H, "inferring onsets from H is not implemented anymore, look in previous versions in the git repo"
         self.to3d()
         summed_pr = self.initH.sum(axis=1)
         if onsets_from_H:
@@ -372,10 +350,58 @@ class NMFTools:
         for note in input_onsets:
             # compute offset
             pitch, onset, offset = note[:3]
+            velocity = -255
             if not onsets_from_H:
                 onset = int(onset / self.res) + 1
                 offset = min(int(offset / self.res), summed_pr.shape[1])
                 pitch = int(pitch - self.minpitch)
+                velocity = note[3]
 
             # argmax = np.argmax(self.H[pitch, :, onset:offset + 1]) + onset
-            yield pitch, onset, offset
+            yield pitch, onset, offset, velocity
+
+    def diffspecs(self, win_size, hop_size, pedaling):
+        """
+        yield two matrices: window from V and from the corresponding
+        reconstruction
+        """
+
+        self.to2d()
+        for start in range(0, self.V.shape[1], hop_size):
+            end = start + win_size
+            if np.any(self.H[:, start:end]):
+                V, V_hat = 1 - self.initV[:, start:
+                                          end], self.W @ self.H[:, start:end]
+                yield V, V_hat, np.mean(pedaling[start:end])
+
+    def collect(self, collection_attr, *args, transform=None):
+        """
+        Arguments
+        ---------
+
+        `*args`:
+            are passed to collection_attr
+        `transform` : Optional[Callable]
+            a callable that is applied to each mini spec
+
+        Returns
+        -------
+
+        np.array:
+            3d array with shape (notes or windows, H, W)
+        """
+        out = []
+        func = getattr(self, collection_attr)
+        for el in func(*args):
+            if transform is not None:
+                el = transform(*el)
+            out.append(el)
+        if isinstance(out[0], Iterable):
+            # el were tuples
+            # transposing in pure-python
+            out = list(zip(*out))
+            return np.array(out[0]), np.array(out[1])
+        else:
+            # not used anymore...
+            # this can happen if you use `onsets_from_H=True`
+            return np.array(out)

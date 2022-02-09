@@ -46,7 +46,7 @@ EPS = 1e-32
 #: width of mini spectrograms: the number of frames after the onset; if the
 #: note lasts longer than this value, it is trimmed, if it lasts less it is
 #: padded with `PADDING_VALUE`
-MINI_SPEC_SIZE = 30
+SPEC_LEN = 30
 #: value used for padding mini specs when their width is < MINI_SPEC_SIZE
 PADDING_VALUE = 1
 #: cost function used in the NMF

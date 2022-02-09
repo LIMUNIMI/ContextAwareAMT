@@ -120,18 +120,17 @@ def build_encoder(hpar, dropout):
 
     k1, k2, activation, kernel = get_hpar(hpar)
 
-    m = (
-        feature_extraction.Encoder(
-            insize=(
-                s.BINS,
-                s.MINI_SPEC_SIZE,
-            ),  # mini_spec_size should change for pedaling...
-            dropout=dropout,
-            k1=k1,
-            k2=k2,
-            activation=activation,
-            kernel=kernel,
-        ).to(s.DEVICE).to(s.DTYPE))
+    m = (feature_extraction.Encoder(
+        insize=(
+            s.BINS,
+            s.SPEC_LEN,
+        ),
+        dropout=dropout,
+        k1=k1,
+        k2=k2,
+        activation=activation,
+        kernel=kernel,
+    ).to(s.DEVICE).to(s.DTYPE))
     # feature_extraction.init_weights(m, s.INIT_PARAMS)
     return m
 

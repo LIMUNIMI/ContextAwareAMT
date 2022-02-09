@@ -193,35 +193,28 @@ def transform_func(dbarr: es.array):
 
 
 def process_pedaling(i, dataset, nmf_params):
+
+    winlen = s.FRAME_SIZE / s.SR
+    hop = s.HOP_SIZE / s.SR
+    pedaling = dataset_utils.get_pedaling_mat(
+        dataset, i, frame_based=True, winlen=winlen, hop=hop)[0][:, 1] / 127.
+
     nmf_tools = nmf.NMFTools(*nmf_params)
     audio, sr = dataset.get_mix(i, sr=s.SR)
     score = dataset_utils.get_score_mat(dataset,
                                         i,
                                         score_type=["precise_alignment"])
     nmf_tools.perform_nmf(audio, score)
-    nmf_tools.to2d()
 
-    # TODO
-    # split nmf_tools.initV in windows
-    # split the reconstructed spectrogram in windows
-    # for each window pair, compute diff of MFCC
-    diff_spec = transform_func(nmf_tools.initV) - transform_func(
-        nmf_tools.renormalize(nmf_tools.W @ nmf_tools.H, initV_sum=True))
-
-    # TODO
-    # get_pedaling is now in dataset_utils
-    # split the pedaling values in windows (with overlap?)
-    # compute average in each window
-    winlen = s.FRAME_SIZE / s.SR
-    hop = s.HOP_SIZE / s.SR
-    pedaling = (
-        dataset.get_pedaling(i, frame_based=True, winlen=winlen, hop=hop)[0] /
-        127)
-    # TODO
+    diff_specs, pedaling = nmf_tools.collect(
+        'diffspecs',
+        s.SPEC_LEN,
+        s.SPEC_LEN // 2,
+        pedaling,
+        transform=lambda x, y, z: (transform_func(x) - transform_func(y), z))
     # now the shape should be (windows, features, frames) for diff_spec
     # now the shape should be (windows, ) for pedaling
-    __import__("ipdb").set_trace()
-    return diff_spec[None], pedaling[None]
+    return diff_specs, pedaling
 
 
 def process_velocities(i, dataset, nmf_params):
@@ -231,14 +224,12 @@ def process_velocities(i, dataset, nmf_params):
                                         i,
                                         score_type=["precise_alignment"])
     nmf_tools.perform_nmf(audio, score)
-    nmf_tools.to2d()
-    velocities = (dataset_utils.get_score_mat(
-        dataset, i, score_type=["precise_alignment"])[:, 3] / 127
-                  )  # type: ignore
-    minispecs = nmf_tools.get_minispecs(transform=transform_func)
+    minispecs, velocities = nmf_tools.collect('minispecs',
+                                              transform=lambda x, y:
+                                              (transform_func(x), y))
     # now the shape should be (notes, features, frames) for minispecs
     # now the shape should be (notes, ) for velocities
-    return minispecs, velocities
+    return minispecs, velocities / 127.
 
 
 def get_loader(groups,

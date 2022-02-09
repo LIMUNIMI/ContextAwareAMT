@@ -120,6 +120,16 @@ def main():
         return
 
     nmf_params = load_nmf_params()
+
+    if args.redump:
+        contexts = list(get_contexts(s.CARLA_PROJ).keys())
+        for split in ['train', 'validation', 'test']:
+            data_management.get_loader(split,
+                                       redump=True,
+                                       contexts=contexts,
+                                       one_context_per_batch=False,
+                                       mode=mode,
+                                       nmf_params=nmf_params)
     if args.skopt:
 
         def objective(x):
@@ -193,18 +203,7 @@ def main():
                        f"{mode}_{args.contextspecific}.pt",
                        test=True)
 
-    if args.redump:
-        contexts = list(get_contexts(s.CARLA_PROJ).keys())
-        for split in ['train', 'validation', 'test']:
-            data_management.get_loader(split,
-                                       redump=True,
-                                       contexts=contexts,
-                                       one_context_per_batch=False,
-                                       mode=mode,
-                                       nmf_params=nmf_params)
-
     if args.evaluate:
-        # TODO
         evaluate.main(mode)
 
 

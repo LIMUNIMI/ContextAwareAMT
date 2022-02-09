@@ -8,10 +8,10 @@ Setup
 #. Enter the root git directory
 #. Install ``poetry``
 #. Install ``pyenv``
-#. Install python 3.9.0: ``pyenv install 3.9.0``
-#. Activate it: ``pyenv shell 3.9.0``
-#. Create a new venv with poetry and install the dependencies: ``poetry update``
+#. Install python 3.8.6: ``pyenv install 3.8.6``
+#. Create a new venv with poetry and install the dependencies: ``poetry install --noroot``
 #. Start a new shell in this venv: ``poetry shell``
+#. Check that the version is correct with `python --version`
 
 N.B. While reading documentation and code in this repo, consider that some code
 for pedaling estimation is available, even if it is not used anymore.
@@ -72,17 +72,15 @@ Other options are described below.
 #. Evaluate [velocity|pedaling] configurations using: ``python run.py [-v|-p] -sk``.
 #. Option `-cm` cleans MLFlow runs, use it if the previous command fails for
    some reason, because the final evaluation is based on MLFlow
-
-----
-
-* option ``-r`` preprocess the dataset using NMF; it should be used only once
-  per each context; each subsequent runs will use the already dumped
-  dataset
-
+  
 3. Evaluation
 -------------
 
 Run `python run.py -e [-v|-p]` to evaluate the average L1 error in each configuration
+
+----
+
+The previous steps can be done in a single command: ``python run.py [-v|-p] -sc -r -sk -e``
 
 Notes
 -----

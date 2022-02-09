@@ -15,9 +15,6 @@ pretty_midi = "^0.2.9"
 essentia = "^2.1b6.dev184"
 plotly = "^4.12.0"
 torch = "1.9.1"
-# TODO: change this when this branch is merged!
-# scikit-optimize = {git = "https://github.com/kernc/scikit-optimize.git", branch="space_constraint"}
-# scikit-optimize = "^0.8.1"
 # errors with most recent version of sicki-learn and scikit-optimize
 scikit-learn = "0.24.2"
 jack-client = "^0.5.2"
