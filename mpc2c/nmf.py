@@ -220,9 +220,6 @@ class NMFTools:
         assert self.initH.shape[0] == self.initW.shape[1],\
             "W, H have different ranks"
 
-    def renormalizeV(self, arr, start, end):
-        return arr / (arr.sum() + s.EPS) * self.initV[start, end].sum()
-
     def perform_nmf(self, audio, score):
         self.to2d()
         # set initH and initV
@@ -366,13 +363,35 @@ class NMFTools:
         reconstruction
         """
 
+        # checking shapes and making everything of the same length
+        ps = pedaling.shape[0]
+        hs = self.H.shape[1]
+        if ps != hs:
+            # pad works on dimension 1, so I need to add one dummy dimension
+            # before of the real one
+            pedaling, H = pad(pedaling[None], self.H.copy())
+            pedaling = pedaling[0]
+            ps = pedaling.shape[0]
+            hs = H.shape[1]
+
+        assert ps == hs, f"Pedaling shape is {ps}, activation shape is {hs}"
+        assert ps == self.initV.shape[
+            1], f"Pedaling shape is {ps}, spectrogram shape is {hs}"
+
         self.to2d()
-        for start in range(0, self.V.shape[1], hop_size):
+        for start in range(0, self.V.shape[1] - win_size, hop_size):
             end = start + win_size
-            if np.any(self.H[:, start:end]):
-                V, V_hat = 1 - self.initV[:, start:
-                                          end], self.W @ self.H[:, start:end]
-                yield V, V_hat, np.mean(pedaling[start:end])
+            if np.any(H[:, start:end]):
+                V = 1 - self.initV[:, start:end]
+                V_hat = self.W @ H[:, start:end]
+                # renormalizing V_hat to match the masked V
+                V_hat /= V_hat.sum() + s.EPS
+                V_hat *= np.sum(V * np.any(self.H[:, start:end], axis=0))
+                p = pedaling[start:end]
+
+                assert p.size > 0, "Not enough pedaling data"
+
+                yield V, V_hat, np.mean(p)
 
     def collect(self, collection_attr, *args, transform=None):
         """
