@@ -118,7 +118,8 @@ TRAIN_DROPOUT = 0.1
 DTYPE = torch.float32
 PRECISION = 32
 #: percentage of the dataset to use
-DATASET_LEN = 1e-3
+VEL_DATASET_LEN = 1e-3
+PED_DATASET_LEN = 3.5e-3
 MAX_TIME_CONV_STACK = 30
 MAX_SIZE_CONV_STACK = 1 * 2**30 // 4  # ~ 1 GB
 SWA = False

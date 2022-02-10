@@ -123,13 +123,12 @@ def main():
 
     if args.redump:
         contexts = list(get_contexts(s.CARLA_PROJ).keys())
-        for split in ['train', 'validation', 'test']:
-            data_management.get_loader(split,
-                                       redump=True,
-                                       contexts=contexts,
-                                       one_context_per_batch=False,
-                                       mode=mode,
-                                       nmf_params=nmf_params)
+        data_management.get_loader(groups=None,
+                                   redump=True,
+                                   contexts=contexts,
+                                   one_context_per_batch=False,
+                                   mode=mode,
+                                   nmf_params=nmf_params)
     if args.skopt:
 
         def objective(x):

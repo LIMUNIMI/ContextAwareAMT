@@ -240,16 +240,18 @@ def get_loader(groups,
                nmf_params=None,
                njobs=s.NJOBS):
     """
-    `nmf_params` and `mode` are needed only if `redump` is True
+    `groups`, `nmf_params` and `mode` are needed only if `redump` is True
     """
     if mode == "velocity":
         process_fn = process_velocities
         data_path = s.VELOCITY_DATA_PATH
         batch_size = s.VEL_BATCH_SIZE
+        dataset_len = s.VEL_DATASET_LEN
     elif mode == "pedaling":
         process_fn = process_pedaling
         data_path = s.PEDALING_DATA_PATH
         batch_size = s.PED_BATCH_SIZE
+        dataset_len = s.PED_DATASET_LEN
     else:
         raise RuntimeError(
             f"mode {mode} not known: available are `velocity` and `pedaling`")
@@ -263,7 +265,7 @@ def get_loader(groups,
     else:
         # select the groups, subsample dataset, and shuffle it
         dataset = dataset.set_operation(dataset_utils.filter, groups=groups)
-        dataset.subsample(s.DATASET_LEN)
+        dataset.subsample(dataset_len)
         return DataLoader(
             dataset,
             batch_sampler=AEBatchSampler(batch_size, dataset,
