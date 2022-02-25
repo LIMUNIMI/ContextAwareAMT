@@ -1,6 +1,8 @@
-=============================================
-Mapping Music Performances Context to Context
-=============================================
+===========================================
+Context-aware Automatic Music Transcription
+===========================================
+
+**Supplementary information are available on the** `MIA website <https://limunimi.github.io/MIA-Music-Interpretation-Analysis>`_.
 
 Setup
 -----
