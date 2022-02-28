@@ -1,13 +1,5 @@
-[submodule "mpc2c/mytorchutils"]
-	path = mpc2c/mytorchutils
-	url = https://gitlab.di.unimi.it/federicosimonetta/mytorchutils
-[submodule "mpc2c/essentiaspec"]
-	path = mpc2c/essentiaspec
-	url = https://gitlab.di.unimi.it/federicosimonetta/essentiaspec
 [submodule "mpc2c/asmd"]
 	path = mpc2c/asmd
-	url = https://gitlab.di.unimi.it/federicosimonetta/asmd/
-[submodule "mpc2c/asmd/"]
 	url = https://gitlab.di.unimi.it/federicosimonetta/asmd/
 [submodule "mpc2c/pycarla"]
 	path = mpc2c/pycarla
