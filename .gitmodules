@@ -1,6 +1,6 @@
 [submodule "mpc2c/asmd"]
 	path = mpc2c/asmd
-	url = https://gitlab.di.unimi.it/federicosimonetta/asmd/
+	url = git@github.com:LIMUNIMI/ASMD.git
 [submodule "mpc2c/pycarla"]
 	path = mpc2c/pycarla
-	url = https://gitlab.di.unimi.it/federicosimonetta/pycarla
+	url = git@github.com:00sapo/pycarla.git
