@@ -1,9 +1,11 @@
+from typing import Optional
+
 import numpy as np
 import torch
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-from .data import DumpableDataset
+from .data import DatasetDump
 
 
 def compute_average(dataloader, *axes: int, **joblib_kwargs):
@@ -36,14 +38,13 @@ class AveragePredictor(object):
         predictor.update_tracking_avg()
         predictor.predict()
     """
-
     def __init__(self, *axes: int):
         """
         `axes` : int
             the axes along which the data will be summed
         """
         self.axes = axes
-        self.__sum_values__: torch.Tensor = None
+        self.__sum_values__: Optional[torch.Tensor] = None
         self.__counter__: int = 0
 
     def update_tracking_avg(self):
@@ -68,16 +69,15 @@ class AveragePredictor(object):
         if update_tracking_avg:
             self.update_tracking_avg()
 
-    def add_dataloader(self, dataset: DumpableDataset, **joblib_kwargs):
+    def add_dataloader(self, dataset: DatasetDump, **joblib_kwargs):
         """
-        Add the targets retrieved by the DumpableDataset object.
+        Add the targets retrieved by the DatasetDump object.
 
         `joblib_kwargs` are keyword arguments for joblib.Parallel
 
-        N.B. DumpableDataset allows to iterate over targets only, making the
+        N.B. DatasetDump allows to iterate over targets only, making the
         loading of data much lighter.
         """
-
         def proc(self, targets):
             self.add_to_average(targets[None])
             # for i, target in enumerate(targets):
@@ -94,7 +94,7 @@ class AveragePredictor(object):
 
         out = Parallel(**joblib_kwargs)(
             delayed(proc)(type(self)(*self.axes), targets)
-            for targets in tqdm(dataset.itertargets()))
+            for targets in dataset.itertargets())
 
         # `out` is:
         #   List[Tuple[float, float]]
@@ -103,8 +103,11 @@ class AveragePredictor(object):
         # `zip(*out)` is:
         #   Tuple[float, float, float, ...], Tuple[float, float, float, ...]
         out = list(zip(*out))
-        self.__sum_values__ = sum(out[0])
-        self.__counter__ = sum(out[1])
+        if self.__sum_values__ is None:
+            self.__sum_values__ = sum(out[0])  # type: ignore
+        else:
+            self.__sum_values__ += sum(out[0])
+        self.__counter__ += sum(out[1])
         self.update_tracking_avg()
 
     def predict(self, *x):
@@ -136,12 +139,12 @@ def test(model,
                 targets[i] = targets[i].to(device).to(dtype)
 
             out = model.predict(*inputs, *lens)
-            predictions.append(out)
+            predictions.append([o.detach().cpu().numpy() for o in out])
             values_same.append(any([torch.min(x) == torch.max(x)
                                     for x in out]))
 
             loss = testloss_fn(out, targets, lens).detach().cpu().numpy()
-            testloss.append(loss.detach().cpu().numpy())
+            testloss.append(loss)
             if np.isnan(loss):
                 raise RuntimeError("Nan in training loss!")
             if dummy_loss:

@@ -1,6 +1,7 @@
 """
 A new API for spectrograms with Essentia
 """
+
 from typing import Callable, Type
 
 import essentia.standard as esst
@@ -99,44 +100,62 @@ class Transform(metaclass=ClassCollection):
         spec: Callable
         bin_width: float
 
-        def __init__(self, size, sample_rate, **kwargs):
-            super().__init__(size, sample_rate, **kwargs)
+        def __init__(self, size, sample_rate, wintype, **kwargs):
+            super().__init__(size, sample_rate, wintype, **kwargs)
 
         def __call__(self, x):
             pass
 
     class Spectrum(_abs_):
-        def __init__(self, size, sample_rate, **kwargs):
-            super().__init__(size, sample_rate, **kwargs)
+        def __init__(self, size, sample_rate, wintype, **kwargs):
+            super().__init__(size, sample_rate, wintype, **kwargs)
+            if wintype != 'none':
+                self.window = esst.Windowing(normalized=False,
+                                             size=size,
+                                             type=wintype)
+            else:
+                self.window = lambda x: x
             self.spec = esst.Spectrum(size=size, **kwargs)
             self.bin_width = (sample_rate // 2) / (size // 2 + 1)
 
         def __call__(self, x):
-            return self.spec(x)
+            return self.spec(self.window(x))
 
     class PowerSpectrum(_abs_):
-        def __init__(self, size, sample_rate, **kwargs):
-            super().__init__(size, sample_rate, **kwargs)
+        def __init__(self, size, sample_rate, wintype, **kwargs):
+            super().__init__(size, sample_rate, wintype, **kwargs)
+            if wintype != 'none':
+                self.window = esst.Windowing(normalized=False,
+                                             size=size,
+                                             type=wintype)
+            else:
+                self.window = lambda x: x
             self.spec = esst.PowerSpectrum(size=size, **kwargs)
             self.bin_width = (sample_rate // 2) / (size // 2 + 1)
 
         def __call__(self, x):
-            return self.spec(x)
+            return self.spec(self.window(x))
 
     class CQT(_abs_):
-        def __init__(self, size, sample_rate, **kwargs):
-            super().__init__(size, sample_rate, **kwargs)
-            self.spec = esst.SpectrumCQ(sampleRate=sample_rate, **kwargs)
+        def __init__(self, size, sample_rate, wintype, **kwargs):
+            super().__init__(size, sample_rate, wintype, **kwargs)
+            self.spec = esst.SpectrumCQ(sampleRate=sample_rate,
+                                        windowType=wintype,
+                                        **kwargs)
             self.bin_width = None
 
         def __call__(self, x):
             return self.spec(x)
 
     class DCT(_abs_):
-        def __init__(self, size, sample_rate, **kwargs):
-            super().__init__(size, sample_rate, **kwargs)
+        """
+        `wintype` is not used here!
+        """
+        def __init__(self, size, sample_rate, wintype, **kwargs):
+            super().__init__(size, sample_rate, wintype, **kwargs)
             self.spec = esst.DCT(inputSize=size, **kwargs)
             self.bin_width = None
+            self.wintype = lambda x: x
 
         def __call__(self, x):
             return self.spec(x)
@@ -163,6 +182,14 @@ class ProcTransform(metaclass=ClassCollection):
 
         def __call__(self, x):
             pass
+
+    class UNARY(_abs_):
+        def __init__(self, sample_rate, spectrum_size, **kwargs):
+            super().__init__(sample_rate, spectrum_size, **kwargs)
+            self.spec = esst.UnaryOperator(**kwargs)
+
+        def __call__(self, x):
+            return self.spec(x)
 
     class LOG(_abs_):
         def __init__(self, sample_rate, spectrum_size, **kwargs):
@@ -290,10 +317,12 @@ class Spectrometer():
 
     SUB_BINS = 100
 
-    def __call__(self, frame: np.array):
+    def __call__(self, frame: np.ndarray) -> np.ndarray:
         return self.apply(frame)
 
-    def apply(self, frame: np.array, retuning_step: float = 0.0):
+    def apply(self,
+              frame: np.ndarray,
+              retuning_step: float = 0.0) -> np.ndarray:
         """
         If `retuning_step` is != 0, this function also tries to retune "audio"
         by increasing/decreasing of the specified frequency step; this is only
@@ -317,9 +346,9 @@ class Spectrometer():
         return self.proctransform(data)
 
     def spectrogram(self,
-                    audio: np.array,
+                    audio: np.ndarray,
                     hop: int = 0,
-                    retuning: float = 440.0):
+                    retuning: float = 440.0) -> np.ndarray:
         """
         Process a full audio array using the specified hop size
         If `retuning` is > 0, this function also tries to retune "audio" to the
@@ -353,6 +382,7 @@ class Spectrometer():
     def __init__(self,
                  frame_size: int,
                  sample_rate: int = 44100,
+                 wintype: str = 'hann',
                  transform: Type[Transform._abs_] = Transform.Spectrum,
                  proctransform: Type[ProcTransform._abs_] = ProcTransform.LOG,
                  transform_params: dict = {},
@@ -367,6 +397,8 @@ class Spectrometer():
         `sample_rate` : int
             the expected size of the sample rates (not needed for FFT and DCT
             with no post-process)
+        `wintype` : str
+            a window type among those of essentia (see `essentia.Windowing`) + 'none'
         `transform` : Transform
             the kind of transform to use: FFT, CQT or DCT
         `proctransform` : ProcTransform
@@ -384,12 +416,13 @@ class Spectrometer():
         self.frame_size = int(frame_size)
         self.sample_rate = int(sample_rate)
         self.hop_size = hop
+        self.wintype = wintype
         self.transform_params = transform_params
-        self.proctransform_params = transform_params
-        self.hop = hop
+        self.proctransform_params = proctransform_params
 
         self.transform = transform(size=frame_size,
                                    sample_rate=sample_rate,
+                                   wintype=wintype,
                                    **transform_params)
 
         self.proctransform = proctransform(spectrum_size=frame_size // 2 + 1,
@@ -400,7 +433,8 @@ class Spectrometer():
         return f"""<Spectrometer:
     frame_size: {self.frame_size},
     sample_rate: {self.sample_rate},
-    hop_size: {self.hop},
+    hop_size: {self.hop_size},
+    window: {self.wintype},
     transform: {self.transform},
     proctransform: {self.proctransform},
     transform_params: {self.transform_params},

@@ -1,23 +1,56 @@
+import time
 import os
 import sys
+import traceback
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple
 from pprint import pprint
+from typing import Callable, Optional, Tuple
+
+import matplotlib.pyplot as plt
 
 import skopt
 from skopt import load, plots
 from skopt.callbacks import CheckpointSaver, VerboseCallback
+import numpy as np
 
+import mlflow
 from . import context
 
 
-def hyperopt(*args, **kwargs):
+def hyperopt(*args, skoptimizer_kwargs={}, optimize_kwargs={}):
     """
     A functional interface to `SKOtimizer`.
-    Just all the args to `SKOptimizer` and run `optimize`.
+    Just pass all the args to `SKOptimizer` and run `optimize`.
     """
-    skoptimizer = SKOptimizer(*args, **kwargs)
-    skoptimizer.optimize()
+    skoptimizer = SKOptimizer(*args, **skoptimizer_kwargs)
+    skoptimizer.optimize(**optimize_kwargs)
+
+
+class EarlyStop(object):
+    def __init__(self, n_iters):
+        """
+        Stops the Optimization if for `n_iters` there are no improvements
+        """
+
+        self.n_iters = n_iters
+        self.counter = 0
+
+    def __call__(self, res):
+        """
+        Return True if there was `self.n_iters` without improvements, otherwise
+        returns False.
+        """
+        if res.fun == res.func_vals[-1]:
+            # last iteration was the best one
+            self.counter = 0
+            return False
+        elif self.counter >= self.n_iters:
+            # n_iters were passed
+            return True
+        else:
+            # n_iters were not passed
+            self.counter += 1
+            return False
 
 
 @dataclass
@@ -48,10 +81,15 @@ class SKOptimizer(object):
 
     `plot_graphs` a boolean default to True; if False, no plot is produced
 
+    `early_stop` a tuple representing the number of iterations without
+        improvement after which the optimization will be stopped even if
+        `num_iter` has not been reached yet; by default, it is set to `num_iter
+        * 0.4`. To disable, simply put this equal to `num_iter`.
+
     Methods
     -------
 
-    `plot` opens a `visdom` instance and plots the `self.res` object in this
+    `plot` opens a `MLFLow` instance and plots the `self.res` object in this
         instance
 
     `optimize` load a checkpoint if it exists and starts the optimization
@@ -63,14 +101,16 @@ class SKOptimizer(object):
 
     space: list
     checkpoint_path: str = 'skopt_checkpoint.pkl'
-    num_iter: Tuple[int] = (0, 100)
+    num_iter: Tuple[int, int] = (0, 100)
     to_minimize: Callable = lambda x: 1
     optimization_method: Callable = skopt.forest_minimize
     space_constraint: Optional[Callable] = None
     plot_graphs: bool = True
     seed: int = 1992
+    early_stop: Tuple[int,
+                      int] = (4 * num_iter[0] // 10, 4 * num_iter[1] // 10)
 
-    def _make_objective_func(self):
+    def _make_objective_func(self, max_loss=1.0):
         global objective
 
         @skopt.utils.use_named_args(self.space)
@@ -85,11 +125,11 @@ class SKOptimizer(object):
             except (ValueError, Exception, RuntimeError) as e:
                 if context.DEBUG:
                     # the following 2 are for debugging
-                    import traceback
                     traceback.print_exc(e)
                 print("Detected runtime error: ", e, file=sys.stderr)
                 print("To view this error, set `context.DEBUG` to False")
-                loss = 1.0
+                loss = max_loss
+
             return loss
 
         return objective
@@ -109,70 +149,89 @@ class SKOptimizer(object):
             return None
 
     def plot(self):
-        import matplotlib.pyplot as plt
         if not self.plot_graphs:
             return
-        print("Plotting a res object, open visdom on localhost!")
+        print("Plotting a res object, open MLFlow on localhost!")
         # plottings
         fig = plt.figure()
         plots.plot_convergence(self.res)
-        context.vis.matplot(fig)
+        mlflow.log_figure(fig, str(int(time.time())) + '.png')
 
         # the previous method doesn't work here (matplotlib sucks)
+        # previous comment was for visdom...
         axes = plots.plot_objective(self.res)
-        context.vis.matplot(axes.flatten()[0].figure)
+        fig = axes.flatten()[0].figure
+        mlflow.log_figure(fig, str(int(time.time())) + '.png')
         axes = plots.plot_evaluations(self.res)
-        context.vis.matplot(axes.flatten()[0].figure)
+        fig = axes.flatten()[0].figure
+        mlflow.log_figure(fig, str(int(time.time())) + '.png')
 
-    def optimize(self):
+    def optimize(self, max_loss=1.0, **kwargs):
         self.res = None
         if self.load_res():
             x0 = self.res.x_iters
             y0 = self.res.func_vals
+            prev_iters = len(x0)
             random_state = self.res.random_state
         else:
             print("Starting new optimization from scratch...")
             x0 = y0 = None
+            prev_iters = 0
             random_state = self.seed
 
         verbose_callback = VerboseCallback(1)
         checkpoint_saver = CheckpointSaver(self.checkpoint_path)
-        if self.num_iter[0] > 0:
+        if prev_iters < self.num_iter[0]:
             print("\n=================================")
             print("Uniform random init")
             print("=================================\n")
-            self.res = skopt.dummy_minimize(
-                func=self._make_objective_func(),
+            kwargs_ = dict(
+                func=self._make_objective_func(max_loss),
                 dimensions=self.space,
                 x0=x0,  # already examined values for x
                 y0=y0,  # observed values for x0
-                callback=[verbose_callback, checkpoint_saver],
-                space_constraint=self._make_constraint(),
+                callback=[
+                    verbose_callback, checkpoint_saver,
+                    EarlyStop(self.early_stop[0])
+                ],
                 random_state=random_state,
-                n_calls=self.num_iter[0])
+                n_calls=self.num_iter[0] - prev_iters,
+                **kwargs
+            )
+            if self.space_constraint is not None:
+                kwargs_["space_constraint"]=self._make_constraint()
+            self.res = skopt.dummy_minimize(**kwargs_)
             x0 = self.res.x_iters
             y0 = self.res.func_vals
+            prev_iters = len(x0)
             random_state = self.res.random_state
 
-        if self.num_iter[1] > 0:
+        if prev_iters - self.num_iter[0] < self.num_iter[1]:
             print("\n=================================")
             print("Specific method optimization")
             print("=================================\n")
-            self.res = self.optimization_method(
-                func=self._make_objective_func(),
+            kwargs_ = dict(
+                func=self._make_objective_func(max_loss),
                 dimensions=self.space,
                 x0=x0,  # already examined values for x
                 y0=y0,  # observed values for x0
-                callback=[verbose_callback, checkpoint_saver],
-                space_constraint=self._make_constraint(),
+                callback=[
+                    verbose_callback, checkpoint_saver,
+                    EarlyStop(self.early_stop[1])
+                ],
                 random_state=random_state,
-                n_calls=self.num_iter[1])
+                model_queue_size=1,
+                n_calls=self.num_iter[1] + self.num_iter[0] - prev_iters,
+                **kwargs
+            )
+            if self.space_constraint is not None:
+                kwargs_["space_constraint"]=self._make_constraint()
+            self.res = self.optimization_method(**kwargs_)
 
         if self.res is None:
             print("No iteration!")
             return
 
-        skopt.utils.dump(self.res, "skopt_result.pkl")
         print("\n=================================\n")
 
         self.plot()
@@ -205,33 +264,3 @@ class SKOptimizer(object):
             return _load(result_fname)
 
         return False
-
-
-def get_default_constraint(model_build_func, test_sample, device, dtype):
-    """
-    A function to build a constraint around the model size; the constraint
-    tries to build the model and use it with a random function
-    """
-    def constraint(hpar):
-        print("----------")
-        print("checking this set of hpar: ")
-        pprint(hpar)
-        allowed = True
-
-        if allowed:
-            try:
-                model = model_build_func(hpar)
-                print("model created")
-                model(*[sample.to(device).to(dtype) for sample in test_sample])
-                print("model tested")
-            except Exception as e:
-                if context.DEBUG:
-                    import traceback
-                    traceback.print_exc(e)
-                print(e)
-                allowed = False
-
-        print(f"hyper-parameters allowed: {allowed}")
-        return allowed
-
-    return constraint
