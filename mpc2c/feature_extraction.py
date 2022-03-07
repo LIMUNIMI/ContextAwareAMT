@@ -184,7 +184,7 @@ def make_stack(insize, k1, k2, activation, kernel, condition):
                                kernel=kernel)
         stack.append(blocks)
         insize = blocks.outsize(insize)
-        num_params += len([p for p in blocks.parameters()])
+        num_params += sum([p.numel() for p in blocks.parameters()])
         if time(
         ) - ttt > s.MAX_TIME_CONV_STACK or num_params > s.MAX_SIZE_CONV_STACK:
             raise RuntimeError("Model exceeded max size for a conv stack")
