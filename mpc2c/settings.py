@@ -1,5 +1,4 @@
 import torch
-from skopt import space
 from torch import nn
 
 from . import essentiaspec
@@ -132,19 +131,6 @@ GRIDSPACE = {
     'spec_k2': [1, 2, 4],
     'spec_kernel': [3, 5],
 }
-
-# SKOPT not used anymore
-SKSPACE = [
-    space.Integer(0, 4, name='enc_k1'),
-    space.Integer(2, 5, name='enc_k2'),
-    space.Integer(2, 7, name='enc_kernel'),
-    space.Integer(0, 4, name='spec_k1'),
-    space.Integer(2, 5, name='spec_k2'),
-    space.Integer(2, 7, name='spec_kernel'),
-    # space.Categorical([nn.GELU(), nn.ReLU(), nn.SELU()], name='activation'),
-]
-SKITERATIONS = (0, 50)
-PLOT_GRAPHS = True
 
 #: If compiling code with cython in pure-python mode
 BUILD = False

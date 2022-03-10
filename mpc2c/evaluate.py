@@ -122,14 +122,14 @@ def significance_analysis(distributions):
     print(reject)
 
 
-def analyze_context_importance(df, methods, var=im + "perfm_test_avg"):
+def analyze_context_importance(df, methods, mode, var=im + "perfm_test_avg"):
     """
     Analyze the importance of condidering context and not by taking the best
     value for each run among those configurations that consider context and
     comparing them to the configuration that doesn't consider context.
     """
 
-    title = "Test Avg By Context"
+    title = f"Test Avg By Context ({mode})"
     dists = {'context': [], 'no_context': []}
     regex = re.compile(".*True.*")
     for m in methods:
@@ -156,12 +156,12 @@ def analyze_context_importance(df, methods, var=im + "perfm_test_avg"):
     fig.show()
 
 
-def analyze_methods(df, methods, var="perfm_test_avg"):
+def analyze_methods(df, methods, mode, var="perfm_test_avg"):
     """
     Analyze each method across the various runs.
     """
 
-    title = "Test Avg By Method"
+    title = f"Test Avg By Method ({mode})"
     distributions_by_method = {m: df.loc[m][var] for m in methods}
     print("Plotting " + title)
 
@@ -245,11 +245,11 @@ def main(mode, metric):
 
     print("\n==============\n")
 
-    analyze_context_importance(df, methods, var=metric)
+    analyze_context_importance(df, methods, mode, var=metric)
 
     print("\n==============\n")
 
-    analyze_methods(df, methods, var=metric)
+    analyze_methods(df, methods, mode, var=metric)
 
     print("\n==============\n")
     find_best_method(df, methods, var=metric)
