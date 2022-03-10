@@ -1,0 +1,115 @@
+using minpitch:  21
+using maxpitch:  108
+Number of valid runs: 104
+
+==============
+
+Parity: 4_1_3_4_1_5 - True-False True-True!
+Parity: 4_1_3_4_1_5 - True-True True-False!
+Parity: 4_1_3_4_4_3 - True-False True-True!
+Parity: 4_1_3_4_4_3 - True-True True-False!
+Parity: 4_1_5_4_1_3 - True-False True-True!
+Parity: 4_1_5_4_1_3 - True-True True-False!
+Parity: 4_1_5_4_1_5 - True-False True-True!
+Parity: 4_1_5_4_1_5 - False-True False-False!
+Parity: 4_1_5_4_1_5 - True-True True-False!
+Parity: 4_1_5_4_1_5 - False-False False-True!
+Parity: 4_1_5_4_2_3 - True-False True-True!
+Parity: 4_1_5_4_2_3 - True-True True-False!
+Parity: 4_1_5_4_4_5 - True-False True-True!
+Parity: 4_1_5_4_4_5 - True-True True-False!
+Wins analysis:
+
+             True-False  False-True  True-True  False-False  all
+True-False           -1           5         14            5    2
+False-True           21          -1         21           18   17
+True-True             6           5         -1            5    2
+False-False          21           7         21           -1    7
+
+==============
+
+Plotting Test Avg By Context
+Normality tests:
+context: 1.73e-06
+no_context: 5.14e-05
+-------
+One-way ANOVA: 2.17e-01
+One-way Kruskal: 3.69e-02
+-------
+
+T-test p-values:
+
+            context  no_context
+context         NaN    0.039657
+no_context      NaN         NaN
+
+Correction reject hypothesis:
+
+            context  no_context
+context         NaN    0.039657
+no_context      NaN         NaN
+
+Wilcoxon p-values:
+
+            context  no_context
+context         NaN     0.00994
+no_context      NaN         NaN
+
+Correction reject hypothesis:
+
+            context  no_context
+context         NaN     0.00994
+no_context      NaN         NaN
+
+==============
+
+Plotting Test Avg By Method
+Normality tests:
+True-False: 3.35e-06
+False-True: 1.16e-06
+True-True: 3.01e-06
+False-False: 5.14e-05
+-------
+One-way ANOVA: 3.27e-01
+One-way Kruskal: 3.65e-03
+-------
+
+T-test p-values:
+
+             True-False  False-True  True-True  False-False
+True-False          NaN    0.078931   0.835273     0.031194
+False-True          NaN         NaN   0.067109     0.652140
+True-True           NaN         NaN        NaN     0.024155
+False-False         NaN         NaN        NaN          NaN
+
+Correction reject hypothesis:
+
+             True-False  False-True  True-True  False-False
+True-False          NaN    0.268435   1.000000     0.155969
+False-True          NaN         NaN   0.268435     1.000000
+True-True           NaN         NaN        NaN     0.144928
+False-False         NaN         NaN        NaN          NaN
+
+Wilcoxon p-values:
+
+             True-False  False-True  True-True  False-False
+True-False          NaN    0.002843   0.390533     0.000765
+False-True          NaN         NaN   0.003088     0.082653
+True-True           NaN         NaN        NaN     0.000635
+False-False         NaN         NaN        NaN          NaN
+
+Correction reject hypothesis:
+
+             True-False  False-True  True-True  False-False
+True-False          NaN    0.011371   0.390533     0.003824
+False-True          NaN         NaN   0.011371     0.165306
+True-True           NaN         NaN        NaN     0.003813
+False-False         NaN         NaN        NaN          NaN
+
+==============
+
+Method         metrics.perfm_test_avg test_avg test_std
+True-False :        2.91e-01  2.91e-01  1.84e-01
+False-True :        2.84e-01  2.84e-01  1.87e-01
+True-True  :        2.91e-01  2.91e-01  1.84e-01
+False-False:        2.85e-01  2.85e-01  2.00e-01
