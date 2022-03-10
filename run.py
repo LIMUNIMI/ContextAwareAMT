@@ -80,6 +80,14 @@ def parse_args():
                         "--evaluate",
                         action="store_true",
                         help="Evaluate configurations")
+    parser.add_argument(
+        "-m",
+        "--metric",
+        action="store",
+        help=
+        "Evaluate configurations against the provided mlflow metric (default: `metrics.perfm_test_avg`).",
+        default="metrics.perfm_test_avg")
+
     return parser.parse_args()
 
 
@@ -203,7 +211,7 @@ def main():
                        test=True)
 
     if args.evaluate:
-        evaluate.main(mode)
+        evaluate.main(mode, args.metric)
 
 
 if __name__ == "__main__":

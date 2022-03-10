@@ -224,11 +224,12 @@ def find_best_method(df,
         )
 
 
-def main(mode):
-    import sys
+def main(mode, metric):
 
-    df = pd.read_csv("{mode}_results.csv")
+    df = pd.read_csv(f"{mode}_results.csv")
 
+    # check if params and metrics are separated with a dot (this depends on
+    # the mlflow version)
     global ip, im
     if 'enc_k1' in df.columns:
         ip = im = ''
@@ -236,29 +237,19 @@ def main(mode):
         ip = 'params.'
         im = 'metrics.'
 
-    if len(sys.argv) == 1:
-        var = im + "perfm_test_avg"
-    else:
-        var = sys.arg[1]
-
     df, methods, params = add_multi_index(df)
 
     print("\n==============\n")
 
-    analyze_wins(df, methods, var=var)
+    analyze_wins(df, methods, var=metric)
 
     print("\n==============\n")
 
-    analyze_context_importance(df, methods, var=var)
+    analyze_context_importance(df, methods, var=metric)
 
     print("\n==============\n")
 
-    analyze_methods(df, methods, var=var)
+    analyze_methods(df, methods, var=metric)
 
     print("\n==============\n")
-    find_best_method(df, methods, var=var)
-
-
-if __name__ == "__main__":
-    import sys
-    main(sys.argv[1])
+    find_best_method(df, methods, var=metric)
