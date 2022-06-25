@@ -1,5 +1,3 @@
-using minpitch:  21
-using maxpitch:  108
 Number of valid runs: 104
 
 ==============

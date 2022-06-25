@@ -211,7 +211,7 @@ def main():
                        test=True)
 
     if args.evaluate:
-        evaluate.main(mode, args.metric)
+        evaluate.main(args.metric)
 
 
 if __name__ == "__main__":

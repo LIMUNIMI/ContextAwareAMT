@@ -8,6 +8,11 @@ import re
 
 OUTPUT_DIR = "imgs"
 ip = im = ''
+regex = re.compile(".*True.*")
+
+
+def is_context_aware(method):
+    regex.match(method)
 
 
 def myplot(title, *args, **kwargs):
@@ -122,19 +127,21 @@ def significance_analysis(distributions):
     print(reject)
 
 
-def analyze_context_importance(df, methods, mode, var=im + "perfm_test_avg"):
+def analyze_context_importance(dfs, methods, var=im + "perfm_test_avg"):
     """
     Analyze the importance of condidering context and not by taking the best
     value for each run among those configurations that consider context and
     comparing them to the configuration that doesn't consider context.
+
+    `dfs`: List[Tuple[str, pd.DataFrame]], where `str` is the mode.
     """
 
-    title = f"Test Avg By Context ({mode})"
+    title = "Test Avg By Context"
     dists = {'context': [], 'no_context': []}
-    regex = re.compile(".*True.*")
+    # TODO: plot two distro's based on `mode`
     for m in methods:
-        data = df.loc[m][var]
-        if regex.match(m):
+        data = dfs.loc[m][var]
+        if is_context_aware(m):
             dists['context'].append(data)
         else:
             dists['no_context'].append(data)
@@ -205,13 +212,13 @@ def analyze_wins(df, methods, var=im + "perfm_test_avg"):
     return wins
 
 
-def find_best_method(df,
+def find_best_method(dfs,
                      methods,
                      var=im + 'perfm_test_avg',
                      lower_is_better=True):
     print(f"Method         {var:<9} test_avg test_std")
     for method in methods:
-        df_method = df.loc[method]
+        df_method = dfs.loc[method]
         if lower_is_better:
             i = df_method[var].argmin()
         else:
@@ -224,32 +231,48 @@ def find_best_method(df,
         )
 
 
-def main(mode, metric):
+def compute_reward(df, methods):
+    """
+    Compute the reward for each method and substitutes it into the dataframe.
 
-    df = pd.read_csv(f"{mode}_results.csv")
+    The method against which the rewqrd will be computed is the one for which
+    `is_context_aware()` returns False
+    """
+    # TODO
+
+
+def main(metric):
+
+    dfs = []
+    for mode in ['pedaling', 'velocity']:
+        mode_df = pd.read_csv(f"{mode}_results.csv")
+        mode_df, methods, params = add_multi_index(mode_df)
+        mode_df = compute_reward(mode_df, methods)
+        dfs.append((mode, mode_df))
 
     # check if params and metrics are separated with a dot (this depends on
     # the mlflow version)
     global ip, im
-    if 'enc_k1' in df.columns:
+    if 'enc_k1' in dfs.columns:
         ip = im = ''
     else:
         ip = 'params.'
         im = 'metrics.'
 
-    df, methods, params = add_multi_index(df)
-
     print("\n==============\n")
 
-    analyze_wins(df, methods, var=metric)
+    analyze_context_importance(dfs, methods, var=metric)
 
-    print("\n==============\n")
+    for mode, df in dfs:
+        print("==========================")
+        print(f"= Analysis for {mode} =")
+        print("===================")
 
-    analyze_context_importance(df, methods, mode, var=metric)
+        print("\n==============\n")
+        analyze_methods(df, methods, mode, var=metric)
 
-    print("\n==============\n")
+        print("\n==============\n")
+        find_best_method(df, methods, var=metric)
 
-    analyze_methods(df, methods, mode, var=metric)
-
-    print("\n==============\n")
-    find_best_method(df, methods, var=metric)
+        print("\n==============\n")
+        analyze_wins(dfs, methods, var=metric)
