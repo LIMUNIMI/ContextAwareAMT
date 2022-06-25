@@ -7,7 +7,6 @@ from statsmodels.stats.multitest import multipletests
 import re
 
 OUTPUT_DIR = "imgs"
-ip = im = ''
 regex = re.compile(".*True.*")
 
 
@@ -27,30 +26,30 @@ def myplot(title, *args, **kwargs):
     return fig
 
 
-def add_multi_index(df: pd.DataFrame):
+def add_multi_index(df: pd.DataFrame, initp="", initm=""):
     """
     Add a multi-index consisting of the hyper-parameters of the runs
     """
 
     hyperparams = df[[
-        ip + 'enc_k1', ip + 'enc_k2', ip + 'enc_kernel', ip + 'spec_k1',
-        ip + 'spec_k2', ip + 'spec_kernel'
+        initp + 'enc_k1', initp + 'enc_k2', initp + 'enc_kernel',
+        initp + 'spec_k1', initp + 'spec_k2', initp + 'spec_kernel'
     ]].astype(str).apply(lambda x: '_'.join(x), axis=1)
     df['params'] = hyperparams
 
-    multiple_performers = df[ip + 'multiple_performers'].astype('string')
-    context_specific = df[ip + 'context_specific'].astype('string')
+    multiple_performers = df[initp + 'multiple_performers'].astype('string')
+    context_specific = df[initp + 'context_specific'].astype('string')
     context_specific = context_specific.astype('string')
     df['method'] = multiple_performers + '-' + context_specific
     methods = df['method'].unique()
 
     # removing runs that have not ended
-    df = df[df[im + 'perfm_test_avg'].notna()]
+    df = df[df[initm + 'perfm_test_avg'].notna()]
     # keep only the 4 most recent runs for each set of params
     # (if one set had a stopped run, it is restarted from scratch)
     df = df.groupby('params').head(4)
     # remove params with less than 4 runs
-    params_ok = df.groupby('params')[im + 'perfm_test_avg'].count() == 4
+    params_ok = df.groupby('params')[initm + 'perfm_test_avg'].count() == 4
     runs_ok = df['params'].isin(params_ok[params_ok].index)
     df = df[runs_ok]
 
@@ -127,7 +126,7 @@ def significance_analysis(distributions):
     print(reject)
 
 
-def analyze_context_importance(dfs, methods, var=im + "perfm_test_avg"):
+def analyze_context_importance(dfs, methods, var="perfm_test_avg", initm=""):
     """
     Analyze the importance of condidering context and not by taking the best
     value for each run among those configurations that consider context and
@@ -136,6 +135,7 @@ def analyze_context_importance(dfs, methods, var=im + "perfm_test_avg"):
     `dfs`: List[Tuple[str, pd.DataFrame]], where `str` is the mode.
     """
 
+    var = initm + var
     title = "Test Avg By Context"
     dists = {'context': [], 'no_context': []}
     # TODO: plot two distro's based on `mode`
@@ -163,11 +163,12 @@ def analyze_context_importance(dfs, methods, var=im + "perfm_test_avg"):
     fig.show()
 
 
-def analyze_methods(df, methods, mode, var="perfm_test_avg"):
+def analyze_methods(df, methods, mode, var="perfm_test_avg", initm=""):
     """
     Analyze each method across the various runs.
     """
 
+    var = initm + var
     title = f"Test Avg By Method ({mode})"
     distributions_by_method = {m: df.loc[m][var] for m in methods}
     print("Plotting " + title)
@@ -179,12 +180,13 @@ def analyze_methods(df, methods, mode, var="perfm_test_avg"):
     fig.show()
 
 
-def analyze_wins(df, methods, var=im + "perfm_test_avg"):
+def analyze_wins(df, methods, var="perfm_test_avg", initm=""):
     """
     Analyze how many configuration each method is the best
 
     Returns a dataframe where rows are methods and cols are beated methods
     """
+    var = initm + var
     L = len(methods)
     cols = list(methods) + ['all']
     wins = pd.DataFrame(np.zeros((L, L + 1), dtype=np.int32), methods, cols)
@@ -214,8 +216,10 @@ def analyze_wins(df, methods, var=im + "perfm_test_avg"):
 
 def find_best_method(dfs,
                      methods,
-                     var=im + 'perfm_test_avg',
+                     var='perfm_test_avg',
+                     initm="",
                      lower_is_better=True):
+    var = initm + var
     print(f"Method         {var:<9} test_avg test_std")
     for method in methods:
         df_method = dfs.loc[method]
@@ -224,8 +228,8 @@ def find_best_method(dfs,
         else:
             i = df_method[var].argmax()
         best_var = df_method.iloc[i][var]
-        best_test_avg = df_method.iloc[i][im + 'perfm_test_avg']
-        best_test_std = df_method.iloc[i][im + 'perfm_test_std']
+        best_test_avg = df_method.iloc[i][initm + 'perfm_test_avg']
+        best_test_std = df_method.iloc[i][initm + 'perfm_test_std']
         print(
             f"{method:<11}:        {best_var:.2e}  {best_test_avg:.2e}  {best_test_std:.2e}"
         )
@@ -238,7 +242,19 @@ def compute_reward(df, methods):
     The method against which the rewqrd will be computed is the one for which
     `is_context_aware()` returns False
     """
+    __import__('ipdb').set_trace()
     # TODO
+
+
+def __get_inits(df):
+    # check if params and metrics are separated with a dot (this depends on
+    # the mlflow version)
+    if 'enc_k1' in df.columns:
+        initp = initm = ''
+    else:
+        initp = 'params.'
+        initm = 'metrics.'
+    return initp, initm
 
 
 def main(metric):
@@ -246,33 +262,28 @@ def main(metric):
     dfs = []
     for mode in ['pedaling', 'velocity']:
         mode_df = pd.read_csv(f"{mode}_results.csv")
-        mode_df, methods, params = add_multi_index(mode_df)
-        mode_df = compute_reward(mode_df, methods)
-        dfs.append((mode, mode_df))
-
-    # check if params and metrics are separated with a dot (this depends on
-    # the mlflow version)
-    global ip, im
-    if 'enc_k1' in dfs.columns:
-        ip = im = ''
-    else:
-        ip = 'params.'
-        im = 'metrics.'
-
-    print("\n==============\n")
-
-    analyze_context_importance(dfs, methods, var=metric)
-
-    for mode, df in dfs:
+        initp, initm = __get_inits(mode_df)
+        mode_df, methods, params = add_multi_index(mode_df,
+                                                   initp=initp,
+                                                   initm=initm)
         print("==========================")
         print(f"= Analysis for {mode} =")
-        print("===================")
+        print("==========================")
 
         print("\n==============\n")
-        analyze_methods(df, methods, mode, var=metric)
+        find_best_method(mode_df, methods, var=metric, initm=initm)
 
         print("\n==============\n")
-        find_best_method(df, methods, var=metric)
+        analyze_wins(dfs, methods, var=metric, initm=initm)
+
+        mode_df = compute_reward(mode_df, methods)
 
         print("\n==============\n")
-        analyze_wins(dfs, methods, var=metric)
+        analyze_methods(mode_df, methods, mode, var=metric, initm=initm)
+
+        dfs.append((mode, mode_df))
+
+    print("\n==============\n")
+    print("Context importance")
+
+    analyze_context_importance(dfs, methods, var=metric, initm=initm)
