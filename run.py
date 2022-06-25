@@ -75,11 +75,11 @@ def parse_args():
         "-pc",
         "--printcontexts",
         action="store_true",
-        help="Print contexts in the order with the labels shown in mlflow log")
+        help="Print contexts in the order with the labels shown in mlflow log and exit")
     parser.add_argument("-e",
                         "--evaluate",
                         action="store_true",
-                        help="Evaluate configurations")
+                        help="Evaluate configurations and exit")
     parser.add_argument(
         "-m",
         "--metric",
@@ -113,9 +113,14 @@ def main():
 
     contexts = list(get_contexts(s.CARLA_PROJ).keys())
 
+    if args.evaluate:
+        evaluate.main(args.metric)
+        return
+
     if args.printcontexts:
         for i, c in enumerate(contexts):
             print(f"{i}: {c}")
+        return
 
     if args.pedaling:
         mode = 'pedaling'
@@ -209,9 +214,6 @@ def main():
                        copy_checkpoint=Path("models") /
                        f"{mode}_{args.contextspecific}.pt",
                        test=True)
-
-    if args.evaluate:
-        evaluate.main(args.metric)
 
 
 if __name__ == "__main__":
