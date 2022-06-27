@@ -11,7 +11,7 @@ regex = re.compile(".*True.*")
 
 
 def is_context_aware(method):
-    regex.match(method)
+    return regex.match(method)
 
 
 def myplot(title, *args, **kwargs):
@@ -21,7 +21,7 @@ def myplot(title, *args, **kwargs):
         **kwargs,
         # box=True,
         title=title,
-        points='all')
+        points=False)
     fig.update_traces(boxmean='sd')
     return fig
 
@@ -128,7 +128,7 @@ def significance_analysis(distributions):
 
 def analyze_context_importance(dfs, methods, var="perfm_test_avg", initm=""):
     """
-    Analyze the importance of condidering context and not by taking the best
+    Analyze the importance of considering context and not by taking the best
     value for each run among those configurations that consider context and
     comparing them to the configuration that doesn't consider context.
 
@@ -137,25 +137,32 @@ def analyze_context_importance(dfs, methods, var="perfm_test_avg", initm=""):
 
     var = initm + var
     title = "Test Avg By Context"
-    dists = {'context': [], 'no_context': []}
-    # TODO: plot two distro's based on `mode`
-    for m in methods:
-        data = dfs.loc[m][var]
-        if is_context_aware(m):
-            dists['context'].append(data)
-        else:
-            dists['no_context'].append(data)
+    dists = {mode: df['reward'] for mode, df in dfs}
+    oracles = {}
 
-    dists['no_context'] = pd.concat(dists['no_context'])
-
-    dists['context'] = pd.concat(dists['context'], axis=1).min(axis=1)
+    # adding the oracles
+    for mode in dists:
+        oracles[mode] = []
+        for m in methods:
+            if is_context_aware(m):
+                oracles[mode].append(dists[mode].loc[m])
+        oracles[mode] = pd.concat(oracles[mode], axis=1).max(axis=1)
 
     print("Plotting " + title)
 
+    print("Significance analysis for all the distributions")
     significance_analysis(dists)
+
+    print("Significance analysis for the oracles")
+    significance_analysis(oracles)
 
     fig = myplot(title,
                  pd.DataFrame(dists).melt(),
+                 x='variable',
+                 y='value',
+                 color='variable')
+    fig = myplot(title + " oracles",
+                 pd.DataFrame(oracles).melt(),
                  x='variable',
                  y='value',
                  color='variable')
@@ -170,7 +177,10 @@ def analyze_methods(df, methods, mode, var="perfm_test_avg", initm=""):
 
     var = initm + var
     title = f"Test Avg By Method ({mode})"
-    distributions_by_method = {m: df.loc[m][var] for m in methods}
+    distributions_by_method = {
+        m: df.loc[m][var]
+        for m in methods if is_context_aware(m)
+    }
     print("Plotting " + title)
 
     significance_analysis(distributions_by_method)
@@ -235,15 +245,31 @@ def find_best_method(dfs,
         )
 
 
-def compute_reward(df, methods):
+def compute_reward(
+    df,
+    methods,
+    var='perfm_test_avg',
+    initm="",
+):
     """
     Compute the reward for each method and substitutes it into the dataframe.
+    Return the new dataframe modified.
 
     The method against which the rewqrd will be computed is the one for which
     `is_context_aware()` returns False
     """
-    __import__('ipdb').set_trace()
-    # TODO
+    var = initm + var
+    new_df = df.copy()
+    new_df['reward_' + var] = None
+    unaware_method = [m for m in methods if not is_context_aware(m)][0]
+    reference = new_df.loc[unaware_method][var]
+    for m in methods:
+        if m == unaware_method:
+            new_df.drop(unaware_method, level=0, axis=0, inplace=True)
+        else:
+            new_df.loc[m,
+                       'reward'] = (new_df.loc[m, var] - reference).to_numpy()
+    return new_df
 
 
 def __get_inits(df):
@@ -262,7 +288,10 @@ def main(metric):
     dfs = []
     for mode in ['pedaling', 'velocity']:
         mode_df = pd.read_csv(f"{mode}_results.csv")
+        # fixing metric based on the version of MLFlow
         initp, initm = __get_inits(mode_df)
+        if metric.startswith(initm):
+            metric = metric[len(initm):]
         mode_df, methods, params = add_multi_index(mode_df,
                                                    initp=initp,
                                                    initm=initm)
@@ -273,17 +302,17 @@ def main(metric):
         print("\n==============\n")
         find_best_method(mode_df, methods, var=metric, initm=initm)
 
-        print("\n==============\n")
-        analyze_wins(dfs, methods, var=metric, initm=initm)
+        # print("\n==============\n")
+        analyze_wins(mode_df, methods, var=metric, initm=initm)
 
-        mode_df = compute_reward(mode_df, methods)
+        mode_df = compute_reward(mode_df, methods, var=metric, initm=initm)
 
         print("\n==============\n")
-        analyze_methods(mode_df, methods, mode, var=metric, initm=initm)
+        analyze_methods(mode_df, methods, mode, var='reward', initm='')
 
         dfs.append((mode, mode_df))
 
     print("\n==============\n")
     print("Context importance")
 
-    analyze_context_importance(dfs, methods, var=metric, initm=initm)
+    analyze_context_importance(dfs, methods, var='reward', initm='')
