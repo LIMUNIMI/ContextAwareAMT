@@ -326,7 +326,7 @@ def add_point_to_point_subplot(other, fig, idx, reference, var):
         fig.add_trace(d, row=1, col=idx + 1)
 
 
-def point_to_point_by_method(df, methods, var='perfm_test_avg', initm=""):
+def point_to_point_by_method(df, methods, mode, var='perfm_test_avg', initm=""):
     """
     Creates a plot with two points for each hyper-parameter combination
     """
@@ -343,7 +343,7 @@ def point_to_point_by_method(df, methods, var='perfm_test_avg', initm=""):
         other = df.loc[m, var].reset_index()
         other['color'] = "e'"
         add_point_to_point_subplot(other, fig, idx, reference, var)
-    title = "Error difference by Method"
+    title = f"Error difference by mode {mode}"
     fig.update_layout(title_text=title)
     fig.update_yaxes(showticklabels=False)  # Hide y axis ticks
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
@@ -386,7 +386,7 @@ def main(metric):
         # print("\n==============\n")
         analyze_wins(mode_df, methods, var=metric, initm=initm)
 
-        point_to_point_by_method(mode_df, methods, var=metric, initm=initm)
+        point_to_point_by_method(mode_df, methods, mode, var=metric, initm=initm)
 
         mode_df = compute_reward(mode_df, methods, var=metric, initm=initm)
 
