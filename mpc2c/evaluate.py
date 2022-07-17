@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
+from plotly.subplots import make_subplots
 from scipy.stats import wilcoxon, f_oneway, ttest_rel, kruskal, shapiro
 from statsmodels.stats.multitest import multipletests
 
@@ -128,9 +129,9 @@ def significance_analysis(distributions):
 
 def analyze_context_importance(dfs, methods, var="perfm_test_avg", initm=""):
     """
-    Analyze the importance of considering context and not by taking the best
+    Analyze the importance of considering context and not. It takes the best
     value for each run among those configurations that consider context and
-    comparing them to the configuration that doesn't consider context.
+    compares them to the configuration that doesn't consider context.
 
     `dfs`: List[Tuple[str, pd.DataFrame]], where `str` is the mode.
     """
@@ -156,16 +157,43 @@ def analyze_context_importance(dfs, methods, var="perfm_test_avg", initm=""):
     print("Significance analysis for the oracles")
     significance_analysis(oracles)
 
-    fig = myplot(title,
-                 pd.DataFrame(dists).melt(),
-                 x='variable',
-                 y='value',
-                 color='variable')
     fig = myplot(title + " oracles",
                  pd.DataFrame(oracles).melt(),
                  x='variable',
                  y='value',
                  color='variable')
+    fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
+    fig.show()
+
+def point_to_point_by_context(dfs, var='perfm_test_avg', initm=""):
+    """
+    Creates point-to-point plot for each df in `dfs`, but only using the best
+    method among the ones that are context-aware
+    """
+    var = initm + var
+
+    fig = make_subplots(rows=1, cols=len(dfs), subplot_titles=[df[0] for df in dfs])
+
+    for idx, (mode, methods, df) in enumerate(dfs):
+        unaware_method = [m for m in methods if not is_context_aware(m)][0]
+        methods = [m for m in methods if is_context_aware(m)]
+
+        reference = df.loc[unaware_method, var].reset_index()
+        reference['color'] = "e''"
+
+        # build the dataframe with the oracle values
+        others = df.loc[methods, var].swaplevel()
+        oracle_df = reference.copy()
+        oracle_df['color'] = "e'"
+        for param in reference['params']:
+            best_value = others.loc[param].min()
+            oracle_df.loc[oracle_df['params'] == param, var] = best_value
+
+        add_point_to_point_subplot(oracle_df, fig, idx, reference, var)
+
+    title = "Error difference by oracles"
+    fig.update_layout(title_text=title)
+    fig.update_yaxes(showticklabels=False)  # Hide y axis ticks
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
     fig.show()
 
@@ -272,6 +300,56 @@ def compute_reward(
     return new_df
 
 
+def add_point_to_point_subplot(other, fig, idx, reference, var):
+    """
+    This function adds a point-to-point subplot to `fig` in column index `idx +
+    1`. It takes data from `other` and uses `reference` in each subplot.
+    The plotted value is `var` and the subplot title is `title`
+    """
+    point_shape = []
+    for i in range(len(other)):
+        if reference.iloc[i][var] - other.iloc[i][var] > 0:
+            point_shape.append('circle-open')
+        else:
+            point_shape.append('cross')
+
+    other['shape'] = point_shape
+    reference['shape'] = point_shape
+    new_df = pd.concat([other, reference], axis=0).reset_index()
+    method_fig = px.scatter(new_df,
+                            y='params',
+                            x=var,
+                            color='color',
+                            symbol='shape',
+                            symbol_map='identity')
+    for d in method_fig.data:
+        fig.add_trace(d, row=1, col=idx + 1)
+
+
+def point_to_point_by_method(df, methods, var='perfm_test_avg', initm=""):
+    """
+    Creates a plot with two points for each hyper-parameter combination
+    """
+    var = initm + var
+
+    unaware_method = [m for m in methods if not is_context_aware(m)][0]
+    methods = [m for m in methods if is_context_aware(m)]
+
+    fig = make_subplots(rows=1, cols=len(methods), subplot_titles=methods)
+
+    reference = df.loc[unaware_method, var].reset_index()
+    reference['color'] = "e''"
+    for idx, m in enumerate(methods):
+        other = df.loc[m, var].reset_index()
+        other['color'] = "e'"
+        add_point_to_point_subplot(other, fig, idx, reference, var)
+    title = "Error difference by Method"
+    fig.update_layout(title_text=title)
+    fig.update_yaxes(showticklabels=False)  # Hide y axis ticks
+    fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
+    fig.show()
+
+
 def __get_inits(df):
     # check if params and metrics are separated with a dot (this depends on
     # the mlflow version)
@@ -285,7 +363,9 @@ def __get_inits(df):
 
 def main(metric):
 
-    dfs = []
+    reward_dfs = []
+    metric_dfs = []
+    initm = ""
     for mode in ['pedaling', 'velocity']:
         mode_df = pd.read_csv(f"{mode}_results.csv")
         # fixing metric based on the version of MLFlow
@@ -295,6 +375,7 @@ def main(metric):
         mode_df, methods, params = add_multi_index(mode_df,
                                                    initp=initp,
                                                    initm=initm)
+        metric_dfs.append((mode, methods, mode_df))
         print("==========================")
         print(f"= Analysis for {mode} =")
         print("==========================")
@@ -305,14 +386,17 @@ def main(metric):
         # print("\n==============\n")
         analyze_wins(mode_df, methods, var=metric, initm=initm)
 
+        point_to_point_by_method(mode_df, methods, var=metric, initm=initm)
+
         mode_df = compute_reward(mode_df, methods, var=metric, initm=initm)
 
         print("\n==============\n")
         analyze_methods(mode_df, methods, mode, var='reward', initm='')
 
-        dfs.append((mode, mode_df))
+        reward_dfs.append((mode, mode_df))
 
     print("\n==============\n")
     print("Context importance")
 
-    analyze_context_importance(dfs, methods, var='reward', initm='')
+    analyze_context_importance(reward_dfs, methods, var='reward', initm='')
+    point_to_point_by_context(metric_dfs, var=metric, initm=initm)
