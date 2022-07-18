@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 from scipy.stats import wilcoxon, f_oneway, ttest_rel, kruskal, shapiro
 from statsmodels.stats.multitest import multipletests
 
@@ -165,6 +166,7 @@ def analyze_context_importance(dfs, methods, var="perfm_test_avg", initm=""):
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
     fig.show()
 
+
 def point_to_point_by_context(dfs, var='perfm_test_avg', initm=""):
     """
     Creates point-to-point plot for each df in `dfs`, but only using the best
@@ -172,7 +174,9 @@ def point_to_point_by_context(dfs, var='perfm_test_avg', initm=""):
     """
     var = initm + var
 
-    fig = make_subplots(rows=1, cols=len(dfs), subplot_titles=[df[0] for df in dfs])
+    fig = make_subplots(rows=1,
+                        cols=len(dfs),
+                        subplot_titles=[df[0] for df in dfs])
 
     for idx, (mode, methods, df) in enumerate(dfs):
         unaware_method = [m for m in methods if not is_context_aware(m)][0]
@@ -193,7 +197,7 @@ def point_to_point_by_context(dfs, var='perfm_test_avg', initm=""):
 
     title = "Error difference by oracles"
     fig.update_layout(title_text=title)
-    fig.update_yaxes(showticklabels=False)  # Hide y axis ticks
+    # fig.update_yaxes(showticklabels=False)  # Hide y axis ticks
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
     fig.show()
 
@@ -306,27 +310,42 @@ def add_point_to_point_subplot(other, fig, idx, reference, var):
     1`. It takes data from `other` and uses `reference` in each subplot.
     The plotted value is `var` and the subplot title is `title`
     """
-    point_shape = []
+    # point_shape = []
+    # point_reward = []
+    showlegend_neg = True
+    showlegend_pos = True
     for i in range(len(other)):
-        if reference.iloc[i][var] - other.iloc[i][var] > 0:
-            point_shape.append('circle-open')
+        e2 = reference.iloc[i][var]
+        e1 = other.iloc[i][var]
+        R = e2 - e1
+        # point_reward.append(abs(reward))
+        if R > 0:
+            color = 'blue'
+            point_shape = 'circle'
+            name = 'R > 0'
+            showlegend = showlegend_pos
+            showlegend_pos = False
         else:
-            point_shape.append('cross')
+            color = 'red'
+            point_shape = 'cross'
+            name = 'R ≤ 0'
+            showlegend = showlegend_neg
+            showlegend_neg = False
+            R = abs(R)
+        trace = go.Scatter(x=[e1, e2],
+                           y=[R, R],
+                           line=dict(color=color),
+                           name=name,
+                           legendgroup=name,
+                           showlegend=showlegend)
+        fig.add_trace(trace, row=1, col=idx + 1)
 
-    other['shape'] = point_shape
-    reference['shape'] = point_shape
-    new_df = pd.concat([other, reference], axis=0).reset_index()
-    method_fig = px.scatter(new_df,
-                            y='params',
-                            x=var,
-                            color='color',
-                            symbol='shape',
-                            symbol_map='identity')
-    for d in method_fig.data:
-        fig.add_trace(d, row=1, col=idx + 1)
 
-
-def point_to_point_by_method(df, methods, mode, var='perfm_test_avg', initm=""):
+def point_to_point_by_method(df,
+                             methods,
+                             mode,
+                             var='perfm_test_avg',
+                             initm=""):
     """
     Creates a plot with two points for each hyper-parameter combination
     """
@@ -345,7 +364,8 @@ def point_to_point_by_method(df, methods, mode, var='perfm_test_avg', initm=""):
         add_point_to_point_subplot(other, fig, idx, reference, var)
     title = f"Error difference by mode {mode}"
     fig.update_layout(title_text=title)
-    fig.update_yaxes(showticklabels=False)  # Hide y axis ticks
+    # fig.update_yaxes(showticklabels=False)  # Hide y axis ticks
+    fig.update_yaxes(type='log')  # Hide y axis ticks
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
     fig.show()
 
@@ -386,7 +406,11 @@ def main(metric):
         # print("\n==============\n")
         analyze_wins(mode_df, methods, var=metric, initm=initm)
 
-        point_to_point_by_method(mode_df, methods, mode, var=metric, initm=initm)
+        point_to_point_by_method(mode_df,
+                                 methods,
+                                 mode,
+                                 var=metric,
+                                 initm=initm)
 
         mode_df = compute_reward(mode_df, methods, var=metric, initm=initm)
 
