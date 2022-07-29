@@ -148,14 +148,18 @@ def analyze_context_importance(dfs, methods, var="perfm_test_avg", initm=""):
         for m in methods:
             if is_context_aware(m):
                 oracles[mode].append(dists[mode].loc[m])
+        # now oracles[mode] contains one array (the results) for each
+        # context_aware method
+        # I contatenate these results and compute the maximum for each
+        # hyperparameter point
         oracles[mode] = pd.concat(oracles[mode], axis=1).max(axis=1)
 
     print("Plotting " + title)
 
-    print("Significance analysis for all the distributions")
+    print("\nComparison of all the methods across modality")
     significance_analysis(dists)
 
-    print("Significance analysis for the oracles")
+    print("\nComparison of the best method across modality")
     significance_analysis(oracles)
 
     fig = myplot(title + " oracles",
