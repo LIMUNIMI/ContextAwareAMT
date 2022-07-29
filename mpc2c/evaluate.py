@@ -296,7 +296,7 @@ def compute_reward(
             new_df.drop(unaware_method, level=0, axis=0, inplace=True)
         else:
             new_df.loc[m,
-                       'reward'] = (new_df.loc[m, var] - reference).to_numpy()
+                       'reward'] = (reference - new_df.loc[m, var]).to_numpy()
     return new_df
 
 
