@@ -8,6 +8,7 @@ from statsmodels.stats.multitest import multipletests
 
 import re
 
+SHOW_HTML = False
 OUTPUT_DIR = "imgs"
 regex = re.compile(".*True.*")
 
@@ -168,7 +169,9 @@ def analyze_context_importance(dfs, methods, var="perfm_test_avg", initm=""):
                  y='value',
                  color='variable')
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
-    fig.show()
+    fig.write_html(f"imgs/{title.replace(' ', '_')}.html")
+    if SHOW_HTML:
+        fig.show()
 
 
 def point_to_point_by_context(dfs, var='perfm_test_avg', initm=""):
@@ -203,8 +206,11 @@ def point_to_point_by_context(dfs, var='perfm_test_avg', initm=""):
 
     title = "Error difference by oracles"
     fig.update_layout(title_text=title)
+    fig.update_yaxes(tickfont_size=10, dtick=1, tick0=0)
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
-    fig.show()
+    fig.write_html(f"imgs/{title.replace(' ', '_')}.html")
+    if SHOW_HTML:
+        fig.show()
 
 
 def analyze_methods(df, methods, mode, var="perfm_test_avg", initm=""):
@@ -224,7 +230,9 @@ def analyze_methods(df, methods, mode, var="perfm_test_avg", initm=""):
 
     fig = myplot(title, df.reset_index(), x='method', y=var, color='method')
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
-    fig.show()
+    fig.write_html(f"imgs/{title.replace(' ', '_')}.html")
+    if SHOW_HTML:
+        fig.show()
 
 
 def analyze_wins(df, methods, var="perfm_test_avg", initm=""):
@@ -333,23 +341,23 @@ def add_point_to_point_subplot(other, fig, idx, reference, var):
         # point_reward.append(abs(reward))
         if R > 0:
             color = 'blue'
-            point_shape = 'circle'
+            point_shape = 'circle-open'
             line_dash = None
             name = 'R > 0'
             showlegend = showlegend_pos
             showlegend_pos = False
         else:
             color = 'red'
-            point_shape = 'x'
+            point_shape = 'x-open'
             line_dash = 'dash'
             name = 'R ≤ 0'
             showlegend = showlegend_neg
             showlegend_neg = False
         trace = go.Scatter(x=[e1, e2],
                            y=[hp, hp],
-                           line=dict(dash=line_dash, color=color),
+                           line=dict(dash=line_dash, width=1, color=color),
                            name=name,
-                           marker_symbol=point_shape,
+                           marker=dict(symbol=point_shape, line_width=1),
                            legendgroup=name,
                            showlegend=showlegend)
         fig.add_trace(trace, row=1, col=idx + 1)
@@ -382,8 +390,11 @@ def point_to_point_by_method(df,
         add_point_to_point_subplot(other, fig, idx, reference, var)
     title = f"Error difference by mode {mode}"
     fig.update_layout(title_text=title)
+    fig.update_yaxes(tickfont_size=10, dtick=1, tick0=0)
     fig.write_image(f"imgs/{title.replace(' ', '_')}.svg")
-    fig.show()
+    fig.write_html(f"imgs/{title.replace(' ', '_')}.html")
+    if SHOW_HTML:
+        fig.show()
 
 
 def __get_inits(df):
