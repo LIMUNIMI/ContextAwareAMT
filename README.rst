@@ -15,9 +15,6 @@ Setup
 #. Start a new shell in this venv: ``poetry shell``
 #. Check that the version is correct with `python --version`
 
-N.B. While reading documentation and code in this repo, consider that some code
-for pedaling estimation is available, even if it is not used anymore.
-
 Config
 ------
 
